@@ -44,6 +44,6 @@ Simply **right-click the icon** to access all hardware toggles. Click **Run on W
 
 ### Compatibility
 
-Built and tested specifically for the **Acer Nitro 16 (AN16-61)**, but utilizes standard `AcerGamingFunction` WMI classes that should work seamlessly across most modern Acer Nitro and Predator laptops (2021+).
+Built and tested specifically for the **Acer Nitro 16S (AN16S-61)**, but utilizes standard `AcerGamingFunction` WMI classes that should work seamlessly across most modern Acer Nitro and Predator laptops (2021+).
 
 *Disclaimer: This is an unofficial, open-source tool. I am not affiliated with Acer. Use at your own risk.*
