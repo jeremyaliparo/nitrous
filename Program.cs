@@ -193,29 +193,88 @@ namespace Nitrous
         private void ToggleStartup()
         {
             string exePath = Application.ExecutablePath;
-            // Because CheckOnClick = true, startupItem.Checked represents the new desired state
             bool enableStartup = startupItem.Checked;
 
             try
             {
-                System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
+                if (enableStartup)
                 {
-                    FileName = "schtasks.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false,
-                    Arguments = enableStartup
-                        ? $"/create /tn \"Nitrous\" /tr \"\\\"{exePath}\\\"\" /sc onlogon /rl highest /f"
-                        : $"/delete /tn \"Nitrous\" /f"
-                };
+                    // Create an XML definition to bypass Windows' terrible default laptop task settings
+                    string xml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
+        <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
+          <Triggers>
+            <LogonTrigger>
+              <Enabled>true</Enabled>
+            </LogonTrigger>
+          </Triggers>
+          <Principals>
+            <Principal id=""Author"">
+              <LogonType>InteractiveToken</LogonType>
+              <RunLevel>HighestAvailable</RunLevel>
+            </Principal>
+          </Principals>
+          <Settings>
+            <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+            <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+            <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+            <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+            <AllowStartOnDemand>true</AllowStartOnDemand>
+            <Enabled>true</Enabled>
+            <RunOnlyIfIdle>false</RunOnlyIfIdle>
+          </Settings>
+          <Actions Context=""Author"">
+            <Exec>
+              <Command>{exePath}</Command>
+            </Exec>
+          </Actions>
+        </Task>";
 
-                using (var process = System.Diagnostics.Process.Start(psi))
-                {
-                    process?.WaitForExit();
+                    // Save XML to a temporary file
+                    string tempXmlFile = System.IO.Path.GetTempFileName();
+                    System.IO.File.WriteAllText(tempXmlFile, xml);
 
-                    // If Windows Task Scheduler returned an error code, revert the checkmark
-                    if (process == null || process.ExitCode != 0)
+                    // Import the XML into Task Scheduler
+                    System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
                     {
-                        startupItem.Checked = !enableStartup;
+                        FileName = "schtasks.exe",
+                        Arguments = $"/create /tn \"Nitrous\" /xml \"{tempXmlFile}\" /f",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+
+                    using (var process = System.Diagnostics.Process.Start(psi))
+                    {
+                        process?.WaitForExit();
+
+                        // If Windows Task Scheduler returned an error code, revert the checkmark
+                        if (process == null || process.ExitCode != 0)
+                        {
+                            startupItem.Checked = false;
+                        }
+                    }
+
+                    // Clean up the temporary XML file
+                    try { System.IO.File.Delete(tempXmlFile); } catch { }
+                }
+                else
+                {
+                    // Delete the task
+                    System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "schtasks.exe",
+                        Arguments = "/delete /tn \"Nitrous\" /f",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+
+                    using (var process = System.Diagnostics.Process.Start(psi))
+                    {
+                        process?.WaitForExit();
+
+                        if (process == null || process.ExitCode != 0)
+                        {
+                            startupItem.Checked = true;
+                        }
                     }
                 }
             }
