@@ -202,11 +202,12 @@ namespace Nitrous
                     // Create an XML definition to bypass Windows' terrible default laptop task settings
                     string xml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
         <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
-          <Triggers>
-            <LogonTrigger>
-              <Enabled>true</Enabled>
-            </LogonTrigger>
-          </Triggers>
+            <Triggers>
+                <LogonTrigger>
+                <Enabled>true</Enabled>
+                <Delay>PT5S</Delay>
+                </LogonTrigger>
+            </Triggers>
           <Principals>
             <Principal id=""Author"">
               <LogonType>InteractiveToken</LogonType>
