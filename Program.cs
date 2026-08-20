@@ -51,6 +51,7 @@ namespace Nitrous
         private ToolStripMenuItem startupItem;
         private ToolStripMenuItem chargeLimitItem;
         private ToolStripMenuItem autoSwitchItem;
+        private ToolStripMenuItem turboModeItem;
         private ToolStripMenuItem perfModeItem;
         private ToolStripMenuItem balModeItem;
         private ToolStripMenuItem quietModeItem;
@@ -98,10 +99,12 @@ namespace Nitrous
             };
             contextMenu.Items.Add(autoSwitchItem);
 
-            perfModeItem = new ToolStripMenuItem("Power: Performance", null, (s, e) => { SetPowerModeAsync(0x04); SetWindowsCpuLimitsAsync(5, 100); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 4); });
-            balModeItem = new ToolStripMenuItem("Power: Balanced", null, (s, e) => { SetPowerModeAsync(0x01); SetWindowsCpuLimitsAsync(5, 100); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 1); });
-            quietModeItem = new ToolStripMenuItem("Power: Quiet", null, (s, e) => { SetPowerModeAsync(0x00); SetWindowsCpuLimitsAsync(5, 99); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 0); });
+            turboModeItem = new ToolStripMenuItem("Power: Turbo", null, (s, e) => { SetPowerModeAsync(0x05); SetWindowsCpuLimitsAsync(5, 100); SetFansAsync("Custom", 100); UpdateFanModeCheck(fanMaxItem); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 5); SaveSetting("FanMode", "Max"); });
+            perfModeItem = new ToolStripMenuItem("Power: Performance", null, (s, e) => { SetPowerModeAsync(0x04); SetWindowsCpuLimitsAsync(5, 100); SetFansAsync("Auto", 0); UpdateFanModeCheck(fanAutoItem); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 4); SaveSetting("FanMode", "Auto"); });
+            balModeItem = new ToolStripMenuItem("Power: Balanced", null, (s, e) => { SetPowerModeAsync(0x01); SetWindowsCpuLimitsAsync(5, 100); SetFansAsync("Auto", 0); UpdateFanModeCheck(fanAutoItem); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 1); SaveSetting("FanMode", "Auto"); });
+            quietModeItem = new ToolStripMenuItem("Power: Quiet", null, (s, e) => { SetPowerModeAsync(0x00); SetWindowsCpuLimitsAsync(5, 99); SetFansAsync("Auto", 0); UpdateFanModeCheck(fanAutoItem); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 0); SaveSetting("FanMode", "Auto"); });
 
+            contextMenu.Items.Add(turboModeItem);
             contextMenu.Items.Add(perfModeItem);
             contextMenu.Items.Add(balModeItem);
             contextMenu.Items.Add(quietModeItem);
@@ -165,10 +168,25 @@ namespace Nitrous
             else
             {
                 int savedPowerMode = GetSetting("PowerMode", 1);
+
                 SetPowerModeAsync((ulong)savedPowerMode);
-                if (savedPowerMode == 4) { UpdatePowerModeCheck(perfModeItem); SetWindowsCpuLimitsAsync(5, 100); }
-                else if (savedPowerMode == 0) { UpdatePowerModeCheck(quietModeItem); SetWindowsCpuLimitsAsync(5, 99); }
-                else { UpdatePowerModeCheck(balModeItem); SetWindowsCpuLimitsAsync(5, 100); }
+
+                if (savedPowerMode == 5)
+                {
+                    UpdatePowerModeCheck(turboModeItem); SetWindowsCpuLimitsAsync(5, 100);
+                }
+                else if (savedPowerMode == 4)
+                {
+                    UpdatePowerModeCheck(perfModeItem); SetWindowsCpuLimitsAsync(5, 100);
+                }
+                else if (savedPowerMode == 1)
+                {
+                    UpdatePowerModeCheck(balModeItem); SetWindowsCpuLimitsAsync(5, 100);
+                }
+                else
+                {
+                    UpdatePowerModeCheck(quietModeItem); SetWindowsCpuLimitsAsync(5, 99);
+                }
             }
 
             string savedFanMode = GetSetting("FanMode", "Auto");
@@ -317,6 +335,7 @@ namespace Nitrous
             if (trayIcon.ContextMenuStrip == null) return;
             Action updateAction = () =>
             {
+                if (turboModeItem != null) turboModeItem.Checked = false;
                 if (perfModeItem != null) perfModeItem.Checked = false;
                 if (balModeItem != null) balModeItem.Checked = false;
                 if (quietModeItem != null) quietModeItem.Checked = false;
