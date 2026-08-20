@@ -98,9 +98,9 @@ namespace Nitrous
             };
             contextMenu.Items.Add(autoSwitchItem);
 
-            perfModeItem = new ToolStripMenuItem("Power: Performance", null, (s, e) => { SetPowerModeAsync(0x04); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 4); });
-            balModeItem = new ToolStripMenuItem("Power: Balanced", null, (s, e) => { SetPowerModeAsync(0x01); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 1); });
-            quietModeItem = new ToolStripMenuItem("Power: Quiet", null, (s, e) => { SetPowerModeAsync(0x00); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 0); });
+            perfModeItem = new ToolStripMenuItem("Power: Performance", null, (s, e) => { SetPowerModeAsync(0x04); SetWindowsCpuLimitsAsync(5, 100); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 4); });
+            balModeItem = new ToolStripMenuItem("Power: Balanced", null, (s, e) => { SetPowerModeAsync(0x01); SetWindowsCpuLimitsAsync(5, 100); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 1); });
+            quietModeItem = new ToolStripMenuItem("Power: Quiet", null, (s, e) => { SetPowerModeAsync(0x00); SetWindowsCpuLimitsAsync(5, 99); UpdatePowerModeCheck(s as ToolStripMenuItem); SaveSetting("PowerMode", 0); });
 
             contextMenu.Items.Add(perfModeItem);
             contextMenu.Items.Add(balModeItem);
@@ -166,9 +166,9 @@ namespace Nitrous
             {
                 int savedPowerMode = GetSetting("PowerMode", 1);
                 SetPowerModeAsync((ulong)savedPowerMode);
-                if (savedPowerMode == 4) UpdatePowerModeCheck(perfModeItem);
-                else if (savedPowerMode == 0) UpdatePowerModeCheck(quietModeItem);
-                else UpdatePowerModeCheck(balModeItem);
+                if (savedPowerMode == 4) { UpdatePowerModeCheck(perfModeItem); SetWindowsCpuLimitsAsync(5, 100); }
+                else if (savedPowerMode == 0) { UpdatePowerModeCheck(quietModeItem); SetWindowsCpuLimitsAsync(5, 99); }
+                else { UpdatePowerModeCheck(balModeItem); SetWindowsCpuLimitsAsync(5, 100); }
             }
 
             string savedFanMode = GetSetting("FanMode", "Auto");
@@ -423,13 +423,15 @@ namespace Nitrous
         {
             if (SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online)
             {
-                SetPowerModeAsync(0x04); // Performance
+                SetPowerModeAsync(0x04); // Performance (WMI)
+                SetWindowsCpuLimitsAsync(5, 100); // Performance (OS)
                 UpdatePowerModeCheck(perfModeItem);
                 SaveSetting("PowerMode", 4);
             }
             else if (SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Offline)
             {
-                SetPowerModeAsync(0x00); // Quiet
+                SetPowerModeAsync(0x00); // Quiet (WMI)
+                SetWindowsCpuLimitsAsync(5, 99); // Quiet (OS)
                 UpdatePowerModeCheck(quietModeItem);
                 SaveSetting("PowerMode", 0);
             }
@@ -456,6 +458,45 @@ namespace Nitrous
                 await InvokeWmiInstanceMethodAsync("AcerGamingFunction", "SetGamingFanSpeed", inParams => { inParams["gmInput"] = (0ul | (speedPercent << 8)).ToString(); });
                 await InvokeWmiInstanceMethodAsync("AcerGamingFunction", "SetGamingFanSpeed", inParams => { inParams["gmInput"] = (1ul | (speedPercent << 8)).ToString(); });
             }
+        }
+
+        // --- WINDOWS OS SCHEDULER CONTROLS ---
+        private async void SetWindowsCpuLimitsAsync(int minPercent, int maxPercent)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    // Apply to AC (Plugged In)
+                    RunPowerCfg($"/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMIN {minPercent}");
+                    RunPowerCfg($"/setacvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX {maxPercent}");
+
+                    // Apply to DC (Battery)
+                    RunPowerCfg($"/setdcvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMIN {minPercent}");
+                    RunPowerCfg($"/setdcvalueindex SCHEME_CURRENT SUB_PROCESSOR PROCTHROTTLEMAX {maxPercent}");
+
+                    // Force Windows to recognize the changes instantly
+                    RunPowerCfg("/setactive SCHEME_CURRENT");
+                }
+                catch { }
+            });
+        }
+
+        private void RunPowerCfg(string arguments)
+        {
+            try
+            {
+                using (var process = new System.Diagnostics.Process())
+                {
+                    process.StartInfo.FileName = "powercfg.exe";
+                    process.StartInfo.Arguments = arguments;
+                    process.StartInfo.CreateNoWindow = true;
+                    process.StartInfo.UseShellExecute = false;
+                    process.Start();
+                    process.WaitForExit();
+                }
+            }
+            catch { }
         }
 
         private void Exit(object? sender, EventArgs e)

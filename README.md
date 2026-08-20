@@ -38,8 +38,6 @@ Once running, Nitrous lives quietly in your Windows System Tray.
 
 Simply **right-click the icon** to access all hardware toggles. Click **Run on Windows Startup** to have Nitrous automatically handle your thermals and battery limits forever.
 
-> **Pro-Tip for Absolute Silence:** Nitrous strictly manages your *hardware* wattage ceilings, while Windows manages your *software* clock speeds. For completely silent fans while browsing the web, open your Windows Control Panel, edit your active Power Plan, and set your **Minimum Processor State** to **5%**.
-
 ---
 
 ### Compatibility
