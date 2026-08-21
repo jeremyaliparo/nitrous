@@ -8,7 +8,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>assets/icon.ico</ApplicationIcon>
+    <ApplicationIcon>../assets/icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
