@@ -9,6 +9,8 @@ namespace Nitrous.Ui;
 
 public partial class NitrousDashboard : Window
 {
+    private bool _isSyncingFans = false;
+
     public NitrousDashboard()
     {
         InitializeComponent();
@@ -90,26 +92,24 @@ public partial class NitrousDashboard : Window
 
     private void UpdateFanSliderState(FanProfile activeFan)
     {
-        if (activeFan == FanProfile.Auto)
+        bool isCustom = activeFan == FanProfile.Medium;
+        CustomFanSection.Opacity = isCustom ? 1.0 : 0.4;
+
+        CpuFanSlider.IsEnabled = isCustom;
+        GpuFanSlider.IsEnabled = isCustom;
+        TogUnifiedFans.IsEnabled = isCustom;
+
+        if (!isCustom)
         {
-            CustomFanSlider.IsEnabled = false;
-            CustomFanSlider.Value = 0;
-            CustomFanLabel.Text = "Fan Speed: Auto (0%)";
-            CustomFanSection.Opacity = 0.4;
-        }
-        else if (activeFan == FanProfile.Max)
-        {
-            CustomFanSlider.IsEnabled = false;
-            CustomFanSlider.Value = 100;
-            CustomFanLabel.Text = "Fan Speed: Max (100%)";
-            CustomFanSection.Opacity = 0.4;
+            int val = activeFan == FanProfile.Max ? 100 : 0;
+            CpuFanSlider.Value = val;
+            GpuFanSlider.Value = val;
         }
         else
         {
-            CustomFanSlider.IsEnabled = true;
-            CustomFanSlider.Value = SettingsManager.Get("CustomFanSpeed", 50);
-            CustomFanLabel.Text = $"Custom Fan Speed: {CustomFanSlider.Value}%";
-            CustomFanSection.Opacity = 1.0;
+            TogUnifiedFans.IsChecked = SettingsManager.Get("UnifiedFans", 1) == 1;
+            CpuFanSlider.Value = SettingsManager.Get("CustomFanSpeedCpu", 50);
+            GpuFanSlider.Value = SettingsManager.Get("CustomFanSpeedGpu", 50);
         }
     }
 
@@ -128,27 +128,64 @@ public partial class NitrousDashboard : Window
         {
             UpdateFanSliderState(mode);
 
-            int speedToSet = (mode == FanProfile.Medium) ? (int)CustomFanSlider.Value : (int)mode;
-            _ = AcerWmiManager.SetFansAsync((FanProfile)speedToSet);
+            if (mode == FanProfile.Medium)
+            {
+                _ = AcerWmiManager.SetCustomFansAsync((int)CpuFanSlider.Value, (int)GpuFanSlider.Value);
+            }
+            else
+            {
+                _ = AcerWmiManager.SetFansAsync(mode);
+            }
             SettingsManager.Save("LastFanMode", mode.ToString());
         }
     }
 
-    private void CustomFanSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    private void TogUnifiedFans_Click(object sender, RoutedEventArgs e)
     {
-        if (CustomFanLabel != null && CustomFanSlider.IsEnabled)
+        bool isUnified = TogUnifiedFans.IsChecked == true;
+        SettingsManager.Save("UnifiedFans", isUnified ? 1 : 0);
+
+        if (isUnified)
         {
-            CustomFanLabel.Text = $"Custom Fan Speed: {(int)e.NewValue}%";
+            GpuFanSlider.Value = CpuFanSlider.Value;
+            FanSlider_DragCompleted(null, null!);
         }
     }
 
-    private void CustomFanSlider_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    private void CpuFanSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (CustomFanSlider.IsEnabled)
+        if (CpuFanLabel != null) CpuFanLabel.Text = $"{(int)e.NewValue}%";
+
+        if (TogUnifiedFans?.IsChecked == true && !_isSyncingFans)
         {
-            int val = (int)CustomFanSlider.Value;
-            SettingsManager.Save("CustomFanSpeed", val);
-            _ = AcerWmiManager.SetFansAsync((FanProfile)val);
+            _isSyncingFans = true;
+            if (GpuFanSlider != null) GpuFanSlider.Value = e.NewValue;
+            _isSyncingFans = false;
+        }
+    }
+
+    private void GpuFanSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (GpuFanLabel != null) GpuFanLabel.Text = $"{(int)e.NewValue}%";
+
+        if (TogUnifiedFans?.IsChecked == true && !_isSyncingFans)
+        {
+            _isSyncingFans = true;
+            if (CpuFanSlider != null) CpuFanSlider.Value = e.NewValue;
+            _isSyncingFans = false;
+        }
+    }
+
+    private void FanSlider_DragCompleted(object? sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
+    {
+        if (CpuFanSlider.IsEnabled)
+        {
+            int cpuVal = (int)CpuFanSlider.Value;
+            int gpuVal = (int)GpuFanSlider.Value;
+
+            SettingsManager.Save("CustomFanSpeedCpu", cpuVal);
+            SettingsManager.Save("CustomFanSpeedGpu", gpuVal);
+            _ = AcerWmiManager.SetCustomFansAsync(cpuVal, gpuVal);
         }
     }
 

@@ -47,6 +47,13 @@ public static class AcerWmiManager
         }
     }
 
+    public static async Task SetCustomFansAsync(int cpuSpeed, int gpuSpeed)
+    {
+        await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanBehavior", 0xC30005ul.ToString());
+        await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | ((ulong)cpuSpeed << 8)).ToString());
+        await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | ((ulong)gpuSpeed << 8)).ToString());
+    }
+
     public static async Task SetChargeLimitAsync(bool enable)
     {
         byte param = enable ? (byte)1 : (byte)0;

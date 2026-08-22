@@ -102,6 +102,27 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SquareCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#B388FF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Cursor="Hand">
+                            <Border Width="12" Height="12" Background="White" CornerRadius="2" VerticalAlignment="Center" Margin="0,0,6,0">
+                                <Path x:Name="CheckIcon" Data="M3,8L6,11L11,3" Stroke="#121214" StrokeThickness="2" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
+                            </Border>
+                            <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,2,0,0"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Bottom Nav Button (Fixes sharp hover corners by binding Tag to CornerRadius) -->
         <Style x:Key="NavButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -191,8 +212,28 @@
                     </Grid>
 
                     <StackPanel x:Name="CustomFanSection" Margin="0,5,0,0">
-                        <TextBlock x:Name="CustomFanLabel" Text="Fan Speed: Auto (0%)" Foreground="White" FontSize="11" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Slider x:Name="CustomFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="50" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="CustomFanSlider_ValueChanged" Thumb.DragCompleted="CustomFanSlider_DragCompleted"/>
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="CUSTOM FAN SPEED" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="TogUnifiedFans" Content="UNIFIED" Style="{StaticResource SquareCheckBoxStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="TogUnifiedFans_Click"/>
+                        </Grid>
+
+                        <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="15,15,15,10">
+                            <StackPanel>
+                                <!-- CPU Slider -->
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="CPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left"/>
+                                    <TextBlock x:Name="CpuFanLabel" Text="20%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="CpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="20" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="CpuFanSlider_ValueChanged" Thumb.DragCompleted="FanSlider_DragCompleted" Margin="0,0,0,15"/>
+
+                                <!-- GPU Slider -->
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="GPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left"/>
+                                    <TextBlock x:Name="GpuFanLabel" Text="85%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Slider x:Name="GpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="85" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="GpuFanSlider_ValueChanged" Thumb.DragCompleted="FanSlider_DragCompleted"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
 

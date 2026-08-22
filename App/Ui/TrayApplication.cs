@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 using System.Threading.Tasks;
-using System.Windows.Forms; // Keeps the System Tray Icon working
+using System.Windows.Forms;
 using Microsoft.Win32;
 using Nitrous.Enums;
 using Nitrous.Hooks;
@@ -70,13 +70,21 @@ public class TrayApplication : ApplicationContext
             string keyMode = isOnline ? "LastAcPowerMode" : "LastDcPowerMode";
             var activeMode = (PowerProfile)SettingsManager.Get(keyMode, (int)(isOnline ? PowerProfile.Performance : PowerProfile.Quiet));
             _ = AcerWmiManager.SetPowerModeAsync(activeMode);
-
             SettingsManager.Save("LastPowerMode", (int)activeMode);
 
             string keyFan = isOnline ? "LastAcFanMode" : "LastDcFanMode";
             var activeFan = Enum.TryParse(SettingsManager.Get(keyFan, "Auto"), out FanProfile f) ? f : FanProfile.Auto;
-            _ = AcerWmiManager.SetFansAsync(activeFan);
 
+            if (activeFan == FanProfile.Medium)
+            {
+                int cpu = SettingsManager.Get("CustomFanSpeedCpu", 50);
+                int gpu = SettingsManager.Get("CustomFanSpeedGpu", 50);
+                _ = AcerWmiManager.SetCustomFansAsync(cpu, gpu);
+            }
+            else
+            {
+                _ = AcerWmiManager.SetFansAsync(activeFan);
+            }
             SettingsManager.Save("LastFanMode", activeFan.ToString());
 
             if (dashboard.IsVisible) dashboard.Dispatcher.Invoke(() => dashboard.RefreshDashboardState());
