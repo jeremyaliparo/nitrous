@@ -1,14 +1,16 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.IO;
+using System.Management;
 
 namespace Nitrous.Managers;
 
 public static class SystemOSManager
 {
     private const string InternalDisplayDevice = @"\\.\DISPLAY1";
+    private static string? _cachedModel;
 
-    // OS CPU Throttling
     public static async Task SetWindowsCpuLimitsAsync(int minPercent, int maxPercent)
     {
         await Task.Run(() =>
@@ -25,12 +27,12 @@ public static class SystemOSManager
     {
         try
         {
-            Process.Start(new ProcessStartInfo("powercfg.exe", args) { CreateNoWindow = true, UseShellExecute = false })?.WaitForExit();
+            using var p = Process.Start(new ProcessStartInfo("powercfg.exe", args) { CreateNoWindow = true, UseShellExecute = false });
+            p?.WaitForExit();
         }
         catch { }
     }
 
-    // Native Display API (Targets Built-in Display Only)
     [StructLayout(LayoutKind.Sequential)]
     public struct DEVMODE
     {
@@ -75,7 +77,6 @@ public static class SystemOSManager
         try
         {
             DEVMODE mode = new DEVMODE { dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)) };
-            // If the laptop display is off/disabled, EnumDisplaySettings returns false and aborts safely
             if (EnumDisplaySettings(InternalDisplayDevice, -1, ref mode) && mode.dmDisplayFrequency != targetHz)
             {
                 mode.dmDisplayFrequency = targetHz;
@@ -85,12 +86,11 @@ public static class SystemOSManager
         catch { }
     }
 
-    // Elevated Startup Control
     public static bool CheckStartupTask()
     {
         try
         {
-            var p = Process.Start(new ProcessStartInfo("schtasks.exe", "/query /tn \"Nitrous\"") { CreateNoWindow = true, UseShellExecute = false });
+            using var p = Process.Start(new ProcessStartInfo("schtasks.exe", "/query /tn \"Nitrous\"") { CreateNoWindow = true, UseShellExecute = false });
             p?.WaitForExit();
             return p != null && p.ExitCode == 0;
         }
@@ -106,18 +106,39 @@ public static class SystemOSManager
                 string xml = $@"<?xml version=""1.0"" encoding=""UTF-16""?><Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task""><Triggers><LogonTrigger><Enabled>true</Enabled><Delay>PT5S</Delay></LogonTrigger></Triggers><Principals><Principal id=""Author""><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals><Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><RunOnlyIfIdle>false</RunOnlyIfIdle></Settings><Actions Context=""Author""><Exec><Command>{exePath}</Command></Exec></Actions></Task>";
                 string tempFile = Path.GetTempFileName();
                 File.WriteAllText(tempFile, xml);
-                var p = Process.Start(new ProcessStartInfo("schtasks.exe", $"/create /tn \"Nitrous\" /xml \"{tempFile}\" /f") { CreateNoWindow = true, UseShellExecute = false });
+
+                using var p = Process.Start(new ProcessStartInfo("schtasks.exe", $"/create /tn \"Nitrous\" /xml \"{tempFile}\" /f") { CreateNoWindow = true, UseShellExecute = false });
                 p?.WaitForExit();
                 try { File.Delete(tempFile); } catch { }
                 return p?.ExitCode == 0;
             }
             else
             {
-                var p = Process.Start(new ProcessStartInfo("schtasks.exe", "/delete /tn \"Nitrous\" /f") { CreateNoWindow = true, UseShellExecute = false });
+                using var p = Process.Start(new ProcessStartInfo("schtasks.exe", "/delete /tn \"Nitrous\" /f") { CreateNoWindow = true, UseShellExecute = false });
                 p?.WaitForExit();
                 return p?.ExitCode != 0;
             }
         }
         catch { return !enable; }
+    }
+
+    public static string GetSystemModel()
+    {
+        if (_cachedModel != null) return _cachedModel;
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT Model FROM Win32_ComputerSystem");
+            using var collection = searcher.Get();
+            foreach (ManagementBaseObject item in collection)
+            {
+                using (item)
+                {
+                    _cachedModel = item["Model"]?.ToString() ?? "Unknown System";
+                    return _cachedModel;
+                }
+            }
+        }
+        catch { }
+        return "Unknown System";
     }
 }
