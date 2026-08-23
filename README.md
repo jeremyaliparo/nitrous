@@ -8,11 +8,22 @@
   <strong>Pure, zero-bloat hardware control for Acer Nitro laptops.</strong>
 </p>
 
-<p align="center">
-  <img src="assets/dashboard.png" alt="Nitrous Dashboard UI" width="45%">
-  &nbsp;&nbsp;&nbsp;
-  <img src="assets/settings.png" alt="Nitrous Settings UI" width="45%">
-</p>
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="assets/dashboard-1.png" alt="Dashboard Main" width="100%"><br>
+      <sub><b>Main Dashboard</b></sub>
+    </td>
+    <td align="center">
+      <img src="assets/dashboard-2.png" alt="Custom Fans" width="100%"><br>
+      <sub><b>Dual Custom Fans</b></sub>
+    </td>
+    <td align="center">
+      <img src="assets/settings.png" alt="Settings" width="100%"><br>
+      <sub><b>App Settings</b></sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
