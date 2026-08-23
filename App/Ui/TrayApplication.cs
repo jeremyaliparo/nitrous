@@ -30,6 +30,8 @@ public class TrayApplication : ApplicationContext
 
         _nitroHook = new NitroKeyHook();
         _nitroHook.NitroKeyPressed += (s, e) => ShowDashboard();
+
+        _ = Task.Run(ApplyPowerSettings);
     }
 
     private void BuildContextMenu()
@@ -55,11 +57,21 @@ public class TrayApplication : ApplicationContext
         Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--ui") { UseShellExecute = true });
     }
 
-    private void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
+    private async void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.StatusChange && SettingsManager.Get("AutoSwitch", 0) == 1)
+        if (e.Mode == PowerModes.StatusChange)
+        {
+            await Task.Delay(1500);
+            ApplyPowerSettings();
+        }
+    }
+
+    private void ApplyPowerSettings()
+    {
+        if (SettingsManager.Get("AutoSwitch", 0) == 1)
         {
             bool isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+
             string keyMode = isOnline ? "LastAcPowerMode" : "LastDcPowerMode";
             var activeMode = (PowerProfile)SettingsManager.Get(keyMode, (int)(isOnline ? PowerProfile.Performance : PowerProfile.Quiet));
             _ = AcerWmiManager.SetPowerModeAsync(activeMode);
