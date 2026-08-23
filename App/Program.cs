@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Windows.Forms;
+using System.Windows.Media;
 using Nitrous.Managers;
 using Nitrous.Ui;
 
@@ -8,37 +9,33 @@ namespace Nitrous;
 
 static class Program
 {
-    // Declare the Mutex at the class level so the garbage collector doesn't destroy it
     private static Mutex? mutex = null;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
-        const string appName = "Nitrous_SingleInstance_Mutex_Lock";
-        bool createdNew;
+        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
-        // Attempt to create a unique system-wide lock
-        mutex = new Mutex(true, appName, out createdNew);
-
-        if (!createdNew)
+        // 1. TRANSIENT UI MODE: Run the dashboard in its own temporary process
+        if (args.Length > 0 && args[0] == "--ui")
         {
-            // Another instance is already running! Exit silently and immediately.
+            var app = new System.Windows.Application();
+            app.Run(new NitrousDashboard());
             return;
         }
+
+        // 2. BACKGROUND ENGINE MODE: Runs purely in the system tray
+        const string appName = "Nitrous_SingleInstance_Mutex_Lock";
+        mutex = new Mutex(true, appName, out bool createdNew);
+
+        if (!createdNew) return;
 
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
-        if (!AcerWmiManager.IsHardwareSupported())
-        {
-            MessageBox.Show("Acer WMI instances not found. This app only works on supported Acer hardware.",
-                            "Hardware Not Supported", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        }
+        if (!AcerWmiManager.IsHardwareSupported()) return;
 
         Application.Run(new TrayApplication());
-
-        // Ensure the mutex stays alive until the application physically exits
         GC.KeepAlive(mutex);
     }
 }

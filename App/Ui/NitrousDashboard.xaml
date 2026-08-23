@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Nitrous Dashboard" Height="670" Width="360"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen" Topmost="True"
+        Topmost="True"
         IsVisibleChanged="Window_IsVisibleChanged"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
@@ -60,8 +60,11 @@
         </Style>
 
         <!-- Modern Slider -->
-        <Style x:Key="ModernSliderStyle" TargetType="Slider">
+<Style x:Key="ModernSliderStyle" TargetType="Slider">
             <Setter Property="Foreground" Value="#B388FF"/>
+            <Setter Property="SmallChange" Value="1"/> <!-- Enables precise Arrow Key movement -->
+            <Setter Property="LargeChange" Value="10"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/> <!-- Instantly jump to where you click -->
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
@@ -72,7 +75,8 @@
                                     <RepeatButton Command="Slider.DecreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="4" Background="{TemplateBinding Foreground}" CornerRadius="2"/>
+                                                <!-- FIX: Tell the track to steal the Violet color from the main Slider! -->
+                                                <Border Height="4" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" CornerRadius="2"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
                                     </RepeatButton>
@@ -81,7 +85,8 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Ellipse Width="14" Height="14" Fill="White" Stroke="{TemplateBinding Foreground}" StrokeThickness="1"/>
+                                                <!-- FIX: Tell the Thumb outline to steal the Violet color too -->
+                                                <Ellipse Width="14" Height="14" Fill="White" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" StrokeThickness="1"/>
                                             </ControlTemplate>
                                         </Thumb.Template>
                                     </Thumb>
@@ -219,17 +224,23 @@
 
                         <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="15,15,15,10">
                             <StackPanel>
-                                <!-- CPU Slider -->
+                              <!-- CPU Slider -->
                                 <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="CPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left"/>
-                                    <TextBlock x:Name="CpuFanLabel" Text="20%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="CPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBox x:Name="CpuFanInput" Text="20" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" PreviewKeyDown="FanInput_PreviewKeyDown" LostFocus="FanInput_LostFocus" CaretBrush="#B388FF"/>
+                                        <TextBlock Text="%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                 </Grid>
                                 <Slider x:Name="CpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="20" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="CpuFanSlider_ValueChanged" Thumb.DragCompleted="FanSlider_DragCompleted" Margin="0,0,0,15"/>
 
                                 <!-- GPU Slider -->
                                 <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="GPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left"/>
-                                    <TextBlock x:Name="GpuFanLabel" Text="85%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="GPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <TextBox x:Name="GpuFanInput" Text="85" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" PreviewKeyDown="FanInput_PreviewKeyDown" LostFocus="FanInput_LostFocus" CaretBrush="#B388FF"/>
+                                        <TextBlock Text="%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    </StackPanel>
                                 </Grid>
                                 <Slider x:Name="GpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="85" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="GpuFanSlider_ValueChanged" Thumb.DragCompleted="FanSlider_DragCompleted"/>
                             </StackPanel>

@@ -25,7 +25,7 @@ public partial class NitrousDashboard : Window
         if (e.ChangedButton == MouseButton.Left) DragMove();
     }
 
-    private void CloseBtn_Click(object sender, RoutedEventArgs e) => this.Hide();
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => this.Close();
 
     private void NavDashBtn_Click(object sender, RoutedEventArgs e)
     {
@@ -154,24 +154,24 @@ public partial class NitrousDashboard : Window
 
     private void CpuFanSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (CpuFanLabel != null) CpuFanLabel.Text = $"{(int)e.NewValue}%";
+        if (CpuFanInput != null && !CpuFanInput.IsFocused) CpuFanInput.Text = ((int)e.NewValue).ToString();
 
         if (TogUnifiedFans?.IsChecked == true && !_isSyncingFans)
         {
             _isSyncingFans = true;
-            if (GpuFanSlider != null) GpuFanSlider.Value = e.NewValue;
+            GpuFanSlider?.Value = e.NewValue;
             _isSyncingFans = false;
         }
     }
 
     private void GpuFanSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (GpuFanLabel != null) GpuFanLabel.Text = $"{(int)e.NewValue}%";
+        if (GpuFanInput != null && !GpuFanInput.IsFocused) GpuFanInput.Text = ((int)e.NewValue).ToString();
 
         if (TogUnifiedFans?.IsChecked == true && !_isSyncingFans)
         {
             _isSyncingFans = true;
-            if (CpuFanSlider != null) CpuFanSlider.Value = e.NewValue;
+            CpuFanSlider?.Value = e.NewValue;
             _isSyncingFans = false;
         }
     }
@@ -189,6 +189,38 @@ public partial class NitrousDashboard : Window
         }
     }
 
+    private void FanInput_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            System.Windows.Input.TraversalRequest request = new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.Next);
+            (sender as UIElement)?.MoveFocus(request);
+            e.Handled = true;
+        }
+    }
+
+    private void FanInput_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.TextBox tb)
+        {
+            if (int.TryParse(tb.Text, out int val))
+            {
+                val = Math.Clamp(val, 0, 100);
+                tb.Text = val.ToString();
+
+                if (tb.Name == "CpuFanInput") CpuFanSlider.Value = val;
+                if (tb.Name == "GpuFanInput") GpuFanSlider.Value = val;
+
+                FanSlider_DragCompleted(null, null!);
+            }
+            else
+            {
+                if (tb.Name == "CpuFanInput") tb.Text = ((int)CpuFanSlider.Value).ToString();
+                if (tb.Name == "GpuFanInput") tb.Text = ((int)GpuFanSlider.Value).ToString();
+            }
+        }
+    }
+
     private void TogCharge_Click(object sender, RoutedEventArgs e)
     {
         bool chk = TogCharge.IsChecked == true;
@@ -201,4 +233,28 @@ public partial class NitrousDashboard : Window
     private void TogRefreshSwitch_Click(object sender, RoutedEventArgs e) => SettingsManager.Save("RefreshAutoSwitch", TogRefreshSwitch.IsChecked == true ? 1 : 0);
 
     private void TogStartup_Click(object sender, RoutedEventArgs e) => SystemOSManager.ToggleStartupTask(TogStartup.IsChecked == true, System.Windows.Forms.Application.ExecutablePath);
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        int top = SettingsManager.Get("WindowTop", -9999);
+        int left = SettingsManager.Get("WindowLeft", -9999);
+
+        if (top != -9999 && left != -9999)
+        {
+            this.Top = top;
+            this.Left = left;
+        }
+        else
+        {
+            this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        SettingsManager.Save("WindowTop", (int)this.Top);
+        SettingsManager.Save("WindowLeft", (int)this.Left);
+    }
 }
