@@ -25,6 +25,7 @@ public class TrayApplication : ApplicationContext
         trayIcon.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowDashboard(); };
 
         BuildContextMenu();
+
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
 
         _ = Task.Run(() => UpdateManager.CheckForUpdatesAsync(true, () => Exit(null, EventArgs.Empty)));
@@ -32,29 +33,25 @@ public class TrayApplication : ApplicationContext
         _nitroHook = new NitroKeyHook();
         _nitroHook.NitroKeyPressed += (s, e) => ShowDashboard();
 
-        _ = Task.Run(ApplyPowerSettings);
+        // Pass 'true' to indicate this is the initial startup run
+        _ = Task.Run(() => ApplyPowerSettings(true));
     }
 
     private void BuildContextMenu()
     {
         var menu = new ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = false };
         menu.Items.Add("Open Nitrous", null, (s, e) => ShowDashboard());
-
         menu.Items.Add("Check for Updates...", null, async (s, e) => await UpdateManager.CheckForUpdatesAsync(false, () => Exit(null, EventArgs.Empty)));
         menu.Items.Add(new ToolStripSeparator());
-
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, Exit);
-
         trayIcon.ContextMenuStrip = menu;
     }
 
     private void ShowDashboard()
     {
-        // Prevent opening multiple UI windows at the same time
         string processName = Process.GetCurrentProcess().ProcessName;
         if (Process.GetProcessesByName(processName).Length > 1) return;
-
         Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--ui") { UseShellExecute = true });
     }
 
@@ -63,15 +60,16 @@ public class TrayApplication : ApplicationContext
         if (e.Mode == PowerModes.StatusChange)
         {
             await Task.Delay(1500);
-            ApplyPowerSettings();
+            // Pass 'false' because this is a physical cord change, not a startup
+            ApplyPowerSettings(false);
         }
     }
 
-    private void ApplyPowerSettings()
+    private void ApplyPowerSettings(bool isStartup = false)
     {
         bool isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
 
-        if (_wasOnAcPower.HasValue && _wasOnAcPower.Value == isOnline) return;
+        if (!isStartup && _wasOnAcPower.HasValue && _wasOnAcPower.Value == isOnline) return;
 
         _wasOnAcPower = isOnline;
 
@@ -93,7 +91,8 @@ public class TrayApplication : ApplicationContext
             SettingsManager.Save("LastFanMode", activeFan.ToString());
         }
 
-        if (SettingsManager.Get("RefreshAutoSwitch", 0) == 1)
+        // FIX: Skip the display refresh rate check on initial boot to prevent screen freezes!
+        if (!isStartup && SettingsManager.Get("RefreshAutoSwitch", 0) == 1)
         {
             SystemOSManager.ApplyAutoRefreshRate(isOnline);
         }
