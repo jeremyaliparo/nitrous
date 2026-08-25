@@ -72,7 +72,7 @@ public static class AcerWmiManager
                         inParams["uFunctionMask"] = (byte)1;
                         inParams["uFunctionStatus"] = param;
                         inParams["uReservedIn"] = new byte[] { 0, 0, 0, 0, 0 };
-                        using var outParams = instance.InvokeMethod("SetBatteryHealthControl", inParams, null);
+                        instance.InvokeMethod("SetBatteryHealthControl", inParams, null);
                     }
                 }
             }
@@ -86,6 +86,7 @@ public static class AcerWmiManager
         {
             try
             {
+                // Grabbing a fresh instance ensures the COM object is alive and connected
                 using var searcher = new ManagementObjectSearcher(@"root\wmi", $"SELECT * FROM {className}");
                 using var collection = searcher.Get();
                 foreach (ManagementObject instance in collection)
@@ -94,7 +95,7 @@ public static class AcerWmiManager
                     {
                         using var inParams = instance.GetMethodParameters(methodName);
                         inParams["gmInput"] = gmInputStr;
-                        using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                        instance.InvokeMethod(methodName, inParams, null);
                     }
                 }
             }

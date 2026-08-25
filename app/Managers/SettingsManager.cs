@@ -1,5 +1,7 @@
 using System;
+using System.Security;
 using Microsoft.Win32;
+
 namespace Nitrous.Managers;
 
 public static class SettingsManager
@@ -8,9 +10,14 @@ public static class SettingsManager
 
     public static void Save(string key, object value)
     {
-        using RegistryKey regKey = Registry.CurrentUser.CreateSubKey(RegPath);
-
-        regKey.SetValue(key, value);
+        try
+        {
+            using RegistryKey regKey = Registry.CurrentUser.CreateSubKey(RegPath);
+            regKey.SetValue(key, value);
+        }
+        catch (UnauthorizedAccessException) { /* Safe failure on permission denial */ }
+        catch (SecurityException) { /* Safe failure on security restriction */ }
+        catch (Exception) { }
     }
 
     public static T Get<T>(string key, T defaultValue)
@@ -18,12 +25,12 @@ public static class SettingsManager
         try
         {
             using RegistryKey? regKey = Registry.CurrentUser.OpenSubKey(RegPath);
-
             object? val = regKey?.GetValue(key);
-
             if (val != null) return (T)Convert.ChangeType(val, typeof(T))!;
         }
-        catch { }
+        catch (UnauthorizedAccessException) { }
+        catch (SecurityException) { }
+        catch (Exception) { }
 
         return defaultValue;
     }
