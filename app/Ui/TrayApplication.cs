@@ -15,6 +15,7 @@ public class TrayApplication : ApplicationContext
     private readonly NotifyIcon trayIcon;
     private readonly NitroKeyHook _nitroHook;
     private bool? _wasOnAcPower = null;
+    private int _powerEventId = 0;
 
     public TrayApplication()
     {
@@ -59,7 +60,13 @@ public class TrayApplication : ApplicationContext
     {
         if (e.Mode == PowerModes.StatusChange)
         {
-            await Task.Delay(1500);
+            // Increment the ID to cancel any pending state checks
+            int eventId = ++_powerEventId;
+
+            await Task.Delay(3500);
+
+            if (eventId != _powerEventId) return;
+
             // Pass 'false' because this is a physical cord change, not a startup
             ApplyPowerSettings(false);
         }
@@ -91,7 +98,6 @@ public class TrayApplication : ApplicationContext
             SettingsManager.Save("LastFanMode", activeFan.ToString());
         }
 
-        // FIX: Skip the display refresh rate check on initial boot to prevent screen freezes!
         if (!isStartup && SettingsManager.Get("RefreshAutoSwitch", 0) == 1)
         {
             SystemOSManager.ApplyAutoRefreshRate(isOnline);
