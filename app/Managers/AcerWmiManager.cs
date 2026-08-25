@@ -28,14 +28,16 @@ public static class AcerWmiManager
     {
         if (profile == FanProfile.Auto)
         {
-            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | (0ul << 8)).ToString());
-            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | (0ul << 8)).ToString());
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanBehavior", 0x410005ul.ToString());
+            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | (0ul << 8)).ToString());
+            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (2ul | (0ul << 8)).ToString());
+            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | (0ul << 8)).ToString());
         }
         else if (profile == FanProfile.Max)
         {
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanBehavior", 0x820005ul.ToString());
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | (100ul << 8)).ToString());
+            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (2ul | (100ul << 8)).ToString());
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | (100ul << 8)).ToString());
         }
         else
@@ -43,6 +45,7 @@ public static class AcerWmiManager
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanBehavior", 0xC30005ul.ToString());
             ulong speedPercent = (ulong)profile;
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | (speedPercent << 8)).ToString());
+            await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (2ul | (speedPercent << 8)).ToString());
             await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | (speedPercent << 8)).ToString());
         }
     }
@@ -50,7 +53,12 @@ public static class AcerWmiManager
     public static async Task SetCustomFansAsync(int cpuSpeed, int gpuSpeed)
     {
         await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanBehavior", 0xC30005ul.ToString());
+
+        // CPU
         await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (1ul | ((ulong)cpuSpeed << 8)).ToString());
+
+        // GPU Broadcast
+        await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (2ul | ((ulong)gpuSpeed << 8)).ToString());
         await InvokeWmiAsync("AcerGamingFunction", "SetGamingFanSpeed", (4ul | ((ulong)gpuSpeed << 8)).ToString());
     }
 
