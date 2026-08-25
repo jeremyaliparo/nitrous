@@ -73,6 +73,8 @@ public static class AcerWmiManager
                         inParams["uFunctionStatus"] = param;
                         inParams["uReservedIn"] = new byte[] { 0, 0, 0, 0, 0 };
                         instance.InvokeMethod("SetBatteryHealthControl", inParams, null);
+
+                        break;
                     }
                 }
             }

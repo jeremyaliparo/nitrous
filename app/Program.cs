@@ -14,9 +14,7 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
-
-        // 1. TRANSIENT UI MODE: Run the dashboard in its own temporary process
+        // TRANSIENT UI MODE: Run the dashboard in its own temporary process
         if (args.Length > 0 && args[0] == "--ui")
         {
             var app = new System.Windows.Application();
@@ -24,10 +22,9 @@ static class Program
             return;
         }
 
-        // 2. BACKGROUND ENGINE MODE: Runs purely in the system tray
+        // BACKGROUND ENGINE MODE: Runs purely in the system tray
         const string appName = "Nitrous_SingleInstance_Mutex_Lock";
         mutex = new Mutex(true, appName, out bool createdNew);
-
         if (!createdNew) return;
 
         Application.EnableVisualStyles();

@@ -75,7 +75,6 @@
                                     <RepeatButton Command="Slider.DecreaseLarge">
                                         <RepeatButton.Template>
                                             <ControlTemplate TargetType="RepeatButton">
-                                                <!-- FIX: Tell the track to steal the Violet color from the main Slider! -->
                                                 <Border Height="4" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" CornerRadius="2"/>
                                             </ControlTemplate>
                                         </RepeatButton.Template>
@@ -85,7 +84,6 @@
                                     <Thumb>
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <!-- FIX: Tell the Thumb outline to steal the Violet color too -->
                                                 <Ellipse Width="14" Height="14" Fill="White" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" StrokeThickness="1"/>
                                             </ControlTemplate>
                                         </Thumb.Template>

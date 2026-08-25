@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Win32;
 using Nitrous.Managers;
 using Nitrous.Enums;
 
@@ -16,9 +17,28 @@ public partial class NitrousDashboard : Window
         // Link the View to the ViewModel (Controller)
         DataContext = new DashboardViewModel();
 
-        SystemModelText.Text = $"Nitrous on {SystemOSManager.GetSystemModel()}";
         DashVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
         SettingsVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            string modelName = SystemOSManager.GetSystemModel();
+            Dispatcher.Invoke(() => SystemModelText.Text = $"Nitrous on {modelName}");
+        });
+
+        SystemEvents.PowerModeChanged += OnPowerStateChanged;
+    }
+
+    private void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.StatusChange)
+        {
+            // Delay slightly to allow the OS and TrayApp to finalize their states
+            System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+            {
+                Dispatcher.Invoke(() => RefreshDashboardState());
+            });
+        }
     }
 
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
@@ -104,6 +124,7 @@ public partial class NitrousDashboard : Window
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
+        SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         SettingsManager.Save("WindowTop", (int)this.Top);
         SettingsManager.Save("WindowLeft", (int)this.Left);
     }

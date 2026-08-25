@@ -8,7 +8,6 @@ namespace Nitrous.Managers;
 
 public static class SystemOSManager
 {
-    private const string InternalDisplayDevice = @"\\.\DISPLAY1";
     private static string? _cachedModel;
 
     public static async Task SetWindowsCpuLimitsAsync(int minPercent, int maxPercent)
@@ -52,35 +51,38 @@ public static class SystemOSManager
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     public static extern int ChangeDisplaySettingsEx(string? lpszDeviceName, ref DEVMODE lpDevMode, IntPtr hwnd, uint dwflags, IntPtr lParam);
 
-    public static int GetMaxRefreshRate()
+    public static void ApplyAutoRefreshRate(bool isAcPower)
     {
-        int maxHz = 60;
         try
         {
             DEVMODE mode = new DEVMODE { dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)) };
-            if (EnumDisplaySettings(InternalDisplayDevice, -1, ref mode))
+
+            // Passing 'null' natively targets the primary display, bypassing MUX switch issues
+            if (!EnumDisplaySettings(null, -1, ref mode)) return;
+
+            int currentWidth = mode.dmPelsWidth;
+            int currentHeight = mode.dmPelsHeight;
+            int maxHz = 60;
+            int i = 0;
+
+            DEVMODE testMode = new DEVMODE { dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)) };
+
+            // Map all supported refresh rates for the exact current resolution
+            while (EnumDisplaySettings(null, i++, ref testMode))
             {
-                int w = mode.dmPelsWidth, h = mode.dmPelsHeight, i = 0;
-                while (EnumDisplaySettings(InternalDisplayDevice, i++, ref mode))
+                if (testMode.dmPelsWidth == currentWidth && testMode.dmPelsHeight == currentHeight)
                 {
-                    if (mode.dmPelsWidth == w && mode.dmPelsHeight == h && mode.dmDisplayFrequency > maxHz)
-                        maxHz = mode.dmDisplayFrequency;
+                    if (testMode.dmDisplayFrequency > maxHz)
+                        maxHz = testMode.dmDisplayFrequency;
                 }
             }
-        }
-        catch { }
-        return maxHz;
-    }
 
-    public static void SetRefreshRate(int targetHz)
-    {
-        try
-        {
-            DEVMODE mode = new DEVMODE { dmSize = (short)Marshal.SizeOf(typeof(DEVMODE)) };
-            if (EnumDisplaySettings(InternalDisplayDevice, -1, ref mode) && mode.dmDisplayFrequency != targetHz)
+            int targetHz = isAcPower ? maxHz : 60;
+
+            if (mode.dmDisplayFrequency != targetHz)
             {
                 mode.dmDisplayFrequency = targetHz;
-                ChangeDisplaySettingsEx(InternalDisplayDevice, ref mode, IntPtr.Zero, 0x01, IntPtr.Zero);
+                _ = ChangeDisplaySettingsEx(null, ref mode, IntPtr.Zero, 0x01, IntPtr.Zero);
             }
         }
         catch { }

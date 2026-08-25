@@ -14,6 +14,7 @@ public class TrayApplication : ApplicationContext
 {
     private readonly NotifyIcon trayIcon;
     private readonly NitroKeyHook _nitroHook;
+    private bool? _wasOnAcPower = null;
 
     public TrayApplication()
     {
@@ -68,10 +69,14 @@ public class TrayApplication : ApplicationContext
 
     private void ApplyPowerSettings()
     {
+        bool isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+
+        if (_wasOnAcPower.HasValue && _wasOnAcPower.Value == isOnline) return;
+
+        _wasOnAcPower = isOnline;
+
         if (SettingsManager.Get("AutoSwitch", 0) == 1)
         {
-            bool isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
-
             string keyMode = isOnline ? "LastAcPowerMode" : "LastDcPowerMode";
             var activeMode = (PowerProfile)SettingsManager.Get(keyMode, (int)(isOnline ? PowerProfile.Performance : PowerProfile.Quiet));
             _ = AcerWmiManager.SetPowerModeAsync(activeMode);
@@ -87,6 +92,11 @@ public class TrayApplication : ApplicationContext
 
             SettingsManager.Save("LastFanMode", activeFan.ToString());
         }
+
+        if (SettingsManager.Get("RefreshAutoSwitch", 0) == 1)
+        {
+            SystemOSManager.ApplyAutoRefreshRate(isOnline);
+        }
     }
 
     private void Exit(object? sender, EventArgs e)
@@ -95,6 +105,18 @@ public class TrayApplication : ApplicationContext
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         trayIcon.Visible = false;
         trayIcon.Dispose();
+
+        try
+        {
+            string pName = Process.GetCurrentProcess().ProcessName;
+            int currentId = Process.GetCurrentProcess().Id;
+            foreach (var p in Process.GetProcessesByName(pName))
+            {
+                if (p.Id != currentId) p.Kill();
+            }
+        }
+        catch { }
+
         Application.Exit();
     }
 }

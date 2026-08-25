@@ -24,7 +24,13 @@ public class DashboardViewModel : ObservableObject
         _chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
         _autoSwitch = SettingsManager.Get("AutoSwitch", 0) == 1;
         _refreshAutoSwitch = SettingsManager.Get("RefreshAutoSwitch", 0) == 1;
-        _runOnStartup = SystemOSManager.CheckStartupTask();
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            bool isTaskEnabled = SystemOSManager.CheckStartupTask();
+            _runOnStartup = isTaskEnabled;
+            OnPropertyChanged(nameof(RunOnStartup));
+        });
 
         // Setup UI Routing Commands
         SetPowerCommand = new RelayCommand(param =>
@@ -33,6 +39,9 @@ public class DashboardViewModel : ObservableObject
             {
                 _ = AcerWmiManager.SetPowerModeAsync(mode);
                 SettingsManager.Save("LastPowerMode", (int)mode);
+
+                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+                SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)mode);
             }
         });
 
@@ -48,6 +57,9 @@ public class DashboardViewModel : ObservableObject
                     _ = AcerWmiManager.SetFansAsync(mode);
 
                 SettingsManager.Save("LastFanMode", mode.ToString());
+
+                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+                SettingsManager.Save(isOnline ? "LastAcFanMode" : "LastDcFanMode", mode.ToString());
             }
         });
     }
