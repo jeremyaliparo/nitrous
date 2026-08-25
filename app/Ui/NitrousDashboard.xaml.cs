@@ -34,7 +34,7 @@ public partial class NitrousDashboard : Window
         if (e.Mode == PowerModes.StatusChange)
         {
             // Delay slightly to allow the OS and TrayApp to finalize their states
-            System.Threading.Tasks.Task.Delay(2000).ContinueWith(_ =>
+            System.Threading.Tasks.Task.Delay(4000).ContinueWith(_ =>
             {
                 Dispatcher.Invoke(() => RefreshDashboardState());
             });
