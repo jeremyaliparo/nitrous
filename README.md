@@ -28,7 +28,7 @@ Nitrous is a single-file system utility that speaks directly to your Acer Nitro 
 - 🔋 **Battery Protection:** Hardware-level 80% charge limit to preserve battery health.
 - ⚡ **Dynamic Power:** Instantly swap between Quiet, Balanced, Performance, and Turbo motherboard TDP limits.
 - 🧠 **Smart Auto-Switching:** Automatically drops to Quiet on battery and restores your exact previous power/fan state (e.g., Turbo) when plugged back in.
-- 🖥️ **Smart Refresh Rate:** Automatically drops your laptop screen to 60Hz on battery and boosts to max Hz on AC power (safely ignores external monitors).
+- 🖥️ **Smart Refresh Rate:** Automatically drops your laptop screen to 60Hz on battery and boosts to max Hz on AC power.
 - 🚀 **True Startup:** Bypasses Windows UAC using Task Scheduler to launch silently in the background every time you boot.
 
 ### 📥 Installation
