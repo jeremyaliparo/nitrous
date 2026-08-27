@@ -2,7 +2,7 @@
   <img src="assets/logo.png" alt="Nitrous Logo" width="120">
 </p>
 
-<h1 align="center">Nitrous ⚡</h1>
+<h1 align="center">Nitrous</h1>
 
 <p align="center">
   <strong>Pure, zero-bloat hardware control for Acer Nitro laptops.</strong>
