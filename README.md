@@ -9,9 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/dashboard-1.png" alt="Main Dashboard" width="31%" valign="top">
-  &nbsp;
-  <img src="assets/dashboard-2.png" alt="Dual Custom Fans" width="31%" valign="top">
+  <img src="assets/dashboard.png" alt="Main Dashboard" width="31%" valign="top">
   &nbsp;
   <img src="assets/settings.png" alt="App Settings" width="31%" valign="top">
 </p>
