@@ -34,7 +34,6 @@ public class TrayApplication : ApplicationContext
         _nitroHook = new NitroKeyHook();
         _nitroHook.NitroKeyPressed += (s, e) => ShowDashboard();
 
-        // Pass 'true' to indicate this is the initial startup run
         _ = Task.Run(() => ApplyPowerSettings(true));
     }
 
@@ -43,7 +42,6 @@ public class TrayApplication : ApplicationContext
         var menu = new ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = false };
         menu.Items.Add("Open Nitrous", null, (s, e) => ShowDashboard());
         menu.Items.Add("Check for Updates...", null, async (s, e) => await UpdateManager.CheckForUpdatesAsync(false, () => Exit(null, EventArgs.Empty)));
-        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, Exit);
         trayIcon.ContextMenuStrip = menu;
@@ -60,14 +58,10 @@ public class TrayApplication : ApplicationContext
     {
         if (e.Mode == PowerModes.StatusChange)
         {
-            // Increment the ID to cancel any pending state checks
             int eventId = ++_powerEventId;
-
             await Task.Delay(3500);
-
             if (eventId != _powerEventId) return;
 
-            // Pass 'false' because this is a physical cord change, not a startup
             ApplyPowerSettings(false);
         }
     }
@@ -77,7 +71,6 @@ public class TrayApplication : ApplicationContext
         bool isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
 
         if (!isStartup && _wasOnAcPower.HasValue && _wasOnAcPower.Value == isOnline) return;
-
         _wasOnAcPower = isOnline;
 
         if (SettingsManager.Get("AutoSwitch", 0) == 1)
@@ -98,9 +91,10 @@ public class TrayApplication : ApplicationContext
             SettingsManager.Save("LastFanMode", activeFan.ToString());
         }
 
-        if (!isStartup && SettingsManager.Get("RefreshAutoSwitch", 0) == 1)
+        if (!isStartup)
         {
-            SystemOSManager.ApplyAutoRefreshRate(isOnline);
+            var refreshMode = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
+            DisplayManager.ApplyRefreshProfile(refreshMode, isOnline);
         }
     }
 

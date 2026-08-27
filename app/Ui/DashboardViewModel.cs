@@ -16,9 +16,12 @@ public class DashboardViewModel : ObservableObject
         _cpuFanSpeed = SettingsManager.Get("CustomFanSpeedCpu", 50);
         _gpuFanSpeed = SettingsManager.Get("CustomFanSpeedGpu", 50);
         _isUnifiedFans = SettingsManager.Get("UnifiedFans", 1) == 1;
-
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
         IsCustomFanEnabled = activeFan == FanProfile.Medium;
+
+        // Initialize Refresh Rate Label
+        int maxHz = DisplayManager.GetPrimaryMaxRefreshRate();
+        MaxRefreshText = $"{maxHz}Hz";
 
         // Initialize Settings State
         _chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
@@ -27,19 +30,18 @@ public class DashboardViewModel : ObservableObject
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            bool isTaskEnabled = SystemOSManager.CheckStartupTask();
+            bool isTaskEnabled = StartupManager.CheckStartupTask();
             _runOnStartup = isTaskEnabled;
             OnPropertyChanged(nameof(RunOnStartup));
         });
 
-        // Setup UI Routing Commands
+        // Setup Commands
         SetPowerCommand = new RelayCommand(param =>
         {
             if (Enum.TryParse(param?.ToString(), out PowerProfile mode))
             {
                 _ = AcerWmiManager.SetPowerModeAsync(mode);
                 SettingsManager.Save("LastPowerMode", (int)mode);
-
                 bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
                 SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)mode);
             }
@@ -50,19 +52,29 @@ public class DashboardViewModel : ObservableObject
             if (Enum.TryParse(param?.ToString(), out FanProfile mode))
             {
                 IsCustomFanEnabled = mode == FanProfile.Medium;
-
                 if (mode == FanProfile.Medium)
                     _ = AcerWmiManager.SetCustomFansAsync(CpuFanSpeed, GpuFanSpeed);
                 else
                     _ = AcerWmiManager.SetFansAsync(mode);
 
                 SettingsManager.Save("LastFanMode", mode.ToString());
-
                 bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
                 SettingsManager.Save(isOnline ? "LastAcFanMode" : "LastDcFanMode", mode.ToString());
             }
         });
+
+        SetRefreshCommand = new RelayCommand(param =>
+        {
+            if (Enum.TryParse(param?.ToString(), out RefreshProfile profile))
+            {
+                SettingsManager.Save("RefreshMode", (int)profile);
+                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+                DisplayManager.ApplyRefreshProfile(profile, isOnline);
+            }
+        });
     }
+
+    public string MaxRefreshText { get; }
 
     // --- FAN PROPERTIES & LOGIC ---
     private int _cpuFanSpeed;
@@ -125,8 +137,6 @@ public class DashboardViewModel : ObservableObject
     private void TriggerFanSave()
     {
         if (!IsCustomFanEnabled) return;
-
-        // Wait 250ms after user stops dragging to update the motherboard
         _fanDebouncer.Debounce(250, () =>
         {
             SettingsManager.Save("CustomFanSpeedCpu", CpuFanSpeed);
@@ -179,11 +189,12 @@ public class DashboardViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _runOnStartup, value))
-                SystemOSManager.ToggleStartupTask(value, System.Windows.Forms.Application.ExecutablePath);
+                StartupManager.ToggleStartupTask(value, System.Windows.Forms.Application.ExecutablePath);
         }
     }
 
     // --- COMMANDS ---
     public ICommand SetPowerCommand { get; }
     public ICommand SetFanCommand { get; }
+    public ICommand SetRefreshCommand { get; }
 }

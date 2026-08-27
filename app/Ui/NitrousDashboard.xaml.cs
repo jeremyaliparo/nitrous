@@ -14,7 +14,6 @@ public partial class NitrousDashboard : Window
     {
         InitializeComponent();
 
-        // Link the View to the ViewModel (Controller)
         DataContext = new DashboardViewModel();
 
         DashVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
@@ -22,7 +21,7 @@ public partial class NitrousDashboard : Window
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            string modelName = SystemOSManager.GetSystemModel();
+            string modelName = SystemInfoManager.GetSystemModel();
             Dispatcher.Invoke(() => SystemModelText.Text = $"Nitrous on {modelName}");
         });
 
@@ -33,7 +32,6 @@ public partial class NitrousDashboard : Window
     {
         if (e.Mode == PowerModes.StatusChange)
         {
-            // Delay slightly to allow the OS and TrayApp to finalize their states
             System.Threading.Tasks.Task.Delay(4000).ContinueWith(_ =>
             {
                 Dispatcher.Invoke(() => RefreshDashboardState());
@@ -71,7 +69,6 @@ public partial class NitrousDashboard : Window
 
     public void RefreshDashboardState()
     {
-        // 1. Pure UI logic for the dynamic AC/Battery pill color changes
         bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
         var powerColor = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isOnline ? "#FF453A" : "#34C759"));
         string powerText = isOnline ? "AC POWER" : "BATTERY";
@@ -91,9 +88,9 @@ public partial class NitrousDashboard : Window
         SettingsPowerPillText.Text = powerText;
         SettingsPowerPillIcon.Data = isOnline ? acGeom : battGeom;
 
-        // 2. Initial radio button visual state sync
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
+        var activeRefresh = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
 
         BtnPowerQuiet.IsChecked = activeMode == PowerProfile.Quiet;
         BtnPowerBal.IsChecked = activeMode == PowerProfile.Balanced;
@@ -103,6 +100,10 @@ public partial class NitrousDashboard : Window
         BtnFanAuto.IsChecked = activeFan == FanProfile.Auto;
         BtnFanMax.IsChecked = activeFan == FanProfile.Max;
         BtnFanCustom.IsChecked = activeFan == FanProfile.Medium;
+
+        BtnRefreshAuto.IsChecked = activeRefresh == RefreshProfile.Auto;
+        BtnRefresh60.IsChecked = activeRefresh == RefreshProfile.Hz60;
+        BtnRefreshMax.IsChecked = activeRefresh == RefreshProfile.MaxHz;
     }
 
     protected override void OnSourceInitialized(EventArgs e)

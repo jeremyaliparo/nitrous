@@ -1,7 +1,7 @@
 <Window x:Class="Nitrous.Ui.NitrousDashboard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Nitrous Dashboard" Height="670" Width="360"
+        Title="Nitrous Dashboard" Height="720" Width="360"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True"
         IsVisibleChanged="Window_IsVisibleChanged"
@@ -203,6 +203,17 @@
                         <RadioButton x:Name="BtnPowerTurbo" GroupName="Power" Uid="Turbo" Tag="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Content="Turbo" Style="{StaticResource ActionButtonStyle}" Grid.Column="3" Margin="4,0,0,0" Command="{Binding SetPowerCommand}" CommandParameter="Turbo"/>
                     </Grid>
 
+                    <!-- Display Refresh Rates (Bound via Command) -->
+                    <TextBlock Text="DISPLAY REFRESH" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <Grid Height="40" Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <RadioButton x:Name="BtnRefreshAuto" GroupName="Refresh" Uid="Auto" Tag="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Grid.Column="0" Margin="0,0,4,0" Command="{Binding SetRefreshCommand}" CommandParameter="Auto"/>
+                        <RadioButton x:Name="BtnRefresh60" GroupName="Refresh" Uid="Hz60" Tag="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4Z" Content="60Hz" Style="{StaticResource ActionButtonStyle}" Grid.Column="1" Margin="2,0,2,0" Command="{Binding SetRefreshCommand}" CommandParameter="Hz60"/>
+                        <RadioButton x:Name="BtnRefreshMax" GroupName="Refresh" Uid="MaxHz" Tag="M13,2.05E-05L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Content="{Binding MaxRefreshText}" Style="{StaticResource ActionButtonStyle}" Grid.Column="2" Margin="4,0,0,0" Command="{Binding SetRefreshCommand}" CommandParameter="MaxHz"/>
+                    </Grid>
+
                     <!-- Fans (Bound via Command) -->
                     <TextBlock Text="FANS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,10"/>
                     <Grid Height="40" Margin="0,0,0,20">
@@ -298,23 +309,6 @@
                                 <TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
                             </StackPanel>
                             <CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
-                        </Grid>
-                    </Border>
-
-                    <Border Background="#1C1C1F" CornerRadius="10" Height="70" Margin="0,0,0,10">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                    <Path Data="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z" Fill="White" Stretch="Uniform" Width="14" Height="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Auto-Switch Hz" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock Text="Lowers refresh rate to 60Hz when on battery." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <CheckBox Grid.Column="1" x:Name="TogRefreshSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding RefreshAutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
                         </Grid>
                     </Border>
 
