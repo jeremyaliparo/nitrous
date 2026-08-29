@@ -50,16 +50,34 @@ public partial class NitrousDashboard : Window
     {
         DashPage.Visibility = Visibility.Visible;
         SettingsPage.Visibility = Visibility.Collapsed;
-        NavDashIcon.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
-        NavSetIcon.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+
+        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
+        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+
+        // DASH (Active)
+        NavDashIcon.Fill = activeBrush;
+        NavDashText.Foreground = activeBrush;
+
+        // SETUP (Inactive)
+        NavSetIcon.Fill = inactiveBrush;
+        NavSetText.Foreground = inactiveBrush;
     }
 
     private void NavSetBtn_Click(object sender, RoutedEventArgs e)
     {
         DashPage.Visibility = Visibility.Collapsed;
         SettingsPage.Visibility = Visibility.Visible;
-        NavDashIcon.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
-        NavSetIcon.Fill = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
+
+        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
+        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+
+        // DASH (Inactive)
+        NavDashIcon.Fill = inactiveBrush;
+        NavDashText.Foreground = inactiveBrush;
+
+        // SETUP (Active)
+        NavSetIcon.Fill = activeBrush;
+        NavSetText.Foreground = activeBrush;
     }
 
     private void Window_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -82,11 +100,11 @@ public partial class NitrousDashboard : Window
         DashPowerPillText.Text = powerText;
         DashPowerPillIcon.Data = isOnline ? acGeom : battGeom;
 
-        SettingsPowerPillBorder.BorderBrush = powerColor;
-        SettingsPowerPillIcon.Fill = powerColor;
-        SettingsPowerPillText.Foreground = powerColor;
-        SettingsPowerPillText.Text = powerText;
-        SettingsPowerPillIcon.Data = isOnline ? acGeom : battGeom;
+        // SettingsPowerPillBorder.BorderBrush = powerColor;
+        // SettingsPowerPillIcon.Fill = powerColor;
+        // SettingsPowerPillText.Foreground = powerColor;
+        // SettingsPowerPillText.Text = powerText;
+        // SettingsPowerPillIcon.Data = isOnline ? acGeom : battGeom;
 
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;

@@ -238,7 +238,7 @@ public class DashboardViewModel : ObservableObject
                     if (telemetry.GpuTemp > 0)
                     {
                         // GPU is awake! If RPM is 0, the WMI tachometer is locked/unsupported, so we omit it.
-                        GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "";
+                        GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
                     }
                     else
                     {

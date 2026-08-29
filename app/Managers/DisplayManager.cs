@@ -10,7 +10,6 @@ public static class DisplayManager
     public const int DM_DISPLAYFREQUENCY = 0x00400000;
     public const int CDS_UPDATEREGISTRY = 0x00000001;
 
-    // FIX: Using Sequential guarantees flawless memory alignment on 64-bit systems
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct DEVMODEW
     {
