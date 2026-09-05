@@ -1,58 +1,46 @@
-<p align="center">
-  <img src="assets/logo.png" alt="Nitrous Logo" width="120">
-</p>
+<div align="center">
 
-<h1 align="center">Nitrous</h1>
+<img src="assets/logo.png" alt="Nitrous Logo" width="120">
 
-<p align="center">
-  <strong>Pure, zero-bloat hardware control for Acer Nitro laptops.</strong>
-</p>
+# Nitrous
 
-<p align="center">
-  <img src="assets/dashboard.png" alt="Main Dashboard" width="31%" valign="top">
-  &nbsp;
-  <img src="assets/settings.png" alt="App Settings" width="31%" valign="top">
-</p>
+**Pure, zero-bloat hardware control for Acer Nitro laptops.**
+
+![Main Dashboard](assets/dashboard.png) &nbsp; ![App Settings](assets/settings.png)
 
 ---
 
-NitroSense is heavy. Nitrous is lightweight.
+</div>
 
-Nitrous is a single-file system utility that speaks directly to your Acer Nitro motherboard's Embedded Controller (EC) via WMI. No bloated telemetry services fighting Windows, and no unnecessary background RAM usage. Just a sleek, ultra-fast dashboard for raw, instant hardware control.
+Nitrous bypasses heavy, bloated telemetry services by communicating directly with your Acer Nitro’s Embedded Controller (EC) via WMI. It gives you a ultra-fast, lightweight dashboard for raw, instant hardware control.
 
-### ✨ Features
+### Key Features
 
-- 🎛️ **Modern Dashboard:** A beautifully designed, hardware-accelerated dark-mode UI featuring dynamic system status HUDs, crisp vector graphics, and a dedicated Active Logic automation page.
-- ❄️ **Granular Fan Control:** Dial in your exact custom fan speed from 0% to 100%, or hand control safely back to the motherboard with Auto and Max modes using mathematically verified 64-bit WMI payloads.
-- 🔄 **Built-in Auto-Updater:** Automatically detects and installs new releases directly from GitHub.
-- 🔋 **Battery Protection:** Hardware-level 80% charge limit to preserve battery health.
-- ⚡ **Dynamic Power:** Instantly swap between Quiet, Balanced, Performance, and Turbo motherboard TDP limits.
-- 🧠 **Smart Auto-Switching:** Automatically drops to Quiet on battery and restores your exact previous power/fan state (e.g., Turbo) when plugged back in.
-- 🖥️ **Smart Refresh Rate:** Automatically drops your laptop screen to 60Hz on battery and boosts to max Hz on AC power.
-- 🚀 **True Startup:** Bypasses Windows UAC using Task Scheduler to launch silently in the background every time you boot.
+* **Granular Fan Control:** Set precise fan speeds from 0% to 100%, or toggle Auto and Max modes via verified 64-bit WMI payloads.
+* **Smart Automation:** Automatically applies quiet modes and 60Hz screen refresh on battery, then restores performance and high refresh rate on AC power.
+* **Battery Protection:** Hardware-level 80% charge limit to extend battery lifespan.
+* **Dynamic Power Profiles:** Toggle instantly between Quiet, Balanced, Performance, and Turbo TDP modes.
+* **Silent Boot:** Bypasses Windows UAC using Task Scheduler to start silently with Windows.
+* **Built-in Auto-Updater:** Detects and installs updates directly from GitHub.
 
-### 📥 Installation
+### Quick Start
 
-Because Nitrous is packaged as a standalone executable (under 1MB), there is no installer required.
+Nitrous is a portable application (under 1MB) with no setup wizard needed.
 
-1. Download **`Nitrous.exe`** from the [Releases](https://github.com/jeremyaliparo/nitrous/releases) page.
-2. Place the file anywhere on your PC (e.g., your Documents or Utilities folder).
-3. Double-click to run it.
+1. Download **`Nitrous.exe`** from [Releases](https://github.com/jeremyaliparo/nitrous/releases).
+2. Save it anywhere on your PC (e.g., `C:\Tools`).
+3. Launch the executable.
 
-### 💻 Usage
+> **Usage:** Nitrous runs silently in your System Tray. Click the tray icon or press your keyboard's dedicated Nitro key to open the dashboard. Configure automation rules in the **Settings** menu.
 
-Once running, Nitrous lives quietly in your Windows System Tray. Simply **click the icon** (or press your dedicated Nitro keyboard button) to access the dashboard and hardware toggles. Click the **Settings Gear** to enable **Active Logic** automation rules and have Nitrous automatically handle your thermals, refresh rate, and battery limits forever.
+### Compatibility
 
-### ⚙️ Compatibility
+Designed for modern Acer Nitro laptops (2021+) using `AcerGamingFunction` WMI classes.
 
-Built and tested for modern Acer Nitro laptops utilizing standard `AcerGamingFunction` WMI classes (2021+).
-
-**Confirmed Working On:**
-
-- Acer Nitro 16S (AN16S-61)
-- Acer Nitro V 15 (ANV15-41)
-- Acer Nitro V 15 (ANV15-52) - _Special thanks to [@Baymax0251](https://github.com/Baymax0251) for hardware testing!_
+**Confirmed Models:**
+* Acer Nitro 16S (`AN16S-61`)
+* Acer Nitro V 15 (`ANV15-41`, `ANV15-52` — *Thanks [@Baymax0251](https://github.com/Baymax0251) for testing!*)
 
 ---
 
-_Disclaimer: This is an unofficial, open-source tool. I am not affiliated with Acer. Use at your own risk._
+*Disclaimer: Unofficial open-source utility. Not affiliated with Acer. Use at your own risk.*
