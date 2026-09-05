@@ -9,19 +9,20 @@ namespace Nitrous.Ui;
 public class DashboardViewModel : ObservableObject
 {
     private readonly ActionDebouncer _fanDebouncer = new ActionDebouncer();
+
     private string _cpuTempText = "--°C";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
 
     private string _cpuTempColor = "White";
     public string CpuTempColor { get => _cpuTempColor; set => SetProperty(ref _cpuTempColor, value); }
 
-    private string _cpuRpmText = "0 RPM";
+    private string _cpuRpmText = "-- RPM";
     public string CpuRpmText { get => _cpuRpmText; set => SetProperty(ref _cpuRpmText, value); }
 
     private string _gpuTempText = "--°C";
     public string GpuTempText { get => _gpuTempText; set => SetProperty(ref _gpuTempText, value); }
 
-    private string _gpuRpmText = "Sleep";
+    private string _gpuRpmText = "-- RPM";
     public string GpuRpmText { get => _gpuRpmText; set => SetProperty(ref _gpuRpmText, value); }
 
     private string _gpuTempColor = "White";
@@ -229,23 +230,12 @@ public class DashboardViewModel : ObservableObject
                 {
                     // Update CPU
                     CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp}°C" : "--°C";
-                    CpuRpmText = $"{telemetry.CpuRpm} RPM";
+                    CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
                     CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
 
                     // Update GPU
                     GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp}°C" : "--°C";
-
-                    if (telemetry.GpuTemp > 0)
-                    {
-                        // GPU is awake! If RPM is 0, the WMI tachometer is locked/unsupported, so we omit it.
-                        GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                    }
-                    else
-                    {
-                        // GPU is genuinely deeply asleep (0°C)
-                        GpuRpmText = "Sleep";
-                    }
-
+                    GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
                     GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
                 });
             });

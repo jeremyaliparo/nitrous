@@ -62,73 +62,65 @@ public static class AcerWmiManager
     public static (int CpuTemp, int CpuRpm, int GpuTemp, int GpuRpm) GetSystemTelemetry()
     {
         int cpuTemp = 0, cpuRpm = 0, gpuTemp = 0, gpuRpm = 0;
+
         try
         {
-            using var searcher = new ManagementObjectSearcher(@"ROOT\WMI", "SELECT * FROM AcerGamingFunction");
+            using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM AcerGamingFunction");
             foreach (ManagementObject instance in searcher.Get())
             {
                 using (instance)
                 {
-                    using var cpuTempParams = instance.GetMethodParameters("GetGamingSysInfo");
-                    cpuTempParams["gmInput"] = 0x0101ul;
-                    using var cpuTempOut = instance.InvokeMethod("GetGamingSysInfo", cpuTempParams, null);
-                    if (cpuTempOut != null)
-                    {
-                        ulong rawCpuTemp = Convert.ToUInt64(cpuTempOut["gmOutput"]);
-                        cpuTemp = (int)((rawCpuTemp >> 8) & 0xFF);
-                    }
+                    // 1. CPU Temperature (Address: 0x0101)
+                    cpuTemp = ReadAcerSensor(instance, 0x0101u, 0xFF);
 
-                    using var cpuRpmParams = instance.GetMethodParameters("GetGamingSysInfo");
-                    cpuRpmParams["gmInput"] = 0x0201ul;
-                    using var cpuRpmOut = instance.InvokeMethod("GetGamingSysInfo", cpuRpmParams, null);
-                    if (cpuRpmOut != null)
-                    {
-                        ulong rawCpuRpm = Convert.ToUInt64(cpuRpmOut["gmOutput"]);
-                        cpuRpm = (int)((rawCpuRpm >> 8) & 0xFFFF);
-                    }
+                    // 2. CPU Fan Speed (Address: 0x0201)
+                    cpuRpm = ReadAcerSensor(instance, 0x0201u, 0xFFFF);
 
-                    ulong[] gpuFanIds = { 2ul, 3ul, 4ul };
-                    foreach (ulong id in gpuFanIds)
-                    {
-                        using var gpuRpmParams = instance.GetMethodParameters("GetGamingSysInfo");
-                        gpuRpmParams["gmInput"] = 0x0200ul | id;
-                        using var gpuRpmOut = instance.InvokeMethod("GetGamingSysInfo", gpuRpmParams, null);
-                        if (gpuRpmOut != null)
-                        {
-                            int rpm = (int)((Convert.ToUInt64(gpuRpmOut["gmOutput"]) >> 8) & 0xFFFF);
-                            if (rpm > gpuRpm) gpuRpm = rpm; // Take the highest valid RPM
-                        }
-                    }
-                    break;
+                    // 3. GPU Temperature (Address: 0x0A01 - Fixed to match ForcaNitro)
+                    gpuTemp = ReadAcerSensor(instance, 0x0A01u, 0xFF);
+
+                    // 4. GPU Fan Speed (Address: 0x0601)
+                    gpuRpm = ReadAcerSensor(instance, 0x0601u, 0xFFFF);
+
+                    break; // Only process the first instance
                 }
             }
         }
-        catch { }
-
-        gpuTemp = GetGpuTempNvidia();
+        catch
+        {
+            // Fail silently if WMI is entirely inaccessible
+        }
 
         return (cpuTemp, cpuRpm, gpuTemp, gpuRpm);
     }
 
-    private static int GetGpuTempNvidia()
+    // Helper method to isolate exceptions per-sensor and handle WMI output safely
+    private static int ReadAcerSensor(ManagementObject instance, uint address, ulong bitmask)
     {
         try
         {
-            using var p = new Process();
-            p.StartInfo.FileName = "nvidia-smi";
-            p.StartInfo.Arguments = "--query-gpu=temperature.gpu --format=csv,noheader,nounits";
-            p.StartInfo.UseShellExecute = false;
-            p.StartInfo.RedirectStandardOutput = true;
-            p.StartInfo.CreateNoWindow = true;
-            p.Start();
+            using var inParams = instance.GetMethodParameters("GetGamingSysInfo");
+            inParams["gmInput"] = address; // Must be uint (UInt32)
 
-            string output = p.StandardOutput.ReadToEnd().Trim();
-            p.WaitForExit(1000); // 1-second timeout safety
+            using var outParams = instance.InvokeMethod("GetGamingSysInfo", inParams, null);
+            if (outParams != null)
+            {
+                // Safely check for gmOutput or outValue depending on the BIOS version
+                object? rawValue = outParams.Properties["gmOutput"]?.Value ?? outParams.Properties["outValue"]?.Value;
 
-            if (int.TryParse(output, out int temp)) return temp;
+                if (rawValue != null)
+                {
+                    ulong rawOutput = Convert.ToUInt64(rawValue);
+                    return (int)((rawOutput >> 8) & bitmask);
+                }
+            }
         }
-        catch { }
-        return 0; // Returns 0 if Nvidia is deeply asleep or missing
+        catch
+        {
+            // If one sensor fails (e.g., GPU is asleep), it won't crash the other sensors
+        }
+
+        return 0;
     }
 
     public static async Task SetChargeLimitAsync(bool enable)
