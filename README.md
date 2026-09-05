@@ -50,8 +50,9 @@ Built and tested for modern Acer Nitro laptops utilizing standard `AcerGamingFun
 **Confirmed Working On:**
 
 - Acer Nitro 16S (AN16S-61)
-- Acer Nitro V 15 (ANV15-41)
-- Acer Nitro V 15 (ANV15-52) - _Special thanks to [@Baymax0251](https://github.com/Baymax0251) for hardware testing!_
+- Acer Nitro V 15
+  - ANV15-41
+  - ANV15-52 - _Special thanks to [@Baymax0251](https://github.com/Baymax0251) for hardware testing!_
 
 ---
 
