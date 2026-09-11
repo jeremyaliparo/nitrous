@@ -389,6 +389,42 @@
                         </StackPanel>
                     </Border>
 
+                    <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="12" Margin="0,0,0,16">
+                        <StackPanel>
+                            <TextBlock Text="{Binding GpuNameText}" Foreground="White" FontSize="12" FontWeight="Bold" Margin="0,0,0,12"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left Column -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="CORE LOAD" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuLoadText}" Foreground="{Binding GpuLoadColor}" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="CORE CLOCK" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuCoreClockText}" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="VRAM USAGE" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuVramText}" Foreground="White" FontSize="14" FontWeight="Bold"/>
+                                </StackPanel>
+
+                                <!-- Right Column -->
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="CORE TEMP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuDeepTempText}" Foreground="{Binding GpuDeepTempColor}" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="MEMORY CLOCK" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuMemClockText}" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="POWER / ENFORCED / CAP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding GpuPowerText}" Foreground="White" FontSize="14" FontWeight="Bold"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Combined GPU Sliders Border -->
                     <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="12,12,12,16" Margin="0,0,0,16">
                         <StackPanel>

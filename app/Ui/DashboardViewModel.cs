@@ -42,6 +42,36 @@ public class DashboardViewModel : ObservableObject
     private int _gpuMemoryOffset;
     public int GpuMemoryOffset { get => _gpuMemoryOffset; set => SetProperty(ref _gpuMemoryOffset, value); }
 
+    private string _gpuNameText = "NVIDIA GPU";
+    public string GpuNameText { get => _gpuNameText; set => SetProperty(ref _gpuNameText, value); }
+
+    private string _gpuLoadText = "0%";
+    public string GpuLoadText { get => _gpuLoadText; set => SetProperty(ref _gpuLoadText, value); }
+
+    private string _gpuVramText = "0 / 0 MB";
+    public string GpuVramText { get => _gpuVramText; set => SetProperty(ref _gpuVramText, value); }
+
+    private string _gpuDeepTempText = "0 C";
+    public string GpuDeepTempText { get => _gpuDeepTempText; set => SetProperty(ref _gpuDeepTempText, value); }
+
+    private string _gpuPStateText = "P0";
+    public string GpuPStateText { get => _gpuPStateText; set => SetProperty(ref _gpuPStateText, value); }
+
+    private string _gpuLoadColor = "#B388FF";
+    public string GpuLoadColor { get => _gpuLoadColor; set => SetProperty(ref _gpuLoadColor, value); }
+
+    private string _gpuDeepTempColor = "#B388FF";
+    public string GpuDeepTempColor { get => _gpuDeepTempColor; set => SetProperty(ref _gpuDeepTempColor, value); }
+
+    private string _gpuCoreClockText = "0 MHz";
+    public string GpuCoreClockText { get => _gpuCoreClockText; set => SetProperty(ref _gpuCoreClockText, value); }
+
+    private string _gpuMemClockText = "0 MHz";
+    public string GpuMemClockText { get => _gpuMemClockText; set => SetProperty(ref _gpuMemClockText, value); }
+
+    private string _gpuPowerText = "0.0 W";
+    public string GpuPowerText { get => _gpuPowerText; set => SetProperty(ref _gpuPowerText, value); }
+
     public DashboardViewModel()
     {
         // Initialize Fan State
@@ -280,18 +310,46 @@ public class DashboardViewModel : ObservableObject
             await System.Threading.Tasks.Task.Run(() =>
             {
                 var telemetry = AcerWmiManager.GetSystemTelemetry();
+                var smi = NvidiaGpuManager.GetSmiTelemetry();
 
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
-                    // Update CPU
                     CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp}°C" : "--°C";
                     CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
-                    CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
+                    CpuTempColor = telemetry.CpuTemp > 90 ? "#FF453A" : (telemetry.CpuTemp >= 85 ? "#FF9F0A" : "White");
 
-                    // Update GPU
                     GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp}°C" : "--°C";
                     GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                    GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
+                    GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : (telemetry.GpuTemp >= 78 ? "#FF9F0A" : "White");
+
+                    if (!string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                    {
+                        GpuNameText = smi.Name;
+                        GpuLoadText = $"{smi.GpuLoad}%";
+                        GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
+
+                        GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
+
+                        GpuDeepTempText = $"{smi.CoreTemp} C";
+                        GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
+
+                        GpuPStateText = smi.PState;
+                        GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
+                        GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
+
+                        if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
+                        {
+                            GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
+                        }
+                        else if (smi.EnforcedPowerLimitW > 0) // Fallback if only enforced limit is detected
+                        {
+                            GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
+                        }
+                        else // Fallback if limits are unavailable (e.g., GPU is asleep)
+                        {
+                            GpuPowerText = $"{smi.PowerDrawW:0.0} W";
+                        }
+                    }
                 });
             });
 

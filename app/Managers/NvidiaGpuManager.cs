@@ -1,6 +1,9 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using NvAPIWrapper;
 using NvAPIWrapper.GPU;
 using NvAPIWrapper.Native;
@@ -209,5 +212,98 @@ public class NvidiaGpuManager : IDisposable
             NVIDIA.Unload();
         }
         catch { }
+    }
+
+    public class GpuTelemetry
+    {
+        public string Name { get; set; } = "Unknown";
+        public int CoreTemp { get; set; }
+        public int GpuLoad { get; set; }
+        public int VramUsedMb { get; set; }
+        public int VramTotalMb { get; set; }
+        public string PState { get; set; } = "Unknown";
+        public int CurrentCoreClock { get; set; }
+        public int CurrentMemoryClock { get; set; }
+        public double PowerDrawW { get; set; }
+        public double MinPowerLimitW { get; set; }
+        public double MaxPowerLimitW { get; set; }
+        public double EnforcedPowerLimitW { get; set; }
+    }
+
+    public static GpuTelemetry GetSmiTelemetry()
+    {
+        var t = new GpuTelemetry();
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "nvidia-smi",
+                Arguments = "--query-gpu=gpu_name,temperature.gpu,utilization.gpu,memory.used,memory.total,pstate,clocks.current.graphics,clocks.current.memory,power.draw,power.min_limit,power.max_limit,enforced.power.limit --format=csv,noheader,nounits",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return t;
+
+            if (!process.WaitForExit(1500))
+            {
+                try { process.Kill(); } catch { }
+                return t;
+            }
+
+            string output = process.StandardOutput.ReadToEnd().Trim();
+            process.WaitForExit();
+
+            if (string.IsNullOrWhiteSpace(output)) return t;
+
+            string[] values = output.Split(',');
+
+            if (values.Length >= 12)
+            {
+                t.Name = values[0].Trim();
+
+                if (int.TryParse(values[1].Trim(), out int temp)) t.CoreTemp = temp;
+                if (int.TryParse(values[2].Trim(), out int load)) t.GpuLoad = load;
+                if (int.TryParse(values[3].Trim(), out int vramUsed)) t.VramUsedMb = vramUsed;
+                if (int.TryParse(values[4].Trim(), out int vramTotal)) t.VramTotalMb = vramTotal;
+
+                t.PState = values[5].Trim();
+
+                if (int.TryParse(values[6].Trim(), out int coreClock)) t.CurrentCoreClock = coreClock;
+                if (int.TryParse(values[7].Trim(), out int memClock)) t.CurrentMemoryClock = memClock;
+
+                // Power Metrics
+                if (double.TryParse(values[8].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double draw))
+                    t.PowerDrawW = draw;
+
+                if (double.TryParse(values[9].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double minLimit))
+                    t.MinPowerLimitW = minLimit;
+
+                if (double.TryParse(values[10].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double maxLimit))
+                    t.MaxPowerLimitW = maxLimit;
+
+                if (double.TryParse(values[11].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double enforcedLimit))
+                    t.EnforcedPowerLimitW = enforcedLimit;
+            }
+        }
+        catch { }
+
+        return t;
+    }
+
+    private static string GetNvidiaSmiPath()
+    {
+        string defaultPath = "nvidia-smi";
+
+        string system32Path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "nvidia-smi.exe");
+        if (File.Exists(system32Path)) return system32Path;
+
+        string programFilesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"NVIDIA Corporation\NVSMI\nvidia-smi.exe");
+        if (File.Exists(programFilesPath)) return programFilesPath;
+
+        return defaultPath;
     }
 }
