@@ -28,6 +28,20 @@ public class DashboardViewModel : ObservableObject
     private string _gpuTempColor = "White";
     public string GpuTempColor { get => _gpuTempColor; set => SetProperty(ref _gpuTempColor, value); }
 
+    private string _applyBtnText = "APPLY";
+    public string ApplyBtnText { get => _applyBtnText; set => SetProperty(ref _applyBtnText, value); }
+
+    private string _applyBtnColor = "#B388FF";
+    public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
+
+    private readonly NvidiaGpuManager _gpuManager = new();
+
+    private int _gpuCoreOffset;
+    public int GpuCoreOffset { get => _gpuCoreOffset; set => SetProperty(ref _gpuCoreOffset, value); }
+
+    private int _gpuMemoryOffset;
+    public int GpuMemoryOffset { get => _gpuMemoryOffset; set => SetProperty(ref _gpuMemoryOffset, value); }
+
     public DashboardViewModel()
     {
         // Initialize Fan State
@@ -88,6 +102,45 @@ public class DashboardViewModel : ObservableObject
                 SettingsManager.Save("RefreshMode", (int)profile);
                 bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
                 DisplayManager.ApplyRefreshProfile(profile, isOnline);
+            }
+        });
+
+        if (_gpuManager.IsValid && _gpuManager.GetClocks(out int core, out int memory))
+        {
+            GpuCoreOffset = core;
+            GpuMemoryOffset = memory;
+        }
+
+        ApplyGpuClocksCommand = new RelayCommand(async _ =>
+        {
+            int result = _gpuManager.SetClocks(GpuCoreOffset, GpuMemoryOffset);
+
+            if (result == 1)
+            {
+                ApplyBtnText = "APPLIED!";
+                ApplyBtnColor = "#34C759"; // Green
+            }
+            else
+            {
+                ApplyBtnText = "ERROR";
+                ApplyBtnColor = "#FF453A"; // Red
+            }
+
+            // Keep the status visible for 2 seconds
+            await System.Threading.Tasks.Task.Delay(2000);
+
+            // Revert back to default state
+            ApplyBtnText = "APPLY";
+            ApplyBtnColor = "#B388FF";
+        });
+
+        ResetGpuClocksCommand = new RelayCommand(_ =>
+        {
+            _gpuManager.ResetOverclock();
+            if (_gpuManager.GetClocks(out int c, out int m))
+            {
+                GpuCoreOffset = c;
+                GpuMemoryOffset = m;
             }
         });
 
@@ -217,6 +270,8 @@ public class DashboardViewModel : ObservableObject
     public ICommand SetPowerCommand { get; }
     public ICommand SetFanCommand { get; }
     public ICommand SetRefreshCommand { get; }
+    public ICommand ApplyGpuClocksCommand { get; }
+    public ICommand ResetGpuClocksCommand { get; }
 
     private async void StartTelemetryPolling()
     {

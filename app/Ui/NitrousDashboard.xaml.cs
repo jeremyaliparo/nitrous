@@ -18,6 +18,7 @@ public partial class NitrousDashboard : Window
 
         DashVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
         SettingsVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
+        GpuVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -49,16 +50,37 @@ public partial class NitrousDashboard : Window
     private void NavDashBtn_Click(object sender, RoutedEventArgs e)
     {
         DashPage.Visibility = Visibility.Visible;
+        GpuPage.Visibility = Visibility.Collapsed;
         SettingsPage.Visibility = Visibility.Collapsed;
 
         var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
         var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
 
-        // DASH (Active)
         NavDashIcon.Fill = activeBrush;
         NavDashText.Foreground = activeBrush;
 
-        // SETUP (Inactive)
+        NavGpuIcon.Fill = inactiveBrush;
+        NavGpuText.Foreground = inactiveBrush;
+
+        NavSetIcon.Fill = inactiveBrush;
+        NavSetText.Foreground = inactiveBrush;
+    }
+
+    private void NavGpuBtn_Click(object sender, RoutedEventArgs e)
+    {
+        DashPage.Visibility = Visibility.Collapsed;
+        GpuPage.Visibility = Visibility.Visible;
+        SettingsPage.Visibility = Visibility.Collapsed;
+
+        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
+        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+
+        NavDashIcon.Fill = inactiveBrush;
+        NavDashText.Foreground = inactiveBrush;
+
+        NavGpuIcon.Fill = activeBrush;
+        NavGpuText.Foreground = activeBrush;
+
         NavSetIcon.Fill = inactiveBrush;
         NavSetText.Foreground = inactiveBrush;
     }
@@ -66,16 +88,18 @@ public partial class NitrousDashboard : Window
     private void NavSetBtn_Click(object sender, RoutedEventArgs e)
     {
         DashPage.Visibility = Visibility.Collapsed;
+        GpuPage.Visibility = Visibility.Collapsed;
         SettingsPage.Visibility = Visibility.Visible;
 
         var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
         var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
 
-        // DASH (Inactive)
         NavDashIcon.Fill = inactiveBrush;
         NavDashText.Foreground = inactiveBrush;
 
-        // SETUP (Active)
+        NavGpuIcon.Fill = inactiveBrush;
+        NavGpuText.Foreground = inactiveBrush;
+
         NavSetIcon.Fill = activeBrush;
         NavSetText.Foreground = activeBrush;
     }

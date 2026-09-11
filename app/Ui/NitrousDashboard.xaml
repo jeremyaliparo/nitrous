@@ -376,13 +376,70 @@
                         </Grid>
                     </Border>
                 </StackPanel>
+
+                <!-- 3. GPU PAGE -->
+                <StackPanel x:Name="GpuPage" Visibility="Collapsed" Margin="20,10,20,0">
+                    <Border Background="#1C1C1F" CornerRadius="12" Height="120" Margin="0,0,0,16">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <Border Width="56" Height="56" CornerRadius="12" Background="#26262A" Margin="0,0,0,8">
+                                <Image Source="pack://application:,,,/assets/logo.png" RenderOptions.BitmapScalingMode="HighQuality" Margin="6" Stretch="Uniform"/>
+                            </Border>
+                            <TextBlock x:Name="GpuVersionText" Text="Nitrous" Foreground="White" FontWeight="Bold" FontSize="14" TextAlignment="Center"/>
+                            <TextBlock Text="Pure, zero-bloat hardware control for Acer Nitro laptops." TextWrapping="Wrap" Foreground="#888890" FontSize="11" TextAlignment="Center" Margin="10,2,10,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Combined GPU Sliders Border -->
+                    <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="12,12,12,16" Margin="0,0,0,16">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,12">
+                                <TextBlock Text="CLOCK OFFSETS" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- Core Slider -->
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="Core Clock" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF"/>
+                                    <TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                            <Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="-250" Maximum="250" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" Margin="0,0,0,12"/>
+
+                            <!-- Memory Slider -->
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="Memory Clock" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF"/>
+                                    <TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                            <Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="-1000" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="RESET" Command="{Binding ResetGpuClocksCommand}" Background="#1C1C1F" Foreground="White" FontSize="11" FontWeight="Bold" Padding="0,12" Cursor="Hand" BorderBrush="#2A2A30" BorderThickness="1">
+                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8"/></Style></Button.Resources>
+                        </Button>
+                        <!-- Notice the bound Content and Background properties here -->
+                        <Button Grid.Column="2" Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="#121214" FontSize="11" FontWeight="Bold" Padding="0,12" Cursor="Hand" BorderThickness="0">
+                            <Button.Resources><Style TargetType="Border"><Setter Property="CornerRadius" Value="8"/></Style></Button.Resources>
+                        </Button>
+                    </Grid>
+                </StackPanel>
             </Grid>
 
             <!-- Bottom Navigation -->
             <Border Grid.Row="2" Background="#1C1C1F" CornerRadius="0,0,15,15">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Dash Nav -->
@@ -393,8 +450,16 @@
                         </StackPanel>
                     </Button>
 
+                    <!-- GPU Nav -->
+                    <Button x:Name="NavGpuBtn" Tag="0,0,0,0" Style="{StaticResource NavButtonStyle}" Grid.Column="1" Click="NavGpuBtn_Click">
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
+                            <Path x:Name="NavGpuIcon" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19" Fill="#888890" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="NavGpuText" Text="GPU" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
                     <!-- Settings Nav -->
-                    <Button x:Name="NavSetBtn" Tag="0,0,15,0" Style="{StaticResource NavButtonStyle}" Grid.Column="1" Click="NavSetBtn_Click">
+                    <Button x:Name="NavSetBtn" Tag="0,0,15,0" Style="{StaticResource NavButtonStyle}" Grid.Column="2" Click="NavSetBtn_Click">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
                             <Path x:Name="NavSetIcon" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="#888890" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
                             <TextBlock x:Name="NavSetText" Text="SETUP" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>

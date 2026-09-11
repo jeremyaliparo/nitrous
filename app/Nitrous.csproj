@@ -14,9 +14,10 @@
 
   <ItemGroup>
     <PackageReference Include="System.Management" Version="10.0.10" />
+    <PackageReference Include="NvAPIWrapper.Net" Version="0.8.1.101" />
   </ItemGroup>
 
-	<ItemGroup>
-	    <Resource Include="..\assets\logo.png" Link="assets\logo.png" />
-	</ItemGroup>
+  <ItemGroup>
+    <Resource Include="..\assets\logo.png" Link="assets\logo.png" />
+  </ItemGroup>
 </Project>
