@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using NvAPIWrapper;
 using NvAPIWrapper.GPU;
 using NvAPIWrapper.Native;
@@ -230,15 +232,18 @@ public class NvidiaGpuManager : IDisposable
         public double EnforcedPowerLimitW { get; set; }
     }
 
-    public static GpuTelemetry GetSmiTelemetry()
+    public static async Task<GpuTelemetry> GetSmiTelemetryAsync(CancellationToken cancellationToken = default)
     {
         var t = new GpuTelemetry();
 
         try
         {
+            string smiPath = GetNvidiaSmiPath();
+            if (string.IsNullOrEmpty(smiPath)) return t;
+
             var psi = new ProcessStartInfo
             {
-                FileName = "nvidia-smi",
+                FileName = smiPath,
                 Arguments = "--query-gpu=gpu_name,temperature.gpu,utilization.gpu,memory.used,memory.total,pstate,clocks.current.graphics,clocks.current.memory,power.draw,power.min_limit,power.max_limit,enforced.power.limit --format=csv,noheader,nounits",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
@@ -248,15 +253,23 @@ public class NvidiaGpuManager : IDisposable
             using var process = Process.Start(psi);
             if (process == null) return t;
 
-            if (!process.WaitForExit(1500))
+            // Combine cancellation token with a 1.5-second timeout for dGPU sleep/D3Cold states
+            using var timeoutCts = new CancellationTokenSource(1500);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+            try
+            {
+                // Asynchronously wait for process exit without blocking any threads
+                await process.WaitForExitAsync(linkedCts.Token);
+            }
+            catch (OperationCanceledException)
             {
                 try { process.Kill(); } catch { }
                 return t;
             }
 
-            string output = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit();
-
+            // Asynchronously read standard output
+            string output = (await process.StandardOutput.ReadToEndAsync(cancellationToken)).Trim();
             if (string.IsNullOrWhiteSpace(output)) return t;
 
             string[] values = output.Split(',');
@@ -275,7 +288,6 @@ public class NvidiaGpuManager : IDisposable
                 if (int.TryParse(values[6].Trim(), out int coreClock)) t.CurrentCoreClock = coreClock;
                 if (int.TryParse(values[7].Trim(), out int memClock)) t.CurrentMemoryClock = memClock;
 
-                // Power Metrics
                 if (double.TryParse(values[8].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double draw))
                     t.PowerDrawW = draw;
 

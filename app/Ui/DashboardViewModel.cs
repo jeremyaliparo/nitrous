@@ -1,4 +1,7 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using Nitrous.Enums;
 using Nitrous.Managers;
@@ -9,6 +12,8 @@ namespace Nitrous.Ui;
 public class DashboardViewModel : ObservableObject
 {
     private readonly ActionDebouncer _fanDebouncer = new ActionDebouncer();
+    private readonly NvidiaGpuManager _gpuManager = new();
+    private CancellationTokenSource? _pollingCts;
 
     private string _cpuTempText = "--°C";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
@@ -33,8 +38,6 @@ public class DashboardViewModel : ObservableObject
 
     private string _applyBtnColor = "#B388FF";
     public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
-
-    private readonly NvidiaGpuManager _gpuManager = new();
 
     private int _gpuCoreOffset;
     public int GpuCoreOffset { get => _gpuCoreOffset; set => SetProperty(ref _gpuCoreOffset, value); }
@@ -303,57 +306,86 @@ public class DashboardViewModel : ObservableObject
     public ICommand ApplyGpuClocksCommand { get; }
     public ICommand ResetGpuClocksCommand { get; }
 
-    private async void StartTelemetryPolling()
+    private void StartTelemetryPolling()
     {
-        while (true)
+        _pollingCts?.Cancel();
+        _pollingCts = new CancellationTokenSource();
+        var token = _pollingCts.Token;
+
+        // Offload the loop entirely to a background ThreadPool thread
+        Task.Run(async () =>
         {
-            await System.Threading.Tasks.Task.Run(() =>
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+
+            while (!token.IsCancellationRequested)
             {
-                var telemetry = AcerWmiManager.GetSystemTelemetry();
-                var smi = NvidiaGpuManager.GetSmiTelemetry();
-
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                try
                 {
-                    CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp}°C" : "--°C";
-                    CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
-                    CpuTempColor = telemetry.CpuTemp > 90 ? "#FF453A" : (telemetry.CpuTemp >= 85 ? "#FF9F0A" : "White");
+                    // Run Acer WMI and Nvidia SMI concurrently in the background
+                    var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
+                    var smiTask = NvidiaGpuManager.GetSmiTelemetryAsync(token);
 
-                    GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp}°C" : "--°C";
-                    GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                    GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : (telemetry.GpuTemp >= 78 ? "#FF9F0A" : "White");
+                    await Task.WhenAll(wmiTask, smiTask);
 
-                    if (!string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                    var telemetry = await wmiTask;
+                    var smi = await smiTask;
+
+                    // Push property changes asynchronously to the WPF UI Thread (non-blocking)
+                    _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
                     {
-                        GpuNameText = smi.Name;
-                        GpuLoadText = $"{smi.GpuLoad}%";
-                        GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
+                        // 1. Update WMI CPU/GPU Telemetry
+                        CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
+                        CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
+                        CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
 
-                        GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
+                        GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp} C" : "-- C";
+                        GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
+                        GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
 
-                        GpuDeepTempText = $"{smi.CoreTemp} C";
-                        GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
-
-                        GpuPStateText = smi.PState;
-                        GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
-                        GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
-
-                        if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
+                        // 2. Update NVIDIA SMI Deep Telemetry
+                        if (!string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                         {
-                            GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
-                        }
-                        else if (smi.EnforcedPowerLimitW > 0) // Fallback if only enforced limit is detected
-                        {
-                            GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
-                        }
-                        else // Fallback if limits are unavailable (e.g., GPU is asleep)
-                        {
-                            GpuPowerText = $"{smi.PowerDrawW:0.0} W";
-                        }
-                    }
-                });
-            });
+                            GpuNameText = smi.Name;
 
-            await System.Threading.Tasks.Task.Delay(2000);
-        }
+                            GpuLoadText = $"{smi.GpuLoad}%";
+                            GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
+
+                            GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
+
+                            GpuDeepTempText = $"{smi.CoreTemp} C";
+                            GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
+
+                            GpuPStateText = smi.PState;
+                            GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
+                            GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
+
+                            if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
+                            {
+                                GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
+                            }
+                            else if (smi.EnforcedPowerLimitW > 0)
+                            {
+                                GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
+                            }
+                            else
+                            {
+                                GpuPowerText = $"{smi.PowerDrawW:0.0} W";
+                            }
+                        }
+                    }, System.Windows.Threading.DispatcherPriority.Background);
+
+                    // Wait asynchronously for the next 2-second interval tick
+                    await timer.WaitForNextTickAsync(token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break; // Gracefully exit when token is cancelled
+                }
+                catch
+                {
+                    // Silently absorb loop exceptions to prevent background thread crash
+                }
+            }
+        }, token);
     }
 }
