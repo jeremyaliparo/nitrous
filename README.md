@@ -6,7 +6,11 @@
 
 **Pure, zero-bloat hardware control for Acer Nitro laptops.**
 
-![Main Dashboard](assets/dashboard.png) &nbsp; ![GPU](assets/gpu.png) &nbsp; ![App Settings](assets/settings.png)
+<p align="center">
+  <img src="assets/dashboard.png" alt="Main Dashboard" width="30%" />
+  <img src="assets/gpu.png" alt="GPU" width="30%" />
+  <img src="assets/settings.png" alt="App Settings" width="30%" />
+</p>
 
 ---
 
