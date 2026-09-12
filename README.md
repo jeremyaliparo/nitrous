@@ -6,16 +6,18 @@
 
 **Pure, zero-bloat hardware control for Acer Nitro laptops.**
 
-![Main Dashboard](assets/dashboard.png) &nbsp; ![App Settings](assets/settings.png)
+![Main Dashboard](assets/dashboard.png) &nbsp; ![GPU](assets/gpu.png) &nbsp; ![App Settings](assets/settings.png)
 
 ---
 
 </div>
 
-Nitrous bypasses heavy, bloated telemetry services by communicating directly with your Acer Nitro’s Embedded Controller (EC) via WMI. It gives you a ultra-fast, lightweight dashboard for raw, instant hardware control.
+Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly with your Acer Nitro’s Embedded Controller (EC) via WMI. It gives you a ultra-fast, lightweight dashboard for raw, instant hardware control.
 
 ### Key Features
-
+* **Dedicated GPU OC/UC Tab:** Fine-tune core and memory offsets to overclock or underclock your GPU.
+* **In-Depth GPU Telemetry:** Monitor real-time GPU metrics, clock speeds, usage, and thermal performance alongside your tuning controls.
+* **Auto-Apply OC Profiles:** Automatically trigger default GPU overclocks based on active power profiles (mimicking native NitroSense behavior) or automatically apply your custom OC profile on system boot.
 * **Granular Fan Control:** Set precise fan speeds from 0% to 100%, or toggle Auto and Max modes via verified 64-bit WMI payloads.
 * **Smart Automation:** Automatically applies quiet modes and 60Hz screen refresh on battery, then restores performance and high refresh rate on AC power.
 * **Battery Protection:** Hardware-level 80% charge limit to extend battery lifespan.
@@ -25,7 +27,7 @@ Nitrous bypasses heavy, bloated telemetry services by communicating directly wit
 
 ### Quick Start
 
-Nitrous is a portable application (under 1MB) with no setup wizard needed.
+Nitrous is a portable application (1MB) with no setup wizard needed.
 
 1. Download **`Nitrous.exe`** from [Releases](https://github.com/jeremyaliparo/nitrous/releases).
 2. Save it anywhere on your PC (e.g., `C:\Tools`).
