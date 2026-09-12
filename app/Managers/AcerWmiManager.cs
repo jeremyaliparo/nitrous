@@ -19,6 +19,47 @@ public static class AcerWmiManager
         catch { return false; }
     }
 
+    public static bool IsTurboModeSupported()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(@"root\wmi", "SELECT * FROM AcerGamingFunction");
+            foreach (ManagementObject instance in searcher.Get())
+            {
+                using (instance)
+                {
+                    // 0x0A represents the "Supported Profiles" registry
+                    using var inParams = instance.GetMethodParameters("GetGamingMiscSetting");
+                    inParams["gmInput"] = 0x0Au;
+
+                    using var outParams = instance.InvokeMethod("GetGamingMiscSetting", inParams, null);
+                    if (outParams != null)
+                    {
+                        object? rawValue = outParams.Properties["gmOutput"]?.Value ?? outParams.Properties["outValue"]?.Value;
+
+                        if (rawValue != null)
+                        {
+                            ulong rawOutput = Convert.ToUInt64(rawValue);
+
+                            // Shift right by 8 to extract the 8-bit hex response
+                            int supportedBitmap = (int)((rawOutput >> 8) & 0xFF);
+
+                            // Check if Bit 5 (Turbo Mode) is set in the bitmap
+                            return (supportedBitmap & (1 << 5)) != 0;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // Fail safely if the WMI method isn't supported at all
+        }
+
+        return false;
+    }
+
     public static async Task SetPowerModeAsync(PowerProfile profile)
     {
         ulong payload = ((ulong)profile << 8) | 0x0B;

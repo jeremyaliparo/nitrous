@@ -75,6 +75,9 @@ public class DashboardViewModel : ObservableObject
     private string _gpuPowerText = "0.0 W";
     public string GpuPowerText { get => _gpuPowerText; set => SetProperty(ref _gpuPowerText, value); }
 
+    private bool _isTurboSupported = true;
+    public bool IsTurboSupported { get => _isTurboSupported; set => SetProperty(ref _isTurboSupported, value); }
+
     public DashboardViewModel()
     {
         // Initialize Fan State
@@ -92,6 +95,8 @@ public class DashboardViewModel : ObservableObject
         _chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
         _autoSwitch = SettingsManager.Get("AutoSwitch", 0) == 1;
         _refreshAutoSwitch = SettingsManager.Get("RefreshAutoSwitch", 0) == 1;
+
+        IsTurboSupported = AcerWmiManager.IsTurboModeSupported();
 
         System.Threading.Tasks.Task.Run(() =>
         {
