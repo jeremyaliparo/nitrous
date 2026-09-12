@@ -169,6 +169,11 @@ public partial class NitrousDashboard : Window
         }
     }
 
+    private void Window_Deactivated(object sender, EventArgs e)
+    {
+        this.WindowState = WindowState.Minimized;
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);

@@ -7,7 +7,8 @@
         IsVisibleChanged="Window_IsVisibleChanged"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
-        RenderOptions.ClearTypeHint="Enabled">
+        RenderOptions.ClearTypeHint="Enabled"
+        Deactivated="Window_Deactivated">
 
 <Window.Resources>
         <Style x:Key="ActionButtonStyle" TargetType="RadioButton">

@@ -55,10 +55,36 @@ public class TrayApplication : ApplicationContext
         trayIcon.ContextMenuStrip = menu;
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
     private void ShowDashboard()
     {
         string processName = Process.GetCurrentProcess().ProcessName;
-        if (Process.GetProcessesByName(processName).Length > 1) return;
+        int currentId = Process.GetCurrentProcess().Id;
+
+        var processes = Process.GetProcessesByName(processName);
+
+        foreach (var p in processes)
+        {
+            if (p.Id != currentId)
+            {
+                // Found the existing UI process. Restore and bring to front.
+                IntPtr hWnd = p.MainWindowHandle;
+                if (hWnd != IntPtr.Zero)
+                {
+                    const int SW_RESTORE = 9;
+                    ShowWindow(hWnd, SW_RESTORE);
+                    SetForegroundWindow(hWnd);
+                }
+                return; // Prevent spawning a new instance
+            }
+        }
+
+        // If no UI process is running, start a new one
         Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--ui") { UseShellExecute = true });
     }
 
