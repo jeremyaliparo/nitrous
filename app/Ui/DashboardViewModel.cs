@@ -96,13 +96,28 @@ public class DashboardViewModel : ObservableObject
         _autoSwitch = SettingsManager.Get("AutoSwitch", 0) == 1;
         _refreshAutoSwitch = SettingsManager.Get("RefreshAutoSwitch", 0) == 1;
 
-        IsTurboSupported = AcerWmiManager.IsTurboModeSupported();
-
         System.Threading.Tasks.Task.Run(() =>
         {
+            bool isTurbo = AcerWmiManager.IsTurboModeSupported();
             bool isTaskEnabled = StartupManager.CheckStartupTask();
-            _runOnStartup = isTaskEnabled;
-            OnPropertyChanged(nameof(RunOnStartup));
+
+            int core = 0, memory = 0;
+            bool hasClocks = _gpuManager.IsValid && _gpuManager.GetClocks(out core, out memory);
+
+            // Push results back to the UI thread asynchronously
+            System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+            {
+                IsTurboSupported = isTurbo;
+
+                _runOnStartup = isTaskEnabled;
+                OnPropertyChanged(nameof(RunOnStartup));
+
+                if (hasClocks)
+                {
+                    GpuCoreOffset = core;
+                    GpuMemoryOffset = memory;
+                }
+            });
         });
 
         // Setup Commands
@@ -149,12 +164,6 @@ public class DashboardViewModel : ObservableObject
                 DisplayManager.ApplyRefreshProfile(profile, isOnline);
             }
         });
-
-        if (_gpuManager.IsValid && _gpuManager.GetClocks(out int core, out int memory))
-        {
-            GpuCoreOffset = core;
-            GpuMemoryOffset = memory;
-        }
 
         ApplyGpuClocksCommand = new RelayCommand(async _ =>
         {
