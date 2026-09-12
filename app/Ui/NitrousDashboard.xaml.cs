@@ -33,7 +33,7 @@ public partial class NitrousDashboard : Window
     {
         if (e.Mode == PowerModes.StatusChange)
         {
-            System.Threading.Tasks.Task.Delay(4000).ContinueWith(_ =>
+            System.Threading.Tasks.Task.Delay(5500).ContinueWith(_ =>
             {
                 Dispatcher.Invoke(() => RefreshDashboardState());
             });
@@ -146,6 +146,11 @@ public partial class NitrousDashboard : Window
         BtnRefreshAuto.IsChecked = activeRefresh == RefreshProfile.Auto;
         BtnRefresh60.IsChecked = activeRefresh == RefreshProfile.Hz60;
         BtnRefreshMax.IsChecked = activeRefresh == RefreshProfile.MaxHz;
+
+        if (DataContext is DashboardViewModel vm)
+        {
+            vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
+        }
     }
 
     protected override void OnSourceInitialized(EventArgs e)

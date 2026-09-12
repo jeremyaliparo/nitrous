@@ -34,7 +34,11 @@ public class TrayApplication : ApplicationContext
         _nitroHook = new NitroKeyHook();
         _nitroHook.NitroKeyPressed += (s, e) => ShowDashboard();
 
-        _ = Task.Run(() => ApplyPowerSettings(true));
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(8000);
+            ApplyPowerSettings(true);
+        });
     }
 
     private void BuildContextMenu()
@@ -91,11 +95,8 @@ public class TrayApplication : ApplicationContext
             SettingsManager.Save("LastFanMode", activeFan.ToString());
         }
 
-        if (!isStartup)
-        {
-            var refreshMode = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
-            DisplayManager.ApplyRefreshProfile(refreshMode, isOnline);
-        }
+        var refreshMode = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
+        DisplayManager.ApplyRefreshProfile(refreshMode, isOnline);
     }
 
     private void Exit(object? sender, EventArgs e)
