@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -85,16 +84,14 @@ public class NvidiaGpuManager : IDisposable
         }
     }
 
-    public int SetClocks(int core, int memory) => SetClocksInternal(core, memory, persist: true);
+    public int SetClocks(int core, int memory) => SetClocksInternal(core, memory);
 
-    private int SetClocksInternal(int core, int memory, bool persist)
+    private int SetClocksInternal(int core, int memory)
     {
         if (!IsValid) return 0;
 
         if (core < MinCoreOffset || core > MaxCoreOffset) return 0;
         if (memory < MinMemoryOffset || memory > MaxMemoryOffset) return 0;
-
-        if (persist) SaveProfile(core, memory);
 
         GetClocks(out int currentCore, out int currentMemory);
 
@@ -124,29 +121,10 @@ public class NvidiaGpuManager : IDisposable
         }
     }
 
-    public void ResetOverclock()
+    public async Task ApplyOnBootAsync(PowerProfile currentProfile)
     {
-        SetClocksInternal(0, 0, persist: false);
-        DeleteProfile();
-    }
-
-    private void SaveProfile(int core, int memory)
-    {
-        SettingsManager.Save("GpuCoreOffset", core);
-        SettingsManager.Save("GpuMemoryOffset", memory);
-    }
-
-    private void DeleteProfile()
-    {
-        // Resetting to 0 effectively deletes the overclock profile
-        SettingsManager.Save("GpuCoreOffset", 0);
-        SettingsManager.Save("GpuMemoryOffset", 0);
-    }
-
-    public async Task RestoreAtBootAsync()
-    {
-        int core = SettingsManager.Get("GpuCoreOffset", 0);
-        int memory = SettingsManager.Get("GpuMemoryOffset", 0);
+        int core = SettingsManager.Get($"GpuCore_{currentProfile}", GetDefaultCore(currentProfile));
+        int memory = SettingsManager.Get($"GpuMemory_{currentProfile}", GetDefaultMemory(currentProfile));
 
         if (core == 0 && memory == 0) return;
 
@@ -157,14 +135,11 @@ public class NvidiaGpuManager : IDisposable
         {
             try
             {
-                if (_internalGpu == null)
-                {
-                    InitializeNvAPI();
-                }
+                if (_internalGpu == null) InitializeNvAPI();
 
                 if (IsValid)
                 {
-                    int result = SetClocksInternal(core, memory, persist: false);
+                    int result = SetClocksInternal(core, memory);
                     if (result == 1) return;
                 }
             }
@@ -174,37 +149,47 @@ public class NvidiaGpuManager : IDisposable
         }
     }
 
-    public int ApplyPowerProfileOc(PowerProfile profile)
+    public async Task<int> ApplyPowerProfileOcAsync(PowerProfile profile)
     {
-        int defaultCore = 0;
-        int defaultMemory = 0;
-
-        switch (profile)
+        return await Task.Run(() =>
         {
-            case PowerProfile.Quiet:
-                defaultCore = -100;
-                defaultMemory = -200;
-                break;
-            case PowerProfile.Balanced:
-                defaultCore = 0;
-                defaultMemory = 0;
-                break;
-            case PowerProfile.Performance:
-                defaultCore = 100;
-                defaultMemory = 150;
-                break;
-            case PowerProfile.Turbo:
-                defaultCore = 150;
-                defaultMemory = 300;
-                break;
-        }
+            int coreOffset = SettingsManager.Get($"GpuCore_{profile}", GetDefaultCore(profile));
+            int memoryOffset = SettingsManager.Get($"GpuMemory_{profile}", GetDefaultMemory(profile));
 
-        // Fetch the user's custom config for this profile, falling back to the defaults
-        int coreOffset = SettingsManager.Get($"GpuCore_{profile}", defaultCore);
-        int memoryOffset = SettingsManager.Get($"GpuMemory_{profile}", defaultMemory);
+            return SetClocksInternal(coreOffset, memoryOffset);
+        });
+    }
 
-        // Apply the clocks. (persist: false because we don't want to overwrite the "Global/Manual" profile)
-        return SetClocksInternal(coreOffset, memoryOffset, persist: false);
+    // Helpers to track default values per profile
+    public int GetDefaultCore(PowerProfile profile) => profile switch
+    {
+        PowerProfile.Quiet => -100,
+        PowerProfile.Performance => 100,
+        PowerProfile.Turbo => 150,
+        _ => 0
+    };
+
+    public int GetDefaultMemory(PowerProfile profile) => profile switch
+    {
+        PowerProfile.Quiet => -200,
+        PowerProfile.Performance => 150,
+        PowerProfile.Turbo => 300,
+        _ => 0
+    };
+
+    // Saves the user's custom slider values to the active profile
+    public void SaveCustomProfileOc(PowerProfile profile, int core, int memory)
+    {
+        SettingsManager.Save($"GpuCore_{profile}", core);
+        SettingsManager.Save($"GpuMemory_{profile}", memory);
+    }
+
+    // Overwrites the custom save with defaults
+    public async Task ResetProfileToDefaultsAsync(PowerProfile profile)
+    {
+        SettingsManager.Save($"GpuCore_{profile}", GetDefaultCore(profile));
+        SettingsManager.Save($"GpuMemory_{profile}", GetDefaultMemory(profile));
+        await ApplyPowerProfileOcAsync(profile);
     }
 
     public void Dispose()

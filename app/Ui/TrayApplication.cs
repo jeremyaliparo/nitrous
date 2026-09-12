@@ -14,6 +14,7 @@ public class TrayApplication : ApplicationContext
 {
     private readonly NotifyIcon trayIcon;
     private readonly NitroKeyHook _nitroHook;
+    private readonly NvidiaGpuManager _gpuManager = new();
     private bool? _wasOnAcPower = null;
     private int _powerEventId = 0;
 
@@ -38,6 +39,9 @@ public class TrayApplication : ApplicationContext
         {
             await Task.Delay(8000);
             ApplyPowerSettings(true);
+
+            var bootProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+            await _gpuManager.ApplyOnBootAsync(bootProfile);
         });
     }
 
@@ -97,6 +101,9 @@ public class TrayApplication : ApplicationContext
 
         var refreshMode = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
         DisplayManager.ApplyRefreshProfile(refreshMode, isOnline);
+
+        var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+        _ = _gpuManager.ApplyPowerProfileOcAsync(currentProfile);
     }
 
     private void Exit(object? sender, EventArgs e)
@@ -105,6 +112,7 @@ public class TrayApplication : ApplicationContext
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         trayIcon.Visible = false;
         trayIcon.Dispose();
+        _gpuManager.Dispose();
 
         try
         {

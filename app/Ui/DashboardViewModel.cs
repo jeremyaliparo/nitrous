@@ -101,7 +101,7 @@ public class DashboardViewModel : ObservableObject
         });
 
         // Setup Commands
-        SetPowerCommand = new RelayCommand(param =>
+        SetPowerCommand = new RelayCommand(async param =>
         {
             if (Enum.TryParse(param?.ToString(), out PowerProfile mode))
             {
@@ -109,6 +109,13 @@ public class DashboardViewModel : ObservableObject
                 SettingsManager.Save("LastPowerMode", (int)mode);
                 bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
                 SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)mode);
+
+                await _gpuManager.ApplyPowerProfileOcAsync(mode);
+                if (_gpuManager.GetClocks(out int c, out int m))
+                {
+                    GpuCoreOffset = c;
+                    GpuMemoryOffset = m;
+                }
             }
         });
 
@@ -146,30 +153,35 @@ public class DashboardViewModel : ObservableObject
 
         ApplyGpuClocksCommand = new RelayCommand(async _ =>
         {
+            var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+
+            // Save to the active profile
+            _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
             int result = _gpuManager.SetClocks(GpuCoreOffset, GpuMemoryOffset);
 
             if (result == 1)
             {
                 ApplyBtnText = "APPLIED!";
-                ApplyBtnColor = "#34C759"; // Green
+                ApplyBtnColor = "#34C759";
             }
             else
             {
                 ApplyBtnText = "ERROR";
-                ApplyBtnColor = "#FF453A"; // Red
+                ApplyBtnColor = "#FF453A";
             }
 
-            // Keep the status visible for 2 seconds
-            await System.Threading.Tasks.Task.Delay(2000);
-
-            // Revert back to default state
+            await Task.Delay(2000);
             ApplyBtnText = "APPLY";
             ApplyBtnColor = "#B388FF";
         });
 
-        ResetGpuClocksCommand = new RelayCommand(_ =>
+        ResetGpuClocksCommand = new RelayCommand(async _ =>
         {
-            _gpuManager.ResetOverclock();
+            var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+
+            // Wipe custom save and load default config
+            await _gpuManager.ResetProfileToDefaultsAsync(currentProfile);
+
             if (_gpuManager.GetClocks(out int c, out int m))
             {
                 GpuCoreOffset = c;
