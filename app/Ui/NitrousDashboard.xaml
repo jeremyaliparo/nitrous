@@ -509,7 +509,7 @@
 									<TextBlock Text="{Binding GpuVramText}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<StackPanel Grid.Row="4" Grid.Column="1">
-									<TextBlock Text="POWER / ENFORECED / CAP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="POWER / ENFORCED / CAP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
 									<TextBlock Text="{Binding GpuPowerText}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 							</Grid>
