@@ -84,6 +84,13 @@ public class DashboardViewModel : ObservableObject
         _cpuFanSpeed = SettingsManager.Get("CustomFanSpeedCpu", 50);
         _gpuFanSpeed = SettingsManager.Get("CustomFanSpeedGpu", 50);
         _isUnifiedFans = SettingsManager.Get("UnifiedFans", 1) == 1;
+
+        _deepGpuTelemetry = SettingsManager.Get("DeepGpuTelemetry", 1) == 1;
+        if (!_deepGpuTelemetry)
+        {
+            ClearDeepTelemetryUI();
+        }
+
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
         IsCustomFanEnabled = activeFan == FanProfile.Medium;
 
@@ -314,6 +321,34 @@ public class DashboardViewModel : ObservableObject
         }
     }
 
+    private bool _deepGpuTelemetry;
+    public bool DeepGpuTelemetry
+    {
+        get => _deepGpuTelemetry;
+        set
+        {
+            if (SetProperty(ref _deepGpuTelemetry, value))
+            {
+                SettingsManager.Save("DeepGpuTelemetry", value ? 1 : 0);
+                if (!value) ClearDeepTelemetryUI();
+            }
+        }
+    }
+
+    private void ClearDeepTelemetryUI()
+    {
+        GpuNameText = "NVIDIA GPU (SLEEPING)";
+        GpuLoadText = "-- %";
+        GpuLoadColor = "#888890";
+        GpuVramText = "-- / -- MB";
+        GpuDeepTempText = "-- C";
+        GpuDeepTempColor = "#888890";
+        GpuPStateText = "--";
+        GpuCoreClockText = "-- MHz";
+        GpuMemClockText = "-- MHz";
+        GpuPowerText = "-- W";
+    }
+
     private bool _runOnStartup;
     public bool RunOnStartup
     {
@@ -349,12 +384,21 @@ public class DashboardViewModel : ObservableObject
                 {
                     // Run Acer WMI and Nvidia SMI concurrently in the background
                     var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
-                    var smiTask = NvidiaGpuManager.GetSmiTelemetryAsync(token);
 
-                    await Task.WhenAll(wmiTask, smiTask);
+                    // Conditionally fetch deep NVIDIA SMI stats
+                    Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
+                    if (DeepGpuTelemetry)
+                    {
+                        smiTask = NvidiaGpuManager.GetSmiTelemetryAsync(token);
+                        await Task.WhenAll(wmiTask, smiTask);
+                    }
+                    else
+                    {
+                        await wmiTask;
+                    }
 
                     var telemetry = await wmiTask;
-                    var smi = await smiTask;
+                    var smi = smiTask != null ? await smiTask : null;
 
                     // Push property changes asynchronously to the WPF UI Thread (non-blocking)
                     _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
@@ -369,7 +413,7 @@ public class DashboardViewModel : ObservableObject
                         GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
 
                         // 2. Update NVIDIA SMI Deep Telemetry
-                        if (!string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                        if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                         {
                             GpuNameText = smi.Name;
 
