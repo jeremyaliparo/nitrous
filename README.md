@@ -45,7 +45,7 @@ Designed for modern Acer Nitro laptops (2021+) using `AcerGamingFunction` WMI cl
 
 **Confirmed Models:**
 * Acer Nitro 16S (`AN16S-61`)
-* Acer Nitro V 15 (`ANV15-41`, `ANV15-52` — *Thanks [@Baymax0251](https://github.com/Baymax0251) for testing!*)
+* Acer Nitro V 15 (`ANV15-41`<!--, `ANV15-52` — *Thanks [@Baymax0251](https://github.com/Baymax0251) for testing!* -->)
 
 ---
 
