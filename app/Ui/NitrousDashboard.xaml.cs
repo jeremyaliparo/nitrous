@@ -23,7 +23,7 @@ public partial class NitrousDashboard : Window
         System.Threading.Tasks.Task.Run(() =>
         {
             string modelName = SystemInfoManager.GetSystemModel();
-            Dispatcher.Invoke(() => SystemModelText.Text = $"Nitrous on {modelName}");
+            Dispatcher.Invoke(() => SystemModelText.Text = $"{modelName}");
         });
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
@@ -171,6 +171,8 @@ public partial class NitrousDashboard : Window
 
     private void Window_Deactivated(object sender, EventArgs e)
     {
+        if (this.Topmost) return;
+
         this.WindowState = WindowState.Minimized;
     }
 
