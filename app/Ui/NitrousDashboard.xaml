@@ -12,76 +12,88 @@
 
 <Window.Resources>
     <BitmapImage x:Key="CachedAppLogo" UriSource="pack://application:,,,/assets/logo.png" CacheOption="OnLoad" />
-    <Style x:Key="ActionButtonStyle" TargetType="RadioButton">
-    <!-- Default state: Transparent background with muted text to let the active state pop -->
-    <Setter Property="Background" Value="Transparent"/>
-    <Setter Property="Foreground" Value="#888890"/>
-    <Setter Property="BorderBrush" Value="#2A2A30"/>
-    <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="Cursor" Value="Hand"/>
-    <Setter Property="Template">
-        <Setter.Value>
-            <ControlTemplate TargetType="RadioButton">
-                <!-- Removed the clunky double-border. A single clean border is much more elegant. -->
-                <Border x:Name="MainBorder"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="8"
-                        SnapsToDevicePixels="True">
+        <Style x:Key="ActionButtonStyle" TargetType="RadioButton">
+            <!-- Default state: Transparent background to blend into the rail -->
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#888890"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="TabIndex" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Background="Transparent">
+                            <Border x:Name="LeftDivider"
+                                    Width="1"
+                                    Height="16"
+                                    Background="#2A2A30"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"/>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Path Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                              Fill="{TemplateBinding Foreground}"
-                              Stretch="Uniform"
-                              Width="14" Height="14"
-                              Margin="0,0,6,0"
-                              VerticalAlignment="Center"/>
+                            <!-- Main Floating Pill -->
+                            <Border x:Name="MainBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6"
+                                    Margin="0"
+                                    SnapsToDevicePixels="True">
 
-                        <TextBlock Text="{TemplateBinding Content}"
-                                   Foreground="{TemplateBinding Foreground}"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path Data="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Fill="{TemplateBinding Foreground}"
+                                        Stretch="Uniform"
+                                        Width="14" Height="14"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"/>
+                                    <TextBlock Text="{TemplateBinding Content}"
+                                            Foreground="{TemplateBinding Foreground}"
+                                            FontSize="11"
+                                            FontWeight="SemiBold"
+                                            VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
 
-                <ControlTemplate.Triggers>
-                    <!-- Hover State: Subtle lift in brightness -->
-                    <Trigger Property="IsMouseOver" Value="True">
-                        <Setter Property="Background" Value="#222226"/>
-                        <Setter Property="Foreground" Value="#E0E0E0"/>
-                        <Setter Property="BorderBrush" Value="#3A3A40"/>
-                    </Trigger>
+                        <ControlTemplate.Triggers>
+                            <!-- Hide the divider if this is the very first item in the track -->
+                            <Trigger Property="TabIndex" Value="0">
+                                <Setter TargetName="LeftDivider" Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
 
-                    <!-- Checked State: Modern tinted background with bright accent border and text -->
-                    <Trigger Property="IsChecked" Value="True">
-                        <Setter Property="Background" Value="#1A1225"/> <!-- Deep, subtle purple tint -->
-                        <Setter Property="Foreground" Value="#B388FF"/> <!-- Vibrant purple icon and text -->
-                        <Setter Property="BorderBrush" Value="#B388FF"/> <!-- Glowing accent border -->
-                    </Trigger>
+                            <!-- Hover State -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="MainBorder" Property="Background" Value="#222226"/>
+                                <Setter Property="Foreground" Value="#E0E0E0"/>
+                                <Setter TargetName="LeftDivider" Property="Opacity" Value="0"/>
+                                <!-- Expanding by 1px horizontally seamlessly masks adjacent dividers -->
+                                <Setter TargetName="MainBorder" Property="Margin" Value="-1,0,-1,0"/>
+                                <Setter Property="Panel.ZIndex" Value="1"/>
+                            </Trigger>
 
-                    <!-- Polish: Hovering over an already checked button -->
-                    <MultiTrigger>
-                        <MultiTrigger.Conditions>
-                            <Condition Property="IsChecked" Value="True"/>
-                            <Condition Property="IsMouseOver" Value="True"/>
-                        </MultiTrigger.Conditions>
-                        <Setter Property="Background" Value="#231833"/>
-                        <Setter Property="BorderBrush" Value="#C4A1FF"/>
-                        <Setter Property="Foreground" Value="#C4A1FF"/>
-                    </MultiTrigger>
+                            <!-- Checked State -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="MainBorder" Property="Background" Value="#1A1225"/>
+                                <Setter Property="Foreground" Value="#B388FF"/>
+                                <Setter TargetName="MainBorder" Property="BorderBrush" Value="#B388FF"/>
+                                <Setter TargetName="LeftDivider" Property="Opacity" Value="0"/>
+                                <!-- Expanding by 1px horizontally seamlessly masks adjacent dividers -->
+                                <Setter TargetName="MainBorder" Property="Margin" Value="-1,0,-1,0"/>
+                                <!-- Elevating Z-Index ensures the active pill draws OVER the dividers of its neighbors -->
+                                <Setter Property="Panel.ZIndex" Value="2"/>
+                            </Trigger>
 
-                    <!-- Disabled State -->
-                    <Trigger Property="IsEnabled" Value="False">
-                        <Setter Property="Opacity" Value="0.3"/>
-                        <Setter Property="Cursor" Value="Arrow"/>
-                    </Trigger>
-                </ControlTemplate.Triggers>
-            </ControlTemplate>
-        </Setter.Value>
-    </Setter>
-</Style>
+                            <!-- Disabled State -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- Modern iOS-style Toggle -->
         <Style x:Key="ModernToggleStyle" TargetType="CheckBox">
@@ -339,114 +351,36 @@
                         </Border>
                     </Grid>
 
-                    <!-- Power Modes -->
-                    <TextBlock Text="POWER" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-                    <UniformGrid Rows="1" Height="40" Margin="-2,0,-2,16">
-                        <RadioButton x:Name="BtnPowerQuiet"
-                            GroupName="Power"
-                            Uid="Quiet"
-                            Tag="M1,13 L9.4,11.5 A3,3 0 1,1 9.4,14.5 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z"
-                            Content="Quiet"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetPowerCommand}"
-                            CommandParameter="Quiet"/>
-
-                        <RadioButton x:Name="BtnPowerBal"
-                            GroupName="Power"
-                            Uid="Balanced"
-                            Tag="M12,2 L13.5,10.4 A3,3 0 1,1 10.5,10.4 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z"
-                            Content="Bal"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetPowerCommand}"
-                            CommandParameter="Balanced"/>
-
-                        <RadioButton x:Name="BtnPowerPerf"
-                            GroupName="Power"
-                            Uid="Performance"
-                            Tag="M19.78,5.22 L14.9,12.22 A3,3 0 1,1 12.78,10.1 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z"
-                            Content="Perf"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetPowerCommand}"
-                            CommandParameter="Performance"/>
-
-                        <RadioButton x:Name="BtnPowerTurbo"
-                            GroupName="Power"
-                            Uid="Turbo"
-                            Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z"
-                            Content="Turbo"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetPowerCommand}"
-                            CommandParameter="Turbo"
-                            Visibility="{Binding IsTurboSupported, Converter={StaticResource BoolToVis}}"/>
+                  <!-- Power Modes -->
+                <TextBlock Text="POWER" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                <Border Background="#121214" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                    <UniformGrid Rows="1" Height="34">
+                        <RadioButton x:Name="BtnPowerQuiet" TabIndex="0" GroupName="Power" Uid="Quiet" Tag="M1,13 L9.4,11.5 A3,3 0 1,1 9.4,14.5 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Quiet" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Quiet"/>
+                        <RadioButton x:Name="BtnPowerBal" TabIndex="1" GroupName="Power" Uid="Balanced" Tag="M12,2 L13.5,10.4 A3,3 0 1,1 10.5,10.4 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Bal" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Balanced"/>
+                        <RadioButton x:Name="BtnPowerPerf" TabIndex="1" GroupName="Power" Uid="Performance" Tag="M19.78,5.22 L14.9,12.22 A3,3 0 1,1 12.78,10.1 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Perf" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Performance"/>
+                        <RadioButton x:Name="BtnPowerTurbo" TabIndex="1" GroupName="Power" Uid="Turbo" Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Turbo" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Turbo" Visibility="{Binding IsTurboSupported, Converter={StaticResource BoolToVis}}"/>
                     </UniformGrid>
+                </Border>
 
-                    <!-- Display Refresh Rates -->
-                    <TextBlock Text="DISPLAY REFRESH" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-                    <UniformGrid Rows="1" Height="40" Margin="-2,0,-2,16">
-                        <RadioButton x:Name="BtnRefreshAuto"
-                            GroupName="Refresh"
-                            Uid="Auto"
-                            Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"
-                            Content="Auto"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetRefreshCommand}"
-                            CommandParameter="Auto"
-                            Margin="2,0,2,0"/>
-
-                        <RadioButton x:Name="BtnRefresh60"
-                            GroupName="Refresh"
-                            Uid="Hz60"
-                            Tag="M2,12C4.5,6.5 7.5,6.5 10.5,12C13.5,17.5 16.5,17.5 19,12H22C18.5,19.5 14.5,19.5 10.5,14C7.5,8.5 5,8.5 2,12Z"
-                            Content="60Hz"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetRefreshCommand}"
-                            CommandParameter="Hz60"
-                            Margin="2,0,2,0"/>
-
-                        <RadioButton x:Name="BtnRefreshMax"
-                            GroupName="Refresh"
-                            Uid="MaxHz"
-                            Tag="M13,2L4,14H11L9,22L20,10H13L15,2Z"
-                            Content="{Binding MaxRefreshText}"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetRefreshCommand}"
-                            CommandParameter="MaxHz"
-                            Margin="2,0,2,0"/>
+                <!-- Display Refresh Rates -->
+                <TextBlock Text="DISPLAY REFRESH" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                <Border Background="#121214" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+                    <UniformGrid Rows="1" Height="34">
+                        <RadioButton x:Name="BtnRefreshAuto" TabIndex="0" GroupName="Refresh" Uid="Auto" Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="Auto"/>
+                        <RadioButton x:Name="BtnRefresh60" TabIndex="1" GroupName="Refresh" Uid="Hz60" Tag="M2,12C4.5,6.5 7.5,6.5 10.5,12C13.5,17.5 16.5,17.5 19,12H22C18.5,19.5 14.5,19.5 10.5,14C7.5,8.5 5,8.5 2,12Z" Content="60Hz" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="Hz60"/>
+                        <RadioButton x:Name="BtnRefreshMax" TabIndex="1" GroupName="Refresh" Uid="MaxHz" Tag="M13,2L4,14H11L9,22L20,10H13L15,2Z" Content="{Binding MaxRefreshText}" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="MaxHz"/>
                     </UniformGrid>
+                </Border>
 
-                    <!-- Fans -->
-                    <TextBlock Text="FANS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-                    <UniformGrid Rows="1" Height="40" Margin="-2,0,-2,12">
-                        <RadioButton x:Name="BtnFanAuto"
-                            GroupName="Fans"
-                            Uid="Auto"
-                            Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"
-                            Content="Auto"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetFanCommand}"
-                            CommandParameter="Auto"
-                            Margin="2,0,2,0"/>
-
-                       <RadioButton x:Name="BtnFanMax"
-                            GroupName="Fans"
-                            Uid="Max"
-                            Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z"
-                            Content="Max"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetFanCommand}"
-                            CommandParameter="Max"
-                            Margin="2,0,2,0"/>
-
-                       <RadioButton x:Name="BtnFanCustom"
-                            GroupName="Fans"
-                            Uid="Medium"
-                            Tag="M3,7V9H13V7H3M15,11H17V9H21V7H17V5H15V11ZM3,15V17H9V15H3M13,19V17H21V15H13V13H11V19H13Z"
-                            Content="Custom"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Command="{Binding SetFanCommand}"
-                            CommandParameter="Medium"
-                            Margin="2,0,2,0"/>
+                <!-- Fans -->
+                <TextBlock Text="FANS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+                <Border Background="#121214" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,12">
+                    <UniformGrid Rows="1" Height="34">
+                        <RadioButton x:Name="BtnFanAuto" TabIndex="0" GroupName="Fans" Uid="Auto" Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Auto"/>
+                        <RadioButton x:Name="BtnFanMax" TabIndex="1" GroupName="Fans" Uid="Max" Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Max" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Max"/>
+                        <RadioButton x:Name="BtnFanCustom" TabIndex="1" GroupName="Fans" Uid="Medium" Tag="M3,7V9H13V7H3M15,11H17V9H21V7H17V5H15V11ZM3,15V17H9V15H3M13,19V17H21V15H13V13H11V19H13Z" Content="Custom" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Medium"/>
                     </UniformGrid>
+                </Border>
 
                     <StackPanel x:Name="CustomFanSection" Opacity="{Binding CustomFanOpacity}">
                         <Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="12,12,12,16">
