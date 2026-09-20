@@ -156,6 +156,9 @@ public partial class NitrousDashboard : Window
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
+
+        this.Topmost = SettingsManager.Get("IsPinned", false);
+
         int top = SettingsManager.Get("WindowTop", -9999);
         int left = SettingsManager.Get("WindowLeft", -9999);
         if (top != -9999 && left != -9999)
@@ -182,5 +185,6 @@ public partial class NitrousDashboard : Window
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         SettingsManager.Save("WindowTop", (int)this.Top);
         SettingsManager.Save("WindowLeft", (int)this.Left);
+        SettingsManager.Save("IsPinned", this.Topmost);
     }
 }
