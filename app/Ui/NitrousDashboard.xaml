@@ -210,12 +210,18 @@
 				<!-- Right Side: Power Pill, Pin to Top & Close -->
 				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
 					<!-- 1. Dynamic Power State Pill -->
-					<Border x:Name="DashPowerPillBorder" Background="#151518" BorderBrush="#FF453A" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,0,12,0">
-						<StackPanel Orientation="Horizontal">
-							<Path x:Name="DashPowerPillIcon" Fill="#FF453A" Stretch="Uniform" Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,6,0" Data="M7,2V13H10V22L17,10H13L17,2H7Z"/>
-							<TextBlock x:Name="DashPowerPillText" Text="AC POWER" Foreground="#FF453A" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
-						</StackPanel>
-					</Border>
+                    <Border x:Name="DashPowerPillBorder" BorderBrush="#FF453A" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0">
+                        <Grid>
+                            <!-- Auto-tinting subtle background -->
+                            <Border Background="{Binding BorderBrush, ElementName=DashPowerPillBorder}" Opacity="0.15" CornerRadius="5"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="8,4">
+                                <!-- Updated to an AC Power Plug icon -->
+                                <Path x:Name="DashPowerPillIcon" Fill="#FF453A" Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0" Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z"/>
+                                <TextBlock x:Name="DashPowerPillText" Text="AC POWER" Foreground="#FF453A" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
 					<!-- 2. Pin to Top Toggle -->
 					<ToggleButton x:Name="BtnPinTop"
                                 Cursor="Hand"

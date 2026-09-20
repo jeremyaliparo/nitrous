@@ -115,7 +115,7 @@ public partial class NitrousDashboard : Window
         var powerColor = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isOnline ? "#FF453A" : "#34C759"));
         string powerText = isOnline ? "AC POWER" : "BATTERY";
 
-        var acGeom = Geometry.Parse("M7,2V13H10V22L17,10H13L17,2H7Z");
+        var acGeom = Geometry.Parse("M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z");
         var battGeom = Geometry.Parse("M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z");
 
         DashPowerPillBorder.BorderBrush = powerColor;
