@@ -1,8 +1,7 @@
 using System;
 using System.Linq;
-using System.Diagnostics;
-using System.Globalization;
-using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NvAPIWrapper;
@@ -25,6 +24,11 @@ public class NvidiaGpuManager : IDisposable
     public int MaxMemoryOffset = 1000;
     public int MinMemoryOffset = -1000;
 
+    // Persist the NVML device handle for rapid polling
+    private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
+    private double _memoryClockDivisor = 4.0; // Default to GDDR5/6/6X
+    private string _cachedArchName = "Unknown";
+
     public NvidiaGpuManager()
     {
         InitializeNvAPI();
@@ -35,13 +39,30 @@ public class NvidiaGpuManager : IDisposable
         try
         {
             try { NVIDIA.Unload(); } catch { }
+            try { NativeNvml.Shutdown(); } catch { }
 
+            // Initialize NvAPI for Overclocking
             NVIDIA.Initialize();
             _internalGpu = GetInternalDiscreteGpu();
+
+            // Initialize NVML for Telemetry
+            if (NativeNvml.Init() == NvmlReturn.Success)
+            {
+                // Grab the handle for the primary GPU (index 0)
+                NativeNvml.DeviceGetHandleByIndex(0, out _nvmlDeviceHandle);
+
+                // Fetch architecture to set the correct memory divisor for GDDR7 (Blackwell+)
+                if (NativeNvml.DeviceGetArchitecture(_nvmlDeviceHandle, out NvmlDeviceArchitecture arch) == NvmlReturn.Success)
+                {
+                    _memoryClockDivisor = ((int)arch >= 10) ? 8.0 : 4.0;
+                    _cachedArchName = arch.ToString();
+                }
+            }
         }
         catch
         {
             _internalGpu = null;
+            _nvmlDeviceHandle = IntPtr.Zero;
         }
     }
 
@@ -160,7 +181,6 @@ public class NvidiaGpuManager : IDisposable
         });
     }
 
-    // Helpers to track default values per profile
     public int GetDefaultCore(PowerProfile profile) => profile switch
     {
         PowerProfile.Quiet => -100,
@@ -177,14 +197,12 @@ public class NvidiaGpuManager : IDisposable
         _ => 0
     };
 
-    // Saves the user's custom slider values to the active profile
     public void SaveCustomProfileOc(PowerProfile profile, int core, int memory)
     {
         SettingsManager.Save($"GpuCore_{profile}", core);
         SettingsManager.Save($"GpuMemory_{profile}", memory);
     }
 
-    // Overwrites the custom save with defaults
     public async Task ResetProfileToDefaultsAsync(PowerProfile profile)
     {
         SettingsManager.Save($"GpuCore_{profile}", GetDefaultCore(profile));
@@ -197,6 +215,7 @@ public class NvidiaGpuManager : IDisposable
         try
         {
             NVIDIA.Unload();
+            NativeNvml.Shutdown();
         }
         catch { }
     }
@@ -204,6 +223,7 @@ public class NvidiaGpuManager : IDisposable
     public class GpuTelemetry
     {
         public string Name { get; set; } = "Unknown";
+        public string Architecture { get; set; } = "Unknown";
         public int CoreTemp { get; set; }
         public int GpuLoad { get; set; }
         public int VramUsedMb { get; set; }
@@ -217,90 +237,162 @@ public class NvidiaGpuManager : IDisposable
         public double EnforcedPowerLimitW { get; set; }
     }
 
-    public static async Task<GpuTelemetry> GetSmiTelemetryAsync(CancellationToken cancellationToken = default)
+    public async Task<GpuTelemetry> GetNvmlTelemetryAsync(CancellationToken cancellationToken = default)
     {
         var t = new GpuTelemetry();
 
-        try
+        if (_nvmlDeviceHandle == IntPtr.Zero)
+            return t;
+
+        // Wrap the synchronous P/Invoke calls in Task.Run so the UI thread doesn't stutter during polling
+        return await Task.Run(() =>
         {
-            string smiPath = GetNvidiaSmiPath();
-            if (string.IsNullOrEmpty(smiPath)) return t;
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = smiPath,
-                Arguments = "--query-gpu=gpu_name,temperature.gpu,utilization.gpu,memory.used,memory.total,pstate,clocks.current.graphics,clocks.current.memory,power.draw,power.min_limit,power.max_limit,enforced.power.limit --format=csv,noheader,nounits",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process == null) return t;
-
-            // Combine cancellation token with a 1.5-second timeout for dGPU sleep/D3Cold states
-            using var timeoutCts = new CancellationTokenSource(1500);
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-
             try
             {
-                // Asynchronously wait for process exit without blocking any threads
-                await process.WaitForExitAsync(linkedCts.Token);
+                // GPU Name
+                var nameBuilder = new StringBuilder(64);
+                if (NativeNvml.DeviceGetName(_nvmlDeviceHandle, nameBuilder, 64) == NvmlReturn.Success)
+                    t.Name = nameBuilder.ToString();
+
+                t.Architecture = _cachedArchName;
+
+                // Core Temp
+                if (NativeNvml.DeviceGetTemperature(_nvmlDeviceHandle, NvmlTemperatureSensors.Gpu, out uint temp) == NvmlReturn.Success)
+                    t.CoreTemp = (int)temp;
+
+                // Load
+                if (NativeNvml.DeviceGetUtilizationRates(_nvmlDeviceHandle, out NvmlUtilization util) == NvmlReturn.Success)
+                    t.GpuLoad = (int)util.Gpu;
+
+                // Memory
+                if (NativeNvml.DeviceGetMemoryInfo(_nvmlDeviceHandle, out NvmlMemory mem) == NvmlReturn.Success)
+                {
+                    // Convert bytes to Megabytes
+                    t.VramUsedMb = (int)(mem.Used / (1024 * 1024));
+                    t.VramTotalMb = (int)(mem.Total / (1024 * 1024));
+                }
+
+                // P-State (Format string to match SMI output like "P0", "P8")
+                if (NativeNvml.DeviceGetPerformanceState(_nvmlDeviceHandle, out NvmlPstates pState) == NvmlReturn.Success)
+                    t.PState = pState.ToString().Replace("Pstate", "P");
+
+                // Clocks
+                if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Graphics, out uint coreClock) == NvmlReturn.Success)
+                    t.CurrentCoreClock = (int)coreClock;
+
+                if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Mem, out uint memClock) == NvmlReturn.Success)
+                    t.CurrentMemoryClock = (int)(memClock / _memoryClockDivisor);
+
+                // Power Limits (Convert milliwatts to Watts)
+                if (NativeNvml.DeviceGetPowerUsage(_nvmlDeviceHandle, out uint powerDraw) == NvmlReturn.Success)
+                    t.PowerDrawW = Math.Round(powerDraw / 1000.0, 1);
+
+                if (NativeNvml.DeviceGetEnforcedPowerLimit(_nvmlDeviceHandle, out uint enforced) == NvmlReturn.Success)
+                    t.EnforcedPowerLimitW = Math.Round(enforced / 1000.0, 1);
+
+                if (NativeNvml.DeviceGetPowerManagementLimitConstraints(_nvmlDeviceHandle, out uint minLimit, out uint maxLimit) == NvmlReturn.Success)
+                {
+                    t.MinPowerLimitW = Math.Round(minLimit / 1000.0, 1);
+                    t.MaxPowerLimitW = Math.Round(maxLimit / 1000.0, 1);
+                }
             }
-            catch (OperationCanceledException)
+            catch
             {
-                try { process.Kill(); } catch { }
-                return t;
+                // Ignore P/Invoke exceptions on unsupported platforms or sleeping GPUs
             }
 
-            // Asynchronously read standard output
-            string output = (await process.StandardOutput.ReadToEndAsync(cancellationToken)).Trim();
-            if (string.IsNullOrWhiteSpace(output)) return t;
-
-            string[] values = output.Split(',');
-
-            if (values.Length >= 12)
-            {
-                t.Name = values[0].Trim();
-
-                if (int.TryParse(values[1].Trim(), out int temp)) t.CoreTemp = temp;
-                if (int.TryParse(values[2].Trim(), out int load)) t.GpuLoad = load;
-                if (int.TryParse(values[3].Trim(), out int vramUsed)) t.VramUsedMb = vramUsed;
-                if (int.TryParse(values[4].Trim(), out int vramTotal)) t.VramTotalMb = vramTotal;
-
-                t.PState = values[5].Trim();
-
-                if (int.TryParse(values[6].Trim(), out int coreClock)) t.CurrentCoreClock = coreClock;
-                if (int.TryParse(values[7].Trim(), out int memClock)) t.CurrentMemoryClock = memClock;
-
-                if (double.TryParse(values[8].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double draw))
-                    t.PowerDrawW = draw;
-
-                if (double.TryParse(values[9].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double minLimit))
-                    t.MinPowerLimitW = minLimit;
-
-                if (double.TryParse(values[10].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double maxLimit))
-                    t.MaxPowerLimitW = maxLimit;
-
-                if (double.TryParse(values[11].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double enforcedLimit))
-                    t.EnforcedPowerLimitW = enforcedLimit;
-            }
-        }
-        catch { }
-
-        return t;
+            return t;
+        }, cancellationToken);
     }
 
-    private static string GetNvidiaSmiPath()
+    #region NVML Native Bindings
+
+    public enum NvmlReturn
     {
-        string defaultPath = "nvidia-smi";
-
-        string system32Path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "nvidia-smi.exe");
-        if (File.Exists(system32Path)) return system32Path;
-
-        string programFilesPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"NVIDIA Corporation\NVSMI\nvidia-smi.exe");
-        if (File.Exists(programFilesPath)) return programFilesPath;
-
-        return defaultPath;
+        Success = 0,
+        Uninitialized = 1,
+        InvalidArgument = 2,
+        NotSupported = 3,
+        NoPermission = 4,
+        AlreadyInitialized = 5,
+        NotFound = 6
     }
+
+    public enum NvmlDeviceArchitecture
+    {
+        Kepler = 2, Maxwell = 3, Pascal = 4, Volta = 5,
+        Turing = 6, Ampere = 7, Ada = 8, Hopper = 9,
+        Blackwell = 10, Rubin = 13
+    }
+
+    public enum NvmlClockType { Graphics = 0, Sm = 1, Mem = 2, Video = 3 }
+    public enum NvmlTemperatureSensors { Gpu = 0 }
+    public enum NvmlPstates
+    {
+        Pstate0 = 0, Pstate1 = 1, Pstate2 = 2, Pstate3 = 3,
+        Pstate4 = 4, Pstate5 = 5, Pstate6 = 6, Pstate7 = 7,
+        Pstate8 = 8, Pstate9 = 9, Pstate10 = 10, Pstate11 = 11,
+        Pstate12 = 12, Pstate13 = 13, Pstate14 = 14, Pstate15 = 15,
+        Unknown = 32
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NvmlUtilization
+    {
+        public uint Gpu;
+        public uint Memory;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NvmlMemory
+    {
+        public ulong Total;
+        public ulong Free;
+        public ulong Used;
+    }
+
+    private static class NativeNvml
+    {
+        private const string NvmlDll = "nvml.dll";
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlInit_v2")]
+        public static extern NvmlReturn Init();
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlShutdown")]
+        public static extern NvmlReturn Shutdown();
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetHandleByIndex_v2")]
+        public static extern NvmlReturn DeviceGetHandleByIndex(uint index, out IntPtr device);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetName")]
+        public static extern NvmlReturn DeviceGetName(IntPtr device, StringBuilder name, uint length);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetUtilizationRates")]
+        public static extern NvmlReturn DeviceGetUtilizationRates(IntPtr device, out NvmlUtilization utilization);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetTemperature")]
+        public static extern NvmlReturn DeviceGetTemperature(IntPtr device, NvmlTemperatureSensors sensorType, out uint temp);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetClockInfo")]
+        public static extern NvmlReturn DeviceGetClockInfo(IntPtr device, NvmlClockType type, out uint clock);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetMemoryInfo")]
+        public static extern NvmlReturn DeviceGetMemoryInfo(IntPtr device, out NvmlMemory memory);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetPowerUsage")]
+        public static extern NvmlReturn DeviceGetPowerUsage(IntPtr device, out uint power);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetEnforcedPowerLimit")]
+        public static extern NvmlReturn DeviceGetEnforcedPowerLimit(IntPtr device, out uint limit);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetPowerManagementLimitConstraints")]
+        public static extern NvmlReturn DeviceGetPowerManagementLimitConstraints(IntPtr device, out uint minLimit, out uint maxLimit);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetPerformanceState")]
+        public static extern NvmlReturn DeviceGetPerformanceState(IntPtr device, out NvmlPstates pState);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetArchitecture")]
+        public static extern NvmlReturn DeviceGetArchitecture(IntPtr device, out NvmlDeviceArchitecture arch);
+    }
+    #endregion
 }

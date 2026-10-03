@@ -36,7 +36,7 @@ public class DashboardViewModel : ObservableObject
     private string _applyBtnText = "APPLY";
     public string ApplyBtnText { get => _applyBtnText; set => SetProperty(ref _applyBtnText, value); }
 
-    private string _applyBtnColor = "#B388FF";
+    private string _applyBtnColor = "#a855f7";
     public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
 
     private int _gpuCoreOffset;
@@ -47,6 +47,9 @@ public class DashboardViewModel : ObservableObject
 
     private string _gpuNameText = "NVIDIA GPU";
     public string GpuNameText { get => _gpuNameText; set => SetProperty(ref _gpuNameText, value); }
+
+    private string _gpuArchText = "--";
+    public string GpuArchText { get => _gpuArchText; set => SetProperty(ref _gpuArchText, value); }
 
     private string _gpuLoadText = "0%";
     public string GpuLoadText { get => _gpuLoadText; set => SetProperty(ref _gpuLoadText, value); }
@@ -221,7 +224,7 @@ public class DashboardViewModel : ObservableObject
 
             await Task.Delay(2000);
             ApplyBtnText = "APPLY";
-            ApplyBtnColor = "#B388FF";
+            ApplyBtnColor = "#a855f7";
         });
 
         ResetGpuClocksCommand = new RelayCommand(async _ =>
@@ -367,6 +370,7 @@ public class DashboardViewModel : ObservableObject
     private void ClearDeepTelemetryUI()
     {
         GpuNameText = "NVIDIA GPU (SLEEPING)";
+        GpuArchText = "--";
         GpuLoadText = "-- %";
         GpuLoadColor = "#888890";
         GpuVramText = "-- / -- MB";
@@ -414,11 +418,12 @@ public class DashboardViewModel : ObservableObject
                     // Run Acer WMI and Nvidia SMI concurrently in the background
                     var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
 
-                    // Conditionally fetch deep NVIDIA SMI stats
+                    // Conditionally fetch deep NVML stats
                     Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
                     if (DeepGpuTelemetry)
                     {
-                        smiTask = NvidiaGpuManager.GetSmiTelemetryAsync(token);
+                        // Use your instantiated _gpuManager and the new method name
+                        smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
                         await Task.WhenAll(wmiTask, smiTask);
                     }
                     else
@@ -445,6 +450,7 @@ public class DashboardViewModel : ObservableObject
                         if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                         {
                             GpuNameText = smi.Name;
+                            GpuArchText = smi.Architecture;
 
                             GpuLoadText = $"{smi.GpuLoad}%";
                             GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");

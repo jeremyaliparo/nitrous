@@ -163,7 +163,7 @@ public class TrayApplication : ApplicationContext
                         // Fallback to NVIDIA SMI if EC reports 0
                         if (effectiveGpuTemp == 0 && deepTelemetry)
                         {
-                            var smi = await NvidiaGpuManager.GetSmiTelemetryAsync(_engineCts.Token);
+                            var smi = await _gpuManager.GetNvmlTelemetryAsync(_engineCts.Token);
                             if (smi != null && smi.CoreTemp > 0)
                             {
                                 effectiveGpuTemp = smi.CoreTemp;

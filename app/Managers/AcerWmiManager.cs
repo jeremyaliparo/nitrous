@@ -105,28 +105,22 @@ public static class AcerWmiManager
             {
                 using (instance)
                 {
-                    // 1. CPU Temperature (Address: 0x0101)
+                    // 1. CPU
                     cpuTemp = ReadAcerSensor(instance, 0x0101u, 0xFF);
-
-                    // 2. CPU Fan Speed (Address: 0x0201)
                     cpuRpm = ReadAcerSensor(instance, 0x0201u, 0xFFFF);
 
-                    // 3. GPU Temperature (Address: 0x0A01)
+                    // 2. GPU Fans (EC controls this, WMI is highly reliable here)
+                    gpuRpm = ReadAcerSensor(instance, 0x0601u, 0xFFFF);
+
                     gpuTemp = ReadAcerSensor(instance, 0x0A01u, 0xFF);
                     if (gpuTemp == 0) gpuTemp = ReadAcerSensor(instance, 0x0901u, 0xFF);
                     if (gpuTemp == 0) gpuTemp = ReadAcerSensor(instance, 0x0B01u, 0xFF);
 
-                    // 4. GPU Fan Speed (Address: 0x0601)
-                    gpuRpm = ReadAcerSensor(instance, 0x0601u, 0xFFFF);
-
-                    break; // Only process the first instance
+                    break;
                 }
             }
         }
-        catch
-        {
-            // Fail silently if WMI is entirely inaccessible
-        }
+        catch { }
 
         return (cpuTemp, cpuRpm, gpuTemp, gpuRpm);
     }
