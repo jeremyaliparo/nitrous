@@ -18,9 +18,7 @@ public partial class NitrousDashboard : Window
 
         DataContext = new DashboardViewModel();
 
-        DashVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
-        SettingsVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
-        GpuVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
+        DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -54,6 +52,7 @@ public partial class NitrousDashboard : Window
         DashPage.Visibility = Visibility.Visible;
         GpuPage.Visibility = Visibility.Collapsed;
         SettingsPage.Visibility = Visibility.Collapsed;
+        KeyboardPage.Visibility = Visibility.Collapsed;
 
         var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
         var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
@@ -64,6 +63,9 @@ public partial class NitrousDashboard : Window
         NavGpuIcon.Fill = inactiveBrush;
         NavGpuText.Foreground = inactiveBrush;
 
+        NavKeyboardIcon.Fill = inactiveBrush;
+        NavKeyboardText.Foreground = inactiveBrush;
+
         NavSetIcon.Fill = inactiveBrush;
         NavSetText.Foreground = inactiveBrush;
     }
@@ -73,6 +75,7 @@ public partial class NitrousDashboard : Window
         DashPage.Visibility = Visibility.Collapsed;
         GpuPage.Visibility = Visibility.Visible;
         SettingsPage.Visibility = Visibility.Collapsed;
+        KeyboardPage.Visibility = Visibility.Collapsed;
 
         var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
         var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
@@ -85,12 +88,39 @@ public partial class NitrousDashboard : Window
 
         NavSetIcon.Fill = inactiveBrush;
         NavSetText.Foreground = inactiveBrush;
+
+        NavKeyboardIcon.Fill = inactiveBrush;
+        NavKeyboardText.Foreground = inactiveBrush;
+    }
+
+    private void NavKeyboardBtn_Click(object sender, RoutedEventArgs e)
+    {
+        DashPage.Visibility = Visibility.Collapsed;
+        GpuPage.Visibility = Visibility.Collapsed;
+        KeyboardPage.Visibility = Visibility.Visible;
+        SettingsPage.Visibility = Visibility.Collapsed;
+
+        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
+        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+
+        NavDashIcon.Fill = inactiveBrush;
+        NavDashText.Foreground = inactiveBrush;
+
+        NavGpuIcon.Fill = inactiveBrush;
+        NavGpuText.Foreground = inactiveBrush;
+
+        NavKeyboardIcon.Fill = activeBrush;
+        NavKeyboardText.Foreground = activeBrush;
+
+        NavSetIcon.Fill = inactiveBrush;
+        NavSetText.Foreground = inactiveBrush;
     }
 
     private void NavSetBtn_Click(object sender, RoutedEventArgs e)
     {
         DashPage.Visibility = Visibility.Collapsed;
         GpuPage.Visibility = Visibility.Collapsed;
+        KeyboardPage.Visibility = Visibility.Collapsed;
         SettingsPage.Visibility = Visibility.Visible;
 
         var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
@@ -101,6 +131,9 @@ public partial class NitrousDashboard : Window
 
         NavGpuIcon.Fill = inactiveBrush;
         NavGpuText.Foreground = inactiveBrush;
+
+        NavKeyboardIcon.Fill = inactiveBrush;
+        NavKeyboardText.Foreground = inactiveBrush;
 
         NavSetIcon.Fill = activeBrush;
         NavSetText.Foreground = activeBrush;
@@ -151,7 +184,15 @@ public partial class NitrousDashboard : Window
 
         if (DataContext is DashboardViewModel vm)
         {
-            vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
+            // vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
+            vm.ActivePowerProfile = activeMode;
+        }
+
+        // Refresh Hotkey labels
+        if (TxtHkCycle != null)
+        {
+            TxtHkCycle.Text = FormatHotkeyLabel(SettingsManager.Get("Hotkey_CyclePower", ""));
+            TxtHkDash.Text = FormatHotkeyLabel(SettingsManager.Get("Hotkey_Dashboard", ""));
         }
     }
 
@@ -225,5 +266,69 @@ public partial class NitrousDashboard : Window
 
         _isDialogOpen = true;
         _activeCurveWindow.Show();
+    }
+
+    private void Hotkey_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        e.Handled = true; // Prevent standard typing
+
+        if (sender is not System.Windows.Controls.TextBox txt || txt.Tag == null) return;
+
+        // Ignore modifier keys pressed on their own
+        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+            e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+            e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.Key == Key.System)
+            return;
+
+        string settingKey = (string)txt.Tag;
+
+        // ESC clears the hotkey
+        if (e.Key == Key.Escape)
+        {
+            txt.Text = "None";
+            SettingsManager.Save(settingKey, "");
+            Keyboard.ClearFocus();
+            return;
+        }
+
+        // Extract actual key (handle System keys like Alt+Key)
+        Key key = (e.Key == Key.System ? e.SystemKey : e.Key);
+        uint vk = (uint)KeyInterop.VirtualKeyFromKey(key);
+
+        // Calculate modifiers
+        uint modifiers = 0;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) modifiers |= 0x0001;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) modifiers |= 0x0002;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) modifiers |= 0x0004;
+
+        // Require at least one modifier to prevent binding simple letters like "W"
+        if (modifiers == 0) return;
+
+        // Save as "Modifiers|VirtualKey"
+        string savedValue = $"{modifiers}|{vk}";
+        SettingsManager.Save(settingKey, savedValue);
+
+        txt.Text = FormatHotkeyLabel(savedValue);
+        Keyboard.ClearFocus();
+    }
+
+    private string FormatHotkeyLabel(string savedValue)
+    {
+        if (string.IsNullOrEmpty(savedValue)) return "None";
+        try
+        {
+            var parts = savedValue.Split('|');
+            uint mods = uint.Parse(parts[0]);
+            uint vk = uint.Parse(parts[1]);
+
+            string label = "";
+            if ((mods & 0x0002) != 0) label += "Ctrl + ";
+            if ((mods & 0x0004) != 0) label += "Shift + ";
+            if ((mods & 0x0001) != 0) label += "Alt + ";
+
+            label += KeyInterop.KeyFromVirtualKey((int)vk).ToString();
+            return label;
+        }
+        catch { return "None"; }
     }
 }
