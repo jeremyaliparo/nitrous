@@ -226,12 +226,21 @@ public class TrayApplication : ApplicationContext
                 break;
         }
 
-        // Apply the new mode
+        // 1. Apply the new Acer power mode
         _ = AcerWmiManager.SetPowerModeAsync(nextProfile);
         SettingsManager.Save("LastPowerMode", (int)nextProfile);
         SettingsManager.Save(acDcKey, (int)nextProfile);
 
-        // Show the correct color on the OSD
+        // 2. Apply Windows CPU Power Limits if enabled
+        if (SettingsManager.Get("ManageCpuPower", 0) == 1)
+        {
+            _ = CpuPowerManager.ApplyProfileLimitsAsync(nextProfile, isOnline);
+        }
+
+        // 3. Apply GPU Overclock/Underclock profile
+        _ = _gpuManager.ApplyPowerProfileOcAsync(nextProfile);
+
+        // 4. Show the correct color and icon on the OSD
         Color osdColor = nextProfile switch
         {
             PowerProfile.Quiet => Color.FromArgb(52, 199, 89),       // Green
@@ -242,9 +251,6 @@ public class TrayApplication : ApplicationContext
         };
 
         _osd.ShowProfile($"{nextProfile} MODE", osdColor, nextProfile);
-
-        // Ping the dashboard to update the highlighted button instantly
-        // SignalManager.SendSignal();
     }
 
     private void StartBackgroundEngine()
