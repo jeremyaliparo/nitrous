@@ -26,7 +26,6 @@ public class NvidiaGpuManager : IDisposable
 
     // Persist the NVML device handle for rapid polling
     private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
-    private double _memoryClockDivisor = 4.0; // Default to GDDR5/6/6X
     private string _cachedArchName = "Unknown";
 
     public NvidiaGpuManager()
@@ -54,7 +53,6 @@ public class NvidiaGpuManager : IDisposable
                 // Fetch architecture to set the correct memory divisor for GDDR7 (Blackwell+)
                 if (NativeNvml.DeviceGetArchitecture(_nvmlDeviceHandle, out NvmlDeviceArchitecture arch) == NvmlReturn.Success)
                 {
-                    _memoryClockDivisor = ((int)arch >= 10) ? 8.0 : 4.0;
                     _cachedArchName = arch.ToString();
                 }
             }
@@ -281,7 +279,7 @@ public class NvidiaGpuManager : IDisposable
                     t.CurrentCoreClock = (int)coreClock;
 
                 if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Mem, out uint memClock) == NvmlReturn.Success)
-                    t.CurrentMemoryClock = (int)(memClock / _memoryClockDivisor);
+                    t.CurrentMemoryClock = (int)memClock;
 
                 // Power Limits (Convert milliwatts to Watts)
                 if (NativeNvml.DeviceGetPowerUsage(_nvmlDeviceHandle, out uint powerDraw) == NvmlReturn.Success)
