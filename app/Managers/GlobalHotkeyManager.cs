@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using Nitrous.Diagnostics;
 
 namespace Nitrous.Managers;
 
@@ -20,23 +21,28 @@ public class GlobalHotkeyManager : NativeWindow, IDisposable
         CreateHandle(new CreateParams()); // Creates a hidden message pump
     }
 
-    public void Register(int id, uint modifiers, uint key)
+    public bool Register(int id, uint modifiers, uint key)
     {
-        UnregisterHotKey(this.Handle, id); // Clear existing
-        RegisterHotKey(this.Handle, id, modifiers, key);
+        UnregisterHotKey(Handle, id); // Clear existing
+        var ok = RegisterHotKey(Handle, id, modifiers, key);
+        if (!ok)
+            Logger.Warn($"Hotkey: RegisterHotKey failed for id {id} (error {Marshal.GetLastWin32Error()}).");
+        return ok;
     }
 
     public void UnregisterAll(params int[] ids)
     {
-        foreach (var id in ids) UnregisterHotKey(this.Handle, id);
+        foreach (var id in ids) UnregisterHotKey(Handle, id);
     }
 
     protected override void WndProc(ref Message m)
     {
         if (m.Msg == WM_HOTKEY)
         {
-            HotkeyPressed?.Invoke(m.WParam.ToInt32());
+            try { HotkeyPressed?.Invoke(m.WParam.ToInt32()); }
+            catch (Exception ex) { Logger.Warn("Hotkey: handler failed.", ex); }
         }
+
         base.WndProc(ref m);
     }
 

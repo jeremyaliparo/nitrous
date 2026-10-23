@@ -1,2 +1,10 @@
 bin/
 obj/
+dist/
+.vs/
+.idea/
+.vscode/
+TestResults/
+*.user
+*.suo
+*.old

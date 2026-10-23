@@ -485,7 +485,7 @@
 										</TextBlock>
 									</StackPanel>
 								</Grid>
-								<Slider x:Name="CpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="{Binding CpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,12"/>
+								<Slider x:Name="CpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="1" Maximum="100" Value="{Binding CpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,12"/>
 								<!-- GPU Slider -->
 								<Grid Margin="0,0,0,4">
 									<TextBlock Text="GPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
@@ -505,7 +505,7 @@
 										</TextBlock>
 									</StackPanel>
 								</Grid>
-								<Slider x:Name="GpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="100" Value="{Binding GpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1"/>
+								<Slider x:Name="GpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="1" Maximum="100" Value="{Binding GpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1"/>
 							</StackPanel>
 						</Border>
 					</StackPanel>

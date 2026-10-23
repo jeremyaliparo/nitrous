@@ -10,6 +10,12 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
+		<Version>0.8.0</Version>
+		<Product>Nitrous</Product>
+		<Company>Nitrous</Company>
+		<RepositoryUrl>https://github.com/jeremyaliparo/nitrous</RepositoryUrl>
+		<DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
+		<DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
 	</PropertyGroup>
 
 	<ItemGroup>

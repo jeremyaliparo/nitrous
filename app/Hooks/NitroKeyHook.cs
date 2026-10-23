@@ -1,7 +1,8 @@
 using System;
+using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Collections.Frozen;
+using Nitrous.Diagnostics;
 
 namespace Nitrous.Hooks;
 
@@ -11,7 +12,7 @@ public partial class NitroKeyHook : IDisposable
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_SYSKEYDOWN = 0x0104;
 
-    private readonly IntPtr _hookID = IntPtr.Zero;
+    private readonly IntPtr _hookID;
     private readonly LowLevelKeyboardProc _proc;
 
     public event EventHandler? NitroKeyPressed;
@@ -22,32 +23,51 @@ public partial class NitroKeyHook : IDisposable
     {
         _proc = HookCallback;
         _hookID = SetHook(_proc);
+        if (_hookID == IntPtr.Zero)
+            Logger.Warn($"Nitro key: SetWindowsHookEx failed (error {Marshal.GetLastWin32Error()}).");
     }
 
     private static IntPtr SetHook(LowLevelKeyboardProc proc)
     {
-        using var curProcess = Process.GetCurrentProcess();
-        using var curModule = curProcess.MainModule;
-        return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule!.ModuleName), 0);
+        try
+        {
+            using var curProcess = Process.GetCurrentProcess();
+            using var curModule = curProcess.MainModule;
+            if (curModule?.ModuleName == null)
+            {
+                Logger.Warn("Nitro key: could not resolve the current module name.");
+                return IntPtr.Zero;
+            }
+
+            return SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Nitro key: hook installation failed.", ex);
+            return IntPtr.Zero;
+        }
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        // Only listen for key down events (ignore key releases)
         if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
         {
             var kbd = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
 
             if (NitroScanCodes.Contains(kbd.scanCode))
             {
-                NitroKeyPressed?.Invoke(this, EventArgs.Empty);
+                try { NitroKeyPressed?.Invoke(this, EventArgs.Empty); }
+                catch (Exception ex) { Logger.Warn("Nitro key: handler failed.", ex); }
             }
         }
 
         return CallNextHookEx(_hookID, nCode, wParam, lParam);
     }
 
-    public void Dispose() => UnhookWindowsHookEx(_hookID);
+    public void Dispose()
+    {
+        if (_hookID != IntPtr.Zero) UnhookWindowsHookEx(_hookID);
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct KBDLLHOOKSTRUCT { public uint vkCode; public uint scanCode; public uint flags; public uint time; public IntPtr dwExtraInfo; }

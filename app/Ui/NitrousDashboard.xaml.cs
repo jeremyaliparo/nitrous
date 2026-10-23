@@ -1,16 +1,24 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Microsoft.Win32;
-using Nitrous.Managers;
+using Nitrous.Diagnostics;
 using Nitrous.Enums;
+using Nitrous.Helpers;
+using Nitrous.Managers;
+
+using Color = System.Windows.Media.Color;
+using ColorConverter = System.Windows.Media.ColorConverter;
+using TextBox = System.Windows.Controls.TextBox;
 
 namespace Nitrous.Ui;
 
 public partial class NitrousDashboard : Window
 {
-    private bool _isDialogOpen = false;
+    private bool _isDialogOpen;
 
     public NitrousDashboard()
     {
@@ -18,26 +26,36 @@ public partial class NitrousDashboard : Window
 
         DataContext = new DashboardViewModel();
 
-        DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text = $"Nitrous {UpdateManager.CurrentVersion}";
+        DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text =
+            $"Nitrous {UpdateManager.CurrentVersion}";
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            string modelName = SystemInfoManager.GetSystemModel();
-            Dispatcher.Invoke(() => SystemModelText.Text = $"{modelName}");
+            var modelName = SystemInfoManager.GetSystemModel();
+            Dispatcher.InvokeAsync(() => SystemModelText.Text = $"{modelName}");
         });
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
+        StateChanged += Window_StateChanged;
     }
 
     private void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.StatusChange)
+        if (e.Mode is not (PowerModes.StatusChange or PowerModes.Resume)) return;
+
+        System.Threading.Tasks.Task.Delay(5500).ContinueWith(_ =>
         {
-            System.Threading.Tasks.Task.Delay(5500).ContinueWith(_ =>
-            {
-                Dispatcher.Invoke(() => RefreshDashboardState());
-            });
-        }
+            if (Dispatcher.HasShutdownStarted) return;
+            Dispatcher.InvokeAsync(RefreshDashboardState);
+        });
+    }
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is not DashboardViewModel vm) return;
+
+        // The dashboard is a transient UI process; stop hammering WMI/NVML when minimized.
+        vm.SetTelemetryEnabled(WindowState != WindowState.Minimized && IsVisible);
     }
 
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
@@ -45,110 +63,44 @@ public partial class NitrousDashboard : Window
         if (e.ChangedButton == MouseButton.Left) DragMove();
     }
 
-    private void CloseBtn_Click(object sender, RoutedEventArgs e) => this.Close();
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
 
-    private void NavDashBtn_Click(object sender, RoutedEventArgs e)
+    private void SetActiveNav(int index)
     {
-        DashPage.Visibility = Visibility.Visible;
-        GpuPage.Visibility = Visibility.Collapsed;
-        SettingsPage.Visibility = Visibility.Collapsed;
-        KeyboardPage.Visibility = Visibility.Collapsed;
+        var pages = new UIElement[] { DashPage, GpuPage, KeyboardPage, SettingsPage };
+        var icons = new Shape[] { NavDashIcon, NavGpuIcon, NavKeyboardIcon, NavSetIcon };
+        var labels = new TextBlock[] { NavDashText, NavGpuText, NavKeyboardText, NavSetText };
 
-        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
-        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
+        var activeBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B388FF"));
+        var inactiveBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888890"));
 
-        NavDashIcon.Fill = activeBrush;
-        NavDashText.Foreground = activeBrush;
-
-        NavGpuIcon.Fill = inactiveBrush;
-        NavGpuText.Foreground = inactiveBrush;
-
-        NavKeyboardIcon.Fill = inactiveBrush;
-        NavKeyboardText.Foreground = inactiveBrush;
-
-        NavSetIcon.Fill = inactiveBrush;
-        NavSetText.Foreground = inactiveBrush;
+        for (var i = 0; i < pages.Length; i++)
+        {
+            pages[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
+            icons[i].Fill = i == index ? activeBrush : inactiveBrush;
+            labels[i].Foreground = i == index ? activeBrush : inactiveBrush;
+        }
     }
 
-    private void NavGpuBtn_Click(object sender, RoutedEventArgs e)
-    {
-        DashPage.Visibility = Visibility.Collapsed;
-        GpuPage.Visibility = Visibility.Visible;
-        SettingsPage.Visibility = Visibility.Collapsed;
-        KeyboardPage.Visibility = Visibility.Collapsed;
-
-        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
-        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
-
-        NavDashIcon.Fill = inactiveBrush;
-        NavDashText.Foreground = inactiveBrush;
-
-        NavGpuIcon.Fill = activeBrush;
-        NavGpuText.Foreground = activeBrush;
-
-        NavSetIcon.Fill = inactiveBrush;
-        NavSetText.Foreground = inactiveBrush;
-
-        NavKeyboardIcon.Fill = inactiveBrush;
-        NavKeyboardText.Foreground = inactiveBrush;
-    }
-
-    private void NavKeyboardBtn_Click(object sender, RoutedEventArgs e)
-    {
-        DashPage.Visibility = Visibility.Collapsed;
-        GpuPage.Visibility = Visibility.Collapsed;
-        KeyboardPage.Visibility = Visibility.Visible;
-        SettingsPage.Visibility = Visibility.Collapsed;
-
-        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
-        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
-
-        NavDashIcon.Fill = inactiveBrush;
-        NavDashText.Foreground = inactiveBrush;
-
-        NavGpuIcon.Fill = inactiveBrush;
-        NavGpuText.Foreground = inactiveBrush;
-
-        NavKeyboardIcon.Fill = activeBrush;
-        NavKeyboardText.Foreground = activeBrush;
-
-        NavSetIcon.Fill = inactiveBrush;
-        NavSetText.Foreground = inactiveBrush;
-    }
-
-    private void NavSetBtn_Click(object sender, RoutedEventArgs e)
-    {
-        DashPage.Visibility = Visibility.Collapsed;
-        GpuPage.Visibility = Visibility.Collapsed;
-        KeyboardPage.Visibility = Visibility.Collapsed;
-        SettingsPage.Visibility = Visibility.Visible;
-
-        var activeBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#B388FF"));
-        var inactiveBrush = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#888890"));
-
-        NavDashIcon.Fill = inactiveBrush;
-        NavDashText.Foreground = inactiveBrush;
-
-        NavGpuIcon.Fill = inactiveBrush;
-        NavGpuText.Foreground = inactiveBrush;
-
-        NavKeyboardIcon.Fill = inactiveBrush;
-        NavKeyboardText.Foreground = inactiveBrush;
-
-        NavSetIcon.Fill = activeBrush;
-        NavSetText.Foreground = activeBrush;
-    }
+    private void NavDashBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(0);
+    private void NavGpuBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(1);
+    private void NavKeyboardBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(2);
+    private void NavSetBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(3);
 
     private void Window_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (this.Visibility == Visibility.Visible) RefreshDashboardState();
+        if (DataContext is DashboardViewModel vm)
+            vm.SetTelemetryEnabled(Visibility == Visibility.Visible && WindowState != WindowState.Minimized);
+
+        if (Visibility == Visibility.Visible) RefreshDashboardState();
     }
 
     public void RefreshDashboardState()
     {
-        bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
-        var powerColor = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(isOnline ? "#FF453A" : "#34C759"));
-        string powerText = isOnline ? "AC POWER" : "BATTERY";
+        var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                       System.Windows.Forms.PowerLineStatus.Online;
+        var powerColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isOnline ? "#FF453A" : "#34C759"));
+        var powerText = isOnline ? "AC POWER" : "BATTERY";
 
         var acGeom = Geometry.Parse("M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z");
         var battGeom = Geometry.Parse("M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z");
@@ -158,12 +110,6 @@ public partial class NitrousDashboard : Window
         DashPowerPillText.Foreground = powerColor;
         DashPowerPillText.Text = powerText;
         DashPowerPillIcon.Data = isOnline ? acGeom : battGeom;
-
-        // SettingsPowerPillBorder.BorderBrush = powerColor;
-        // SettingsPowerPillIcon.Fill = powerColor;
-        // SettingsPowerPillText.Foreground = powerColor;
-        // SettingsPowerPillText.Text = powerText;
-        // SettingsPowerPillIcon.Data = isOnline ? acGeom : battGeom;
 
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
@@ -184,15 +130,14 @@ public partial class NitrousDashboard : Window
 
         if (DataContext is DashboardViewModel vm)
         {
-            // vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
             vm.ActivePowerProfile = activeMode;
+            vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
         }
 
-        // Refresh Hotkey labels
         if (TxtHkCycle != null)
         {
-            TxtHkCycle.Text = FormatHotkeyLabel(SettingsManager.Get("Hotkey_CyclePower", ""));
-            TxtHkDash.Text = FormatHotkeyLabel(SettingsManager.Get("Hotkey_Dashboard", ""));
+            TxtHkCycle.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_CyclePower", ""));
+            TxtHkDash.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_Dashboard", ""));
         }
     }
 
@@ -200,43 +145,45 @@ public partial class NitrousDashboard : Window
     {
         base.OnSourceInitialized(e);
 
-        this.Topmost = SettingsManager.Get("IsPinned", false);
+        Topmost = SettingsManager.Get("IsPinned", false);
 
-        int top = SettingsManager.Get("WindowTop", -9999);
-        int left = SettingsManager.Get("WindowLeft", -9999);
+        var top = SettingsManager.Get("WindowTop", -9999);
+        var left = SettingsManager.Get("WindowLeft", -9999);
         if (top != -9999 && left != -9999)
         {
-            this.Top = top;
-            this.Left = left;
+            Top = top;
+            Left = left;
         }
         else
         {
-            this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
     }
 
     private void Window_Deactivated(object sender, EventArgs e)
     {
-        if (this.Topmost || _isDialogOpen) return;
+        if (Topmost || _isDialogOpen) return;
 
-        this.WindowState = WindowState.Minimized;
+        WindowState = WindowState.Minimized;
     }
 
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
-        SettingsManager.Save("WindowTop", (int)this.Top);
-        SettingsManager.Save("WindowLeft", (int)this.Left);
-        SettingsManager.Save("IsPinned", this.Topmost);
+        StateChanged -= Window_StateChanged;
+        SettingsManager.Save("WindowTop", (int)Top);
+        SettingsManager.Save("WindowLeft", (int)Left);
+        SettingsManager.Save("IsPinned", Topmost);
+
+        (DataContext as DashboardViewModel)?.Dispose();
     }
 
     private FanCurveWindow? _activeCurveWindow;
 
     private void OpenCurveEditor_Click(object sender, RoutedEventArgs e)
     {
-        // If the window is already open, just bring it to the front
-        if (_activeCurveWindow != null && _activeCurveWindow.IsLoaded)
+        if (_activeCurveWindow is { IsLoaded: true })
         {
             _activeCurveWindow.Activate();
             return;
@@ -248,21 +195,24 @@ public partial class NitrousDashboard : Window
             WindowStartupLocation = WindowStartupLocation.Manual
         };
 
-        double currentLeft = double.IsNaN(this.Left) ? (SystemParameters.WorkArea.Width / 2) - (this.Width / 2) : this.Left;
-        double currentTop = double.IsNaN(this.Top) ? (SystemParameters.WorkArea.Height / 2) - (this.Height / 2) : this.Top;
+        var currentLeft = double.IsNaN(Left)
+            ? (SystemParameters.WorkArea.Width / 2) - (Width / 2)
+            : Left;
+        var currentTop = double.IsNaN(Top)
+            ? (SystemParameters.WorkArea.Height / 2) - (Height / 2)
+            : Top;
 
-        double targetLeft = currentLeft - _activeCurveWindow.Width - 10;
-
-        if (targetLeft < 0)
-        {
-            targetLeft = currentLeft + this.Width + 10;
-        }
+        var targetLeft = currentLeft - _activeCurveWindow.Width - 10;
+        if (targetLeft < 0) targetLeft = currentLeft + Width + 10;
 
         _activeCurveWindow.Left = targetLeft;
         _activeCurveWindow.Top = currentTop;
 
-        // Attach an event to clear the flag when the window closes
-        _activeCurveWindow.Closed += (s, args) => _isDialogOpen = false;
+        _activeCurveWindow.Closed += (s, args) =>
+        {
+            _isDialogOpen = false;
+            _activeCurveWindow = null;
+        };
 
         _isDialogOpen = true;
         _activeCurveWindow.Show();
@@ -272,17 +222,16 @@ public partial class NitrousDashboard : Window
     {
         e.Handled = true; // Prevent standard typing
 
-        if (sender is not System.Windows.Controls.TextBox txt || txt.Tag == null) return;
+        if (sender is not TextBox txt || txt.Tag == null) return;
 
-        // Ignore modifier keys pressed on their own
-        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
-            e.Key == Key.LeftShift || e.Key == Key.RightShift ||
-            e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.Key == Key.System)
+        // Ignore modifier keys pressed on their own.
+        if (e.Key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift
+            or Key.LeftAlt or Key.RightAlt or Key.System)
             return;
 
-        string settingKey = (string)txt.Tag;
+        var settingKey = (string)txt.Tag;
 
-        // ESC clears the hotkey
+        // ESC clears the hotkey.
         if (e.Key == Key.Escape)
         {
             txt.Text = "None";
@@ -291,44 +240,21 @@ public partial class NitrousDashboard : Window
             return;
         }
 
-        // Extract actual key (handle System keys like Alt+Key)
-        Key key = (e.Key == Key.System ? e.SystemKey : e.Key);
-        uint vk = (uint)KeyInterop.VirtualKeyFromKey(key);
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var virtualKey = (uint)KeyInterop.VirtualKeyFromKey(key);
 
-        // Calculate modifiers
         uint modifiers = 0;
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) modifiers |= 0x0001;
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) modifiers |= 0x0002;
-        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) modifiers |= 0x0004;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) modifiers |= HotkeyBinding.ModAlt;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) modifiers |= HotkeyBinding.ModControl;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) modifiers |= HotkeyBinding.ModShift;
 
-        // Require at least one modifier to prevent binding simple letters like "W"
+        // Require at least one modifier to prevent binding simple letters like "W".
         if (modifiers == 0) return;
 
-        // Save as "Modifiers|VirtualKey"
-        string savedValue = $"{modifiers}|{vk}";
+        var savedValue = HotkeyBinding.Create(modifiers, virtualKey);
         SettingsManager.Save(settingKey, savedValue);
 
-        txt.Text = FormatHotkeyLabel(savedValue);
+        txt.Text = HotkeyBinding.Format(savedValue);
         Keyboard.ClearFocus();
-    }
-
-    private string FormatHotkeyLabel(string savedValue)
-    {
-        if (string.IsNullOrEmpty(savedValue)) return "None";
-        try
-        {
-            var parts = savedValue.Split('|');
-            uint mods = uint.Parse(parts[0]);
-            uint vk = uint.Parse(parts[1]);
-
-            string label = "";
-            if ((mods & 0x0002) != 0) label += "Ctrl + ";
-            if ((mods & 0x0004) != 0) label += "Shift + ";
-            if ((mods & 0x0001) != 0) label += "Alt + ";
-
-            label += KeyInterop.KeyFromVirtualKey((int)vk).ToString();
-            return label;
-        }
-        catch { return "None"; }
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -10,23 +11,44 @@ using NvAPIWrapper.Native;
 using NvAPIWrapper.Native.GPU;
 using NvAPIWrapper.Native.GPU.Structures;
 using NvAPIWrapper.Native.Interfaces.GPU;
+using Nitrous.Diagnostics;
 using Nitrous.Enums;
 
 namespace Nitrous.Managers;
 
 public class NvidiaGpuManager : IDisposable
 {
+    private static readonly FieldInfo ClockEntryFlagsField =
+        typeof(PerformanceStates20ClockEntryV1).GetField(
+            "_Flags",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("NvAPIWrapper clock entry layout changed.");
+
+    private static readonly FieldInfo PerformanceStateFlagsField =
+        typeof(PerformanceStates20InfoV1.PerformanceState20).GetField(
+            "_Flags",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("NvAPIWrapper performance state layout changed.");
+
+    private readonly object _gate = new();
+    private volatile bool _disposed;
     private PhysicalGPU? _internalGpu;
-    public bool IsValid => _internalGpu != null;
+    private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
+    private bool _nvmlInitialized;
+    private string _cachedArchName = "Unknown";
+    private int _nvmlConsecutiveFailures;
+    private DateTime _lastNvmlReset = DateTime.MinValue;
+    private bool _initFailureLogged;
+
+    public bool IsValid
+    {
+        get { lock (_gate) return !_disposed && _internalGpu != null; }
+    }
 
     public int MaxCoreOffset = 250;
     public int MinCoreOffset = -250;
     public int MaxMemoryOffset = 1000;
     public int MinMemoryOffset = -1000;
-
-    // Persist the NVML device handle for rapid polling
-    private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
-    private string _cachedArchName = "Unknown";
 
     public NvidiaGpuManager()
     {
@@ -35,43 +57,81 @@ public class NvidiaGpuManager : IDisposable
 
     private void InitializeNvAPI()
     {
-        try
+        lock (_gate)
         {
+            if (_disposed) return;
             try { NVIDIA.Unload(); } catch { }
-            try { NativeNvml.Shutdown(); } catch { }
+            ResetNvmlLocked();
 
-            // Initialize NvAPI for Overclocking
-            NVIDIA.Initialize();
-            _internalGpu = GetInternalDiscreteGpu();
+            _internalGpu = null;
 
-            // Initialize NVML for Telemetry
-            if (NativeNvml.Init() == NvmlReturn.Success)
+            try
             {
-                // Grab the handle for the primary GPU (index 0)
-                NativeNvml.DeviceGetHandleByIndex(0, out _nvmlDeviceHandle);
-
-                // Fetch architecture to set the correct memory divisor for GDDR7 (Blackwell+)
-                if (NativeNvml.DeviceGetArchitecture(_nvmlDeviceHandle, out NvmlDeviceArchitecture arch) == NvmlReturn.Success)
+                NVIDIA.Initialize();
+                _internalGpu = GetInternalDiscreteGpu();
+                _initFailureLogged = false;
+            }
+            catch (Exception ex)
+            {
+                if (!_initFailureLogged)
                 {
-                    _cachedArchName = arch.ToString();
+                    Logger.Warn("NVAPI: initialization failed (the dGPU may be asleep).", ex);
+                    _initFailureLogged = true;
                 }
             }
+
+            InitializeNvmlLocked();
         }
-        catch
+    }
+
+    private void InitializeNvmlLocked()
+    {
+        try
         {
-            _internalGpu = null;
-            _nvmlDeviceHandle = IntPtr.Zero;
+            if (!_nvmlInitialized)
+            {
+                if (NativeNvml.Init() != NvmlReturn.Success)
+                {
+                    Logger.Warn("NVML: initialization failed.");
+                    return;
+                }
+
+                _nvmlInitialized = true;
+            }
+
+            if (_nvmlDeviceHandle == IntPtr.Zero &&
+                NativeNvml.DeviceGetHandleByIndex(0, out var handle) == NvmlReturn.Success)
+            {
+                _nvmlDeviceHandle = handle;
+            }
+
+            if (_nvmlDeviceHandle != IntPtr.Zero &&
+                NativeNvml.DeviceGetArchitecture(_nvmlDeviceHandle, out var arch) == NvmlReturn.Success)
+            {
+                _cachedArchName = arch.ToString();
+            }
         }
+        catch (Exception ex)
+        {
+            Logger.Warn("NVML: initialization failed.", ex);
+        }
+    }
+
+    private void ResetNvmlLocked()
+    {
+        try { NativeNvml.Shutdown(); } catch { }
+        _nvmlInitialized = false;
+        _nvmlDeviceHandle = IntPtr.Zero;
+        _lastNvmlReset = DateTime.UtcNow;
     }
 
     private static PhysicalGPU? GetInternalDiscreteGpu()
     {
         try
         {
-            return PhysicalGPU
-                .GetPhysicalGPUs()
-                .FirstOrDefault(gpu => gpu.SystemType == SystemType.Laptop)
-                ?? PhysicalGPU.GetPhysicalGPUs().FirstOrDefault();
+            var gpus = PhysicalGPU.GetPhysicalGPUs();
+            return gpus.FirstOrDefault(gpu => gpu.SystemType == SystemType.Laptop)
+                   ?? gpus.FirstOrDefault();
         }
         catch
         {
@@ -79,103 +139,350 @@ public class NvidiaGpuManager : IDisposable
         }
     }
 
-    public bool GetClocks(out int core, out int memory)
+    public bool GetClocks(out int core, out int memory) => TryGetClocks(out core, out memory, out _);
+
+    /// <summary>
+    /// Reads the currently applied P0 deltas. Returns false (instead of reporting 0/0) when the
+    /// GPU is asleep or NVAPI fails, so callers never mistake "could not read" for "reset".
+    /// </summary>
+    public bool TryGetClocks(out int core, out int memory, out string? error)
     {
-        core = memory = 0;
-        if (!IsValid) return false;
+        core = 0;
+        memory = 0;
+        error = null;
 
-        try
+        lock (_gate)
         {
-            IPerformanceStates20Info states = GPUApi.GetPerformanceStates20(_internalGpu!.Handle);
-            var p0Clocks = states.Clocks[PerformanceStateId.P0_3DPerformance];
+            if (_disposed)
+            {
+                error = "The GPU manager has been disposed.";
+                return false;
+            }
 
-            var coreClock = p0Clocks.FirstOrDefault(c => c.DomainId == PublicClockDomain.Graphics);
-            var memClock = p0Clocks.FirstOrDefault(c => c.DomainId == PublicClockDomain.Memory);
+            try
+            {
+                if (_internalGpu == null) InitializeNvAPI();
+                if (_internalGpu == null)
+                {
+                    error = "NVAPI is not initialized (GPU asleep or driver unavailable).";
+                    return false;
+                }
 
-            core = (coreClock?.FrequencyDeltaInkHz.DeltaValue ?? 0) / 1000;
-            memory = (memClock?.FrequencyDeltaInkHz.DeltaValue ?? 0) / 1000;
+                var states = GPUApi.GetPerformanceStates20(_internalGpu.Handle);
+                if (!states.Clocks.TryGetValue(PerformanceStateId.P0_3DPerformance, out var p0Clocks))
+                {
+                    error = "P0 performance state is unavailable.";
+                    return false;
+                }
 
-            return true;
+                var coreEntry = p0Clocks.FirstOrDefault(c =>
+                    c.DomainId == PublicClockDomain.Graphics && c.IsEditable);
+                var memoryEntry = p0Clocks.FirstOrDefault(c =>
+                    c.DomainId == PublicClockDomain.Memory && c.IsEditable);
+
+                if (coreEntry == null || memoryEntry == null)
+                {
+                    error = "Editable graphics/memory clock entries are unavailable.";
+                    return false;
+                }
+
+                core = coreEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                memory = memoryEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                InvalidateGpuLocked();
+                return false;
+            }
         }
-        catch
+    }
+
+    public int SetClocks(int core, int memory) => TrySetClocks(core, memory, out _) ? 1 : 0;
+
+    /// <summary>
+    /// Applies the offsets to P0 and verifies the result by reading it back.
+    ///
+    /// Blackwell-class drivers reject a full Get -> modify -> Set round trip with
+    /// NVAPI_NOT_SUPPORTED. The request is therefore built as one P-state with one clock entry
+    /// per call (Graphics and Memory separately) and the editable bit set, which is the shape
+    /// the driver accepts.
+    /// </summary>
+    public bool TrySetClocks(int core, int memory, out string? error)
+    {
+        error = null;
+
+        if (core < MinCoreOffset || core > MaxCoreOffset)
         {
+            error = $"Core offset {core} MHz is outside {MinCoreOffset}..{MaxCoreOffset} MHz.";
+            return false;
+        }
+
+        if (memory < MinMemoryOffset || memory > MaxMemoryOffset)
+        {
+            error = $"Memory offset {memory} MHz is outside {MinMemoryOffset}..{MaxMemoryOffset} MHz.";
+            return false;
+        }
+
+        lock (_gate)
+        {
+            if (_disposed)
+            {
+                error = "The GPU manager has been disposed.";
+                return false;
+            }
+
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    if (_internalGpu == null) InitializeNvAPI();
+                    if (_internalGpu == null)
+                    {
+                        error = "NVAPI is not initialized (GPU asleep or driver unavailable).";
+                        return false;
+                    }
+
+                    var states = GPUApi.GetPerformanceStates20(_internalGpu.Handle);
+                    if (!states.IsEditable)
+                    {
+                        error = "The driver reports that performance states are not editable.";
+                        return false;
+                    }
+
+                    if (!states.Clocks.TryGetValue(PerformanceStateId.P0_3DPerformance, out var p0Clocks))
+                    {
+                        error = "P0 performance state is unavailable.";
+                        return false;
+                    }
+
+                    var coreEntry = p0Clocks.FirstOrDefault(c =>
+                        c.DomainId == PublicClockDomain.Graphics && c.IsEditable);
+                    var memoryEntry = p0Clocks.FirstOrDefault(c =>
+                        c.DomainId == PublicClockDomain.Memory && c.IsEditable);
+
+                    if (coreEntry == null || memoryEntry == null)
+                    {
+                        error = "Editable graphics/memory clock entries are unavailable.";
+                        return false;
+                    }
+
+                    var currentCore = coreEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                    var currentMemory = memoryEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                    if (currentCore == core && currentMemory == memory)
+                    {
+                        return true; // idempotent
+                    }
+
+                    var coreRange = coreEntry.FrequencyDeltaInkHz.DeltaRange;
+                    var memoryRange = memoryEntry.FrequencyDeltaInkHz.DeltaRange;
+                    if (!IsWithinRange(core * 1000, coreRange.Minimum, coreRange.Maximum))
+                    {
+                        error = $"Core offset {core} MHz is outside the driver range " +
+                                $"{coreRange.Minimum / 1000}..{coreRange.Maximum / 1000} MHz.";
+                        return false;
+                    }
+
+                    if (!IsWithinRange(memory * 1000, memoryRange.Minimum, memoryRange.Maximum))
+                    {
+                        error = $"Memory offset {memory} MHz is outside the driver range " +
+                                $"{memoryRange.Minimum / 1000}..{memoryRange.Maximum / 1000} MHz.";
+                        return false;
+                    }
+
+                    // Blackwell-class drivers (notably the 596.x branch) reject a full
+                    // Get -> modify -> Set round trip with NVAPI_NOT_SUPPORTED, even when
+                    // only one field changed. Send a sparse request instead: one P-state,
+                    // one clock entry, one editable flag. Split core and memory into two
+                    // independent calls so one domain cannot poison the other's packet.
+                    if (core != currentCore)
+                        ApplyClockDomainLocked(_internalGpu.Handle, PerformanceStateId.P0_3DPerformance,
+                            PublicClockDomain.Graphics, core * 1000);
+
+                    if (memory != currentMemory)
+                        ApplyClockDomainLocked(_internalGpu.Handle, PerformanceStateId.P0_3DPerformance,
+                            PublicClockDomain.Memory, memory * 1000);
+
+                    if (TryGetClocks(out var appliedCore, out var appliedMemory, out var readError) &&
+                        appliedCore == core && appliedMemory == memory)
+                    {
+                        Logger.Info($"GPU OC: applied core {core:+#;-#;0} MHz, memory {memory:+#;-#;0} MHz.");
+                        return true;
+                    }
+
+                    error = $"Driver did not retain the offsets " +
+                            $"(wanted {core}/{memory}, read {appliedCore}/{appliedMemory})" +
+                            (readError == null ? "." : $": {readError}");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    InvalidateGpuLocked();
+
+                    if (attempt == 0)
+                    {
+                        // A sleeping/reset GPU leaves a stale NVAPI handle. Rebuild it and retry once.
+                        InitializeNvAPI();
+                        continue;
+                    }
+
+                    Logger.Warn("GPU OC: failed to apply offsets.", ex);
+                }
+            }
+
             return false;
         }
     }
 
-    public int SetClocks(int core, int memory) => SetClocksInternal(core, memory);
-
-    private int SetClocksInternal(int core, int memory)
+    /// <summary>
+    /// Sends a single-domain P0 offset using the sparse request shape that Blackwell-class
+    /// drivers accept. A full Get -> modify -> Set round trip (all clocks, the Video entry, or
+    /// both domains in one packet) is rejected with NVAPI_NOT_SUPPORTED on those drivers even
+    /// though Get succeeds. The driver wants numPstates=1, numClocks=1, numBaseVoltages=0 and
+    /// the editable bit set on both the P-state and the clock entry.
+    /// </summary>
+    private static void ApplyClockDomainLocked(
+        PhysicalGPUHandle gpuHandle,
+        PerformanceStateId stateId,
+        PublicClockDomain domain,
+        int deltaKhz)
     {
-        if (!IsValid) return 0;
+        var entry = new PerformanceStates20ClockEntryV1(
+            domain,
+            new PerformanceStates20ParameterDelta(deltaKhz));
+        entry = WithEditableFlag(entry);
 
-        if (core < MinCoreOffset || core > MaxCoreOffset) return 0;
-        if (memory < MinMemoryOffset || memory > MaxMemoryOffset) return 0;
+        var performanceState = new PerformanceStates20InfoV1.PerformanceState20(
+            stateId,
+            new[] { entry },
+            Array.Empty<PerformanceStates20BaseVoltageEntryV1>());
+        performanceState = WithEditableFlag(performanceState);
 
-        GetClocks(out int currentCore, out int currentMemory);
+        var request = new PerformanceStates20InfoV1(
+            new[] { performanceState },
+            clocksCount: 1,
+            baseVoltagesCount: 0);
 
-        if (Math.Abs(core - currentCore) < 5 && Math.Abs(memory - currentMemory) < 5)
-            return 1;
+        GPUApi.SetPerformanceStates20(gpuHandle, request);
+    }
 
-        var coreClock = new PerformanceStates20ClockEntryV1(PublicClockDomain.Graphics, new PerformanceStates20ParameterDelta(core * 1000));
-        var memoryClock = new PerformanceStates20ClockEntryV1(PublicClockDomain.Memory, new PerformanceStates20ParameterDelta(memory * 1000));
+    private static PerformanceStates20ClockEntryV1 WithEditableFlag(
+        PerformanceStates20ClockEntryV1 entry)
+    {
+        object boxed = entry;
+        ClockEntryFlagsField.SetValue(boxed, 1u);
+        return (PerformanceStates20ClockEntryV1)boxed;
+    }
 
-        PerformanceStates20ClockEntryV1[] clocks = { coreClock, memoryClock };
-        PerformanceStates20BaseVoltageEntryV1[] voltages = { };
+    private static PerformanceStates20InfoV1.PerformanceState20 WithEditableFlag(
+        PerformanceStates20InfoV1.PerformanceState20 state)
+    {
+        object boxed = state;
+        PerformanceStateFlagsField.SetValue(boxed, 1u);
+        return (PerformanceStates20InfoV1.PerformanceState20)boxed;
+    }
 
-        PerformanceStates20InfoV1.PerformanceState20[] performanceStates = {
-                new PerformanceStates20InfoV1.PerformanceState20(PerformanceStateId.P0_3DPerformance, clocks, voltages)
-            };
+    private static bool IsWithinRange(int value, int minimum, int maximum)
+    {
+        // Some drivers report an empty 0..0 range; treat that as "no advertised limit".
+        if (minimum == 0 && maximum == 0) return true;
+        return value >= minimum && value <= maximum;
+    }
 
-        var overclock = new PerformanceStates20InfoV1(performanceStates, 2, 0);
-
-        try
-        {
-            GPUApi.SetPerformanceStates20(_internalGpu!.Handle, overclock);
-            return 1;
-        }
-        catch
-        {
-            return 0;
-        }
+    private void InvalidateGpuLocked()
+    {
+        _internalGpu = null;
     }
 
     public async Task ApplyOnBootAsync(PowerProfile currentProfile)
     {
-        int core = SettingsManager.Get($"GpuCore_{currentProfile}", GetDefaultCore(currentProfile));
-        int memory = SettingsManager.Get($"GpuMemory_{currentProfile}", GetDefaultMemory(currentProfile));
+        var core = SettingsManager.Get($"GpuCore_{currentProfile}", GetDefaultCore(currentProfile));
+        var memory = SettingsManager.Get($"GpuMemory_{currentProfile}", GetDefaultMemory(currentProfile));
 
-        if (core == 0 && memory == 0) return;
-
-        const int maxAttempts = 8;
-        const int delayMs = 1500;
-
-        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        // A stock profile is not an instruction to clear an offset somebody else (or an
+        // earlier profile) applied. This was the old boot behavior; the old profile switch
+        // path lost it and cleared a working OC back to 0.
+        if (core == 0 && memory == 0)
         {
-            try
-            {
-                if (_internalGpu == null) InitializeNvAPI();
+            Logger.Info($"GPU OC: boot profile {currentProfile} is stock (0/0); leaving offsets untouched.");
+            return;
+        }
 
-                if (IsValid)
-                {
-                    int result = SetClocksInternal(core, memory);
-                    if (result == 1) return;
-                }
+        // Boot can be slow: the driver may take tens of seconds to expose NVAPI.
+        const int maxAttempts = 30;
+        const int delayMs = 2000;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (_disposed) return;
+
+            if (TrySetClocks(core, memory, out var error))
+            {
+                Logger.Info($"GPU OC: boot profile {currentProfile} applied ({core}/{memory} MHz).");
+                return;
             }
-            catch { }
+
+            if (attempt == 1 || attempt % 5 == 0)
+                Logger.Warn($"GPU OC: boot apply {attempt}/{maxAttempts} failed for {currentProfile}: {error}");
 
             await Task.Delay(delayMs);
         }
+
+        Logger.Error($"GPU OC: could not apply boot profile {currentProfile} after {maxAttempts} attempts.");
     }
 
-    public async Task<int> ApplyPowerProfileOcAsync(PowerProfile profile)
+    /// <summary>
+    /// Idempotent watchdog used after resume and on a timer. It only writes when a successful
+    /// read shows the offsets drifted; a failed read is left alone so a sleeping dGPU is not woken.
+    /// </summary>
+    public Task<bool> EnsureClocksAppliedAsync(PowerProfile profile)
     {
+        var core = SettingsManager.Get($"GpuCore_{profile}", GetDefaultCore(profile));
+        var memory = SettingsManager.Get($"GpuMemory_{profile}", GetDefaultMemory(profile));
+
+        // 0/0 means "stock / no override" for automatic repairs; do not use the watchdog to
+        // clear an offset that was applied manually or by another tool.
+        if (core == 0 && memory == 0)
+            return Task.FromResult(true);
+
+        return Task.Run(() =>
+        {
+            if (!TryGetClocks(out var currentCore, out var currentMemory, out _))
+                return false;
+
+            if (currentCore == core && currentMemory == memory)
+                return true;
+
+            Logger.Warn($"GPU OC: offsets drifted from {core}/{memory} to {currentCore}/{currentMemory}; reapplying.");
+            return TrySetClocks(core, memory, out var error) || LogEnsureFailure(error);
+        });
+    }
+
+    private static bool LogEnsureFailure(string? error)
+    {
+        Logger.Warn($"GPU OC: watchdog re-apply failed: {error}");
+        return false;
+    }
+
+    public async Task<int> ApplyPowerProfileOcAsync(PowerProfile profile, bool allowStockReset = false)
+    {
+        var coreOffset = SettingsManager.Get($"GpuCore_{profile}", GetDefaultCore(profile));
+        var memoryOffset = SettingsManager.Get($"GpuMemory_{profile}", GetDefaultMemory(profile));
+
+        // Automatic startup/resume/AC-DC/profile application must not wipe an existing OC
+        // just because this profile's saved offsets are 0/0. Explicit Apply/Power-profile
+        // clicks pass allowStockReset: true and still return the GPU to stock.
+        if (!allowStockReset && coreOffset == 0 && memoryOffset == 0)
+        {
+            Logger.Info($"GPU OC: {profile} is stock (0/0); leaving current offsets untouched.");
+            return 1;
+        }
+
         return await Task.Run(() =>
         {
-            int coreOffset = SettingsManager.Get($"GpuCore_{profile}", GetDefaultCore(profile));
-            int memoryOffset = SettingsManager.Get($"GpuMemory_{profile}", GetDefaultMemory(profile));
-
-            return SetClocksInternal(coreOffset, memoryOffset);
+            return TrySetClocks(coreOffset, memoryOffset, out _) ? 1 : 0;
         });
     }
 
@@ -205,17 +512,22 @@ public class NvidiaGpuManager : IDisposable
     {
         SettingsManager.Save($"GpuCore_{profile}", GetDefaultCore(profile));
         SettingsManager.Save($"GpuMemory_{profile}", GetDefaultMemory(profile));
-        await ApplyPowerProfileOcAsync(profile);
+        await ApplyPowerProfileOcAsync(profile, allowStockReset: true);
     }
 
     public void Dispose()
     {
-        try
+        lock (_gate)
         {
-            NVIDIA.Unload();
-            NativeNvml.Shutdown();
+            if (_disposed) return;
+            _disposed = true;
+
+            try { NVIDIA.Unload(); } catch { }
+            try { NativeNvml.Shutdown(); } catch { }
+            _internalGpu = null;
+            _nvmlInitialized = false;
+            _nvmlDeviceHandle = IntPtr.Zero;
         }
-        catch { }
     }
 
     public class GpuTelemetry
@@ -237,69 +549,124 @@ public class NvidiaGpuManager : IDisposable
 
     public async Task<GpuTelemetry> GetNvmlTelemetryAsync(CancellationToken cancellationToken = default)
     {
-        var t = new GpuTelemetry();
+        var telemetry = new GpuTelemetry();
 
-        if (_nvmlDeviceHandle == IntPtr.Zero)
-            return t;
-
-        // Wrap the synchronous P/Invoke calls in Task.Run so the UI thread doesn't stutter during polling
         return await Task.Run(() =>
         {
-            try
+            lock (_gate)
             {
-                // GPU Name
-                var nameBuilder = new StringBuilder(64);
-                if (NativeNvml.DeviceGetName(_nvmlDeviceHandle, nameBuilder, 64) == NvmlReturn.Success)
-                    t.Name = nameBuilder.ToString();
+                if (_disposed) return telemetry;
 
-                t.Architecture = _cachedArchName;
-
-                // Core Temp
-                if (NativeNvml.DeviceGetTemperature(_nvmlDeviceHandle, NvmlTemperatureSensors.Gpu, out uint temp) == NvmlReturn.Success)
-                    t.CoreTemp = (int)temp;
-
-                // Load
-                if (NativeNvml.DeviceGetUtilizationRates(_nvmlDeviceHandle, out NvmlUtilization util) == NvmlReturn.Success)
-                    t.GpuLoad = (int)util.Gpu;
-
-                // Memory
-                if (NativeNvml.DeviceGetMemoryInfo(_nvmlDeviceHandle, out NvmlMemory mem) == NvmlReturn.Success)
+                if (_nvmlDeviceHandle == IntPtr.Zero)
                 {
-                    // Convert bytes to Megabytes
-                    t.VramUsedMb = (int)(mem.Used / (1024 * 1024));
-                    t.VramTotalMb = (int)(mem.Total / (1024 * 1024));
+                    if (!_nvmlInitialized) InitializeNvmlLocked();
+
+                    // A previous init succeeded but the handle was lost (sleep/driver reset).
+                    if (_nvmlDeviceHandle == IntPtr.Zero &&
+                        DateTime.UtcNow - _lastNvmlReset > TimeSpan.FromSeconds(30))
+                    {
+                        ResetNvmlLocked();
+                        InitializeNvmlLocked();
+                    }
                 }
 
-                // P-State (Format string to match SMI output like "P0", "P8")
-                if (NativeNvml.DeviceGetPerformanceState(_nvmlDeviceHandle, out NvmlPstates pState) == NvmlReturn.Success)
-                    t.PState = pState.ToString().Replace("Pstate", "P");
+                if (_nvmlDeviceHandle == IntPtr.Zero)
+                    return telemetry;
 
-                // Clocks
-                if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Graphics, out uint coreClock) == NvmlReturn.Success)
-                    t.CurrentCoreClock = (int)coreClock;
+                var anySuccess = false;
 
-                if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Mem, out uint memClock) == NvmlReturn.Success)
-                    t.CurrentMemoryClock = (int)memClock;
-
-                // Power Limits (Convert milliwatts to Watts)
-                if (NativeNvml.DeviceGetPowerUsage(_nvmlDeviceHandle, out uint powerDraw) == NvmlReturn.Success)
-                    t.PowerDrawW = Math.Round(powerDraw / 1000.0, 1);
-
-                if (NativeNvml.DeviceGetEnforcedPowerLimit(_nvmlDeviceHandle, out uint enforced) == NvmlReturn.Success)
-                    t.EnforcedPowerLimitW = Math.Round(enforced / 1000.0, 1);
-
-                if (NativeNvml.DeviceGetPowerManagementLimitConstraints(_nvmlDeviceHandle, out uint minLimit, out uint maxLimit) == NvmlReturn.Success)
+                try
                 {
-                    t.MinPowerLimitW = Math.Round(minLimit / 1000.0, 1);
-                    t.MaxPowerLimitW = Math.Round(maxLimit / 1000.0, 1);
-                }
-            }
-            catch
-            {
-                // Ignore P/Invoke exceptions on unsupported platforms or sleeping GPUs
-            }
+                    var nameBuilder = new StringBuilder(96);
+                    if (NativeNvml.DeviceGetName(_nvmlDeviceHandle, nameBuilder, 96) == NvmlReturn.Success)
+                    {
+                        telemetry.Name = nameBuilder.ToString();
+                        anySuccess = true;
+                    }
 
-            return t;
+                    telemetry.Architecture = _cachedArchName;
+
+                    if (NativeNvml.DeviceGetTemperature(_nvmlDeviceHandle, NvmlTemperatureSensors.Gpu, out var temp) == NvmlReturn.Success)
+                    {
+                        telemetry.CoreTemp = (int)temp;
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetUtilizationRates(_nvmlDeviceHandle, out var util) == NvmlReturn.Success)
+                    {
+                        telemetry.GpuLoad = (int)util.Gpu;
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetMemoryInfo(_nvmlDeviceHandle, out var memory) == NvmlReturn.Success)
+                    {
+                        telemetry.VramUsedMb = (int)(memory.Used / (1024 * 1024));
+                        telemetry.VramTotalMb = (int)(memory.Total / (1024 * 1024));
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetPerformanceState(_nvmlDeviceHandle, out var pState) == NvmlReturn.Success)
+                    {
+                        telemetry.PState = pState.ToString().Replace("Pstate", "P");
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Graphics, out var coreClock) == NvmlReturn.Success)
+                    {
+                        telemetry.CurrentCoreClock = (int)coreClock;
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetClockInfo(_nvmlDeviceHandle, NvmlClockType.Mem, out var memClock) == NvmlReturn.Success)
+                    {
+                        telemetry.CurrentMemoryClock = (int)memClock;
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetPowerUsage(_nvmlDeviceHandle, out var powerDraw) == NvmlReturn.Success)
+                    {
+                        telemetry.PowerDrawW = Math.Round(powerDraw / 1000.0, 1);
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetEnforcedPowerLimit(_nvmlDeviceHandle, out var enforced) == NvmlReturn.Success)
+                    {
+                        telemetry.EnforcedPowerLimitW = Math.Round(enforced / 1000.0, 1);
+                        anySuccess = true;
+                    }
+
+                    if (NativeNvml.DeviceGetPowerManagementLimitConstraints(_nvmlDeviceHandle, out var minLimit, out var maxLimit) == NvmlReturn.Success)
+                    {
+                        telemetry.MinPowerLimitW = Math.Round(minLimit / 1000.0, 1);
+                        telemetry.MaxPowerLimitW = Math.Round(maxLimit / 1000.0, 1);
+                        anySuccess = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (_nvmlConsecutiveFailures == 0)
+                        Logger.Warn("NVML: telemetry read failed; will retry.", ex);
+                }
+
+                if (anySuccess)
+                {
+                    _nvmlConsecutiveFailures = 0;
+                }
+                else
+                {
+                    _nvmlConsecutiveFailures++;
+                    // Rebuild the NVML handle after ~30 seconds of total failure (e.g. after sleep),
+                    // but never more often than once a minute.
+                    if (_nvmlConsecutiveFailures >= 15 && DateTime.UtcNow - _lastNvmlReset > TimeSpan.FromMinutes(1))
+                    {
+                        ResetNvmlLocked();
+                        InitializeNvmlLocked();
+                        _nvmlConsecutiveFailures = 0;
+                    }
+                }
+
+                return telemetry;
+            }
         }, cancellationToken);
     }
 

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (win-x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore app/Nitrous.csproj
+
+      - name: Build
+        run: dotnet build app/Nitrous.csproj -c Release --no-restore
+
+      - name: Validate single-file publish
+        shell: pwsh
+        run: |
+          dotnet publish app/Nitrous.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained false `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o dist
+
+          if (-not (Test-Path "dist/Nitrous.exe")) {
+            throw "Publish did not produce dist/Nitrous.exe"
+          }

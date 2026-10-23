@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish single-file executable
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tags must look like vMAJOR.MINOR.PATCH (got '$tag')."
+          }
+          $version = $Matches.version
+
+          dotnet publish app/Nitrous.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained false `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:Version=$version `
+            -p:DebugType=none `
+            -p:DebugSymbols=false `
+            -o dist
+
+          if (-not (Test-Path "dist/Nitrous.exe")) {
+            throw "Publish did not produce dist/Nitrous.exe"
+          }
+
+          $hash = (Get-FileHash "dist/Nitrous.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $sumLine = "$hash  Nitrous.exe`n"
+
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "dist/SHA256SUMS"),
+            $sumLine,
+            [System.Text.Encoding]::ASCII)
+
+          [System.IO.File]::WriteAllText(
+            (Join-Path (Get-Location) "dist/Nitrous.exe.sha256"),
+            $sumLine,
+            [System.Text.Encoding]::ASCII)
+
+          Write-Host "Published Nitrous $version ($hash)"
+
+      - name: Create GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.Substring(1)
+
+          $notes = @(
+            "## Nitrous $version",
+            "",
+            'Requires the [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0).',
+            "",
+            '- `Nitrous.exe` is a framework-dependent single-file build.',
+            '- Verify the download against `SHA256SUMS` or `Nitrous.exe.sha256`.',
+            '- The executable is not code-signed; the checksums are published so the updater can',
+            '  verify an automatic update and so users can verify a manual download.'
+          ) -join "`n"
+
+          gh release create "$tag" `
+            "dist/Nitrous.exe" `
+            "dist/SHA256SUMS" `
+            "dist/Nitrous.exe.sha256" `
+            --title "Nitrous $version" `
+            --notes $notes `
+            --verify-tag

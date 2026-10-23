@@ -3,17 +3,25 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using Nitrous.Diagnostics;
 using Nitrous.Enums;
+using Nitrous.Helpers;
 using Nitrous.Managers;
 using Nitrous.Mvvm;
 
+using MessageBox = System.Windows.MessageBox;
+
 namespace Nitrous.Ui;
 
-public class DashboardViewModel : ObservableObject
+public class DashboardViewModel : ObservableObject, IDisposable
 {
-    private readonly ActionDebouncer _fanDebouncer = new ActionDebouncer();
+    private readonly ActionDebouncer _fanDebouncer = new();
     private readonly NvidiaGpuManager _gpuManager = new();
     private CancellationTokenSource? _pollingCts;
+    private volatile bool _telemetryEnabled = true;
+    private bool _telemetryErrorLogged;
+    private bool _isApplyingClocks;
+    private bool _disposed;
 
     private string _cpuTempText = "--°C";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
@@ -98,6 +106,10 @@ public class DashboardViewModel : ObservableObject
             {
                 SettingsManager.Save("IsCurveModeEnabled", value ? 1 : 0);
                 OnPropertyChanged(nameof(IsManualSliderEnabled));
+
+                // Leaving curve mode should immediately hand control back to the manual sliders.
+                if (!value && IsCustomFanEnabled)
+                    _ = AcerWmiManager.SetCustomFansAsync(CpuFanSpeed, GpuFanSpeed);
             }
         }
     }
@@ -108,20 +120,40 @@ public class DashboardViewModel : ObservableObject
         get => _manageCpuPower;
         set
         {
-            if (SetProperty(ref _manageCpuPower, value))
-            {
-                SettingsManager.Save("ManageCpuPower", value ? 1 : 0);
-                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+            if (!SetProperty(ref _manageCpuPower, value)) return;
 
-                if (value)
+            SettingsManager.Save("ManageCpuPower", value ? 1 : 0);
+            var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                           System.Windows.Forms.PowerLineStatus.Online;
+
+            if (!value)
+            {
+                // Restore synchronously: the user may close the dashboard immediately after
+                // turning the feature off, and a background task would die with the process
+                // while the CPU limits are still applied.
+                try
                 {
-                    _ = CpuPowerManager.ApplyProfileLimitsAsync(ActivePowerProfile, isOnline);
+                    CpuPowerManager.RestoreOriginalSynchronously();
                 }
-                else
+                catch (Exception ex)
                 {
-                    _ = CpuPowerManager.RestoreDefaultsAsync(isOnline);
+                    Logger.Warn("CPU power: toggle restore failed.", ex);
                 }
+
+                return;
             }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await CpuPowerManager.ApplyProfileLimitsAsync(ActivePowerProfile, isOnline);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("CPU power: toggle failed.", ex);
+                }
+            });
         }
     }
 
@@ -129,40 +161,44 @@ public class DashboardViewModel : ObservableObject
 
     public DashboardViewModel()
     {
-        // Initialize Fan State
-        _cpuFanSpeed = SettingsManager.Get("CustomFanSpeedCpu", 50);
-        _gpuFanSpeed = SettingsManager.Get("CustomFanSpeedGpu", 50);
+        // Initialize fan state. Old versions could persist 0/1%, so repair it on load.
+        var savedCpu = SettingsManager.Get("CustomFanSpeedCpu", 50);
+        var savedGpu = SettingsManager.Get("CustomFanSpeedGpu", 50);
+        _cpuFanSpeed = FanSafety.Clamp(savedCpu);
+        _gpuFanSpeed = FanSafety.Clamp(savedGpu);
+        if (_cpuFanSpeed != savedCpu) SettingsManager.Save("CustomFanSpeedCpu", _cpuFanSpeed);
+        if (_gpuFanSpeed != savedGpu) SettingsManager.Save("CustomFanSpeedGpu", _gpuFanSpeed);
+
         _isUnifiedFans = SettingsManager.Get("UnifiedFans", 1) == 1;
         _isCurveModeEnabled = SettingsManager.Get("IsCurveModeEnabled", 0) == 1;
         _manageCpuPower = SettingsManager.Get("ManageCpuPower", 0) == 1;
 
         _deepGpuTelemetry = SettingsManager.Get("DeepGpuTelemetry", 1) == 1;
-        if (!_deepGpuTelemetry)
-        {
-            ClearDeepTelemetryUI();
-        }
+        if (!_deepGpuTelemetry) ClearDeepTelemetryUI();
 
-        var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
+        var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f)
+            ? f
+            : FanProfile.Auto;
         IsCustomFanEnabled = activeFan == FanProfile.Medium;
 
-        // Initialize Refresh Rate Label
-        int maxHz = DisplayManager.GetPrimaryMaxRefreshRate();
-        MaxRefreshText = $"{maxHz}Hz";
+        // Initialize refresh-rate label.
+        MaxRefreshText = $"{DisplayManager.GetPrimaryMaxRefreshRate()}Hz";
 
-        // Initialize Settings State
+        // Initialize settings state.
         _chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
         _autoSwitch = SettingsManager.Get("AutoSwitch", 0) == 1;
         _refreshAutoSwitch = SettingsManager.Get("RefreshAutoSwitch", 0) == 1;
 
-        System.Threading.Tasks.Task.Run(() =>
+        ActivePowerProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+
+        Task.Run(() =>
         {
-            bool isTurbo = AcerWmiManager.IsTurboModeSupported();
-            bool isTaskEnabled = StartupManager.CheckStartupTask();
+            var isTurbo = AcerWmiManager.IsTurboModeSupported();
+            var isTaskEnabled = StartupManager.CheckStartupTask();
+            var hasClocks = _gpuManager.TryGetClocks(out var core, out var memory, out var clockError);
+            if (!hasClocks && !string.IsNullOrEmpty(clockError))
+                Logger.Info($"GPU OC: initial clock read failed: {clockError}");
 
-            int core = 0, memory = 0;
-            bool hasClocks = _gpuManager.IsValid && _gpuManager.GetClocks(out core, out memory);
-
-            // Push results back to the UI thread asynchronously
             System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
             {
                 IsTurboSupported = isTurbo;
@@ -170,6 +206,7 @@ public class DashboardViewModel : ObservableObject
                 _runOnStartup = isTaskEnabled;
                 OnPropertyChanged(nameof(RunOnStartup));
 
+                // Never overwrite the user's saved offsets with 0 just because the GPU was asleep.
                 if (hasClocks)
                 {
                     GpuCoreOffset = core;
@@ -178,95 +215,145 @@ public class DashboardViewModel : ObservableObject
             });
         });
 
-        ActivePowerProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
-
-        // Setup Commands
+        // Setup commands.
         SetPowerCommand = new RelayCommand(async param =>
         {
-            if (Enum.TryParse(param?.ToString(), out PowerProfile mode))
+            try
             {
+                if (!Enum.TryParse(param?.ToString(), out PowerProfile mode)) return;
+
                 ActivePowerProfile = mode;
 
-                _ = AcerWmiManager.SetPowerModeAsync(mode);
+                var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                               System.Windows.Forms.PowerLineStatus.Online;
+
                 SettingsManager.Save("LastPowerMode", (int)mode);
-                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
                 SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)mode);
 
-                if (ManageCpuPower)
-                {
-                    _ = CpuPowerManager.ApplyProfileLimitsAsync(mode, isOnline);
-                }
+                await AcerWmiManager.SetPowerModeAsync(mode);
 
-                await _gpuManager.ApplyPowerProfileOcAsync(mode);
-                if (_gpuManager.GetClocks(out int c, out int m))
+                if (ManageCpuPower)
+                    await CpuPowerManager.ApplyProfileLimitsAsync(mode, isOnline);
+
+                await _gpuManager.ApplyPowerProfileOcAsync(mode, allowStockReset: true);
+
+                if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
                 {
                     GpuCoreOffset = c;
                     GpuMemoryOffset = m;
                 }
+                else
+                {
+                    Logger.Info($"GPU OC: could not read clocks after switching to {mode}: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Power: failed to switch profile.", ex);
             }
         });
 
-        SetFanCommand = new RelayCommand(param =>
+        SetFanCommand = new RelayCommand(async param =>
         {
-            if (Enum.TryParse(param?.ToString(), out FanProfile mode))
+            try
             {
-                IsCustomFanEnabled = mode == FanProfile.Medium;
-                if (mode == FanProfile.Medium)
-                    _ = AcerWmiManager.SetCustomFansAsync(CpuFanSpeed, GpuFanSpeed);
-                else
-                    _ = AcerWmiManager.SetFansAsync(mode);
+                if (!Enum.TryParse(param?.ToString(), out FanProfile mode)) return;
 
+                IsCustomFanEnabled = mode == FanProfile.Medium;
+
+                // Persist the choice before the WMI calls: the dashboard is a separate process
+                // and may be closed while the async hardware write is still in flight.
                 SettingsManager.Save("LastFanMode", mode.ToString());
-                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+                var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                               System.Windows.Forms.PowerLineStatus.Online;
                 SettingsManager.Save(isOnline ? "LastAcFanMode" : "LastDcFanMode", mode.ToString());
+
+                if (mode == FanProfile.Medium)
+                    await AcerWmiManager.SetCustomFansAsync(CpuFanSpeed, GpuFanSpeed);
+                else
+                    await AcerWmiManager.SetFansAsync(mode);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Fan: failed to switch mode.", ex);
             }
         });
 
         SetRefreshCommand = new RelayCommand(param =>
         {
-            if (Enum.TryParse(param?.ToString(), out RefreshProfile profile))
+            try
             {
+                if (!Enum.TryParse(param?.ToString(), out RefreshProfile profile)) return;
+
                 SettingsManager.Save("RefreshMode", (int)profile);
-                bool isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus == System.Windows.Forms.PowerLineStatus.Online;
+                var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                               System.Windows.Forms.PowerLineStatus.Online;
                 DisplayManager.ApplyRefreshProfile(profile, isOnline);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Display: failed to switch refresh profile.", ex);
             }
         });
 
         ApplyGpuClocksCommand = new RelayCommand(async _ =>
         {
-            var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+            if (_isApplyingClocks) return;
 
-            // Save to the active profile
-            _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
-            int result = _gpuManager.SetClocks(GpuCoreOffset, GpuMemoryOffset);
-
-            if (result == 1)
+            _isApplyingClocks = true;
+            try
             {
-                ApplyBtnText = "APPLIED!";
-                ApplyBtnColor = "#34C759";
-            }
-            else
-            {
-                ApplyBtnText = "ERROR";
-                ApplyBtnColor = "#FF453A";
-            }
+                var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
 
-            await Task.Delay(2000);
-            ApplyBtnText = "APPLY";
-            ApplyBtnColor = "#a855f7";
+                _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
+                var applied = _gpuManager.TrySetClocks(GpuCoreOffset, GpuMemoryOffset, out var error);
+
+                if (applied)
+                {
+                    ApplyBtnText = "APPLIED!";
+                    ApplyBtnColor = "#34C759";
+                }
+                else
+                {
+                    ApplyBtnText = "ERROR";
+                    ApplyBtnColor = "#FF453A";
+                    Logger.Warn($"GPU OC: apply failed: {error}");
+                }
+
+                await Task.Delay(2000);
+                ApplyBtnText = "APPLY";
+                ApplyBtnColor = "#a855f7";
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("GPU OC: apply command failed.", ex);
+            }
+            finally
+            {
+                _isApplyingClocks = false;
+            }
         });
 
         ResetGpuClocksCommand = new RelayCommand(async _ =>
         {
-            var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
-
-            // Wipe custom save and load default config
-            await _gpuManager.ResetProfileToDefaultsAsync(currentProfile);
-
-            if (_gpuManager.GetClocks(out int c, out int m))
+            try
             {
-                GpuCoreOffset = c;
-                GpuMemoryOffset = m;
+                var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+                await _gpuManager.ResetProfileToDefaultsAsync(currentProfile);
+
+                if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
+                {
+                    GpuCoreOffset = c;
+                    GpuMemoryOffset = m;
+                }
+                else
+                {
+                    Logger.Info($"GPU OC: could not read clocks after reset: {error}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("GPU OC: reset failed.", ex);
             }
         });
 
@@ -282,11 +369,11 @@ public class DashboardViewModel : ObservableObject
         get => _cpuFanSpeed;
         set
         {
-            if (SetProperty(ref _cpuFanSpeed, value))
-            {
-                if (IsUnifiedFans) GpuFanSpeed = value;
-                TriggerFanSave();
-            }
+            value = FanSafety.Clamp(value);
+            if (!SetProperty(ref _cpuFanSpeed, value)) return;
+
+            if (IsUnifiedFans) GpuFanSpeed = value;
+            TriggerFanSave();
         }
     }
 
@@ -296,11 +383,11 @@ public class DashboardViewModel : ObservableObject
         get => _gpuFanSpeed;
         set
         {
-            if (SetProperty(ref _gpuFanSpeed, value))
-            {
-                if (IsUnifiedFans) CpuFanSpeed = value;
-                TriggerFanSave();
-            }
+            value = FanSafety.Clamp(value);
+            if (!SetProperty(ref _gpuFanSpeed, value)) return;
+
+            if (IsUnifiedFans) CpuFanSpeed = value;
+            TriggerFanSave();
         }
     }
 
@@ -324,11 +411,10 @@ public class DashboardViewModel : ObservableObject
         get => _isCustomFanEnabled;
         set
         {
-            if (SetProperty(ref _isCustomFanEnabled, value))
-            {
-                OnPropertyChanged(nameof(CustomFanOpacity));
-                OnPropertyChanged(nameof(IsManualSliderEnabled));
-            }
+            if (!SetProperty(ref _isCustomFanEnabled, value)) return;
+
+            OnPropertyChanged(nameof(CustomFanOpacity));
+            OnPropertyChanged(nameof(IsManualSliderEnabled));
         }
     }
 
@@ -337,11 +423,14 @@ public class DashboardViewModel : ObservableObject
     private void TriggerFanSave()
     {
         if (!IsCustomFanEnabled) return;
+
         _fanDebouncer.Debounce(250, () =>
         {
-            SettingsManager.Save("CustomFanSpeedCpu", CpuFanSpeed);
-            SettingsManager.Save("CustomFanSpeedGpu", GpuFanSpeed);
-            _ = AcerWmiManager.SetCustomFansAsync(CpuFanSpeed, GpuFanSpeed);
+            var cpu = FanSafety.Clamp(CpuFanSpeed);
+            var gpu = FanSafety.Clamp(GpuFanSpeed);
+            SettingsManager.Save("CustomFanSpeedCpu", cpu);
+            SettingsManager.Save("CustomFanSpeedGpu", gpu);
+            _ = AcerWmiManager.SetCustomFansAsync(cpu, gpu);
         });
     }
 
@@ -352,11 +441,10 @@ public class DashboardViewModel : ObservableObject
         get => _chargeLimit;
         set
         {
-            if (SetProperty(ref _chargeLimit, value))
-            {
-                SettingsManager.Save("ChargeLimit", value ? 1 : 0);
-                _ = AcerWmiManager.SetChargeLimitAsync(value);
-            }
+            if (!SetProperty(ref _chargeLimit, value)) return;
+
+            SettingsManager.Save("ChargeLimit", value ? 1 : 0);
+            _ = AcerWmiManager.SetChargeLimitAsync(value);
         }
     }
 
@@ -388,11 +476,10 @@ public class DashboardViewModel : ObservableObject
         get => _deepGpuTelemetry;
         set
         {
-            if (SetProperty(ref _deepGpuTelemetry, value))
-            {
-                SettingsManager.Save("DeepGpuTelemetry", value ? 1 : 0);
-                if (!value) ClearDeepTelemetryUI();
-            }
+            if (!SetProperty(ref _deepGpuTelemetry, value)) return;
+
+            SettingsManager.Save("DeepGpuTelemetry", value ? 1 : 0);
+            if (!value) ClearDeepTelemetryUI();
         }
     }
 
@@ -417,8 +504,17 @@ public class DashboardViewModel : ObservableObject
         get => _runOnStartup;
         set
         {
-            if (SetProperty(ref _runOnStartup, value))
-                StartupManager.ToggleStartupTask(value, System.Windows.Forms.Application.ExecutablePath);
+            if (!SetProperty(ref _runOnStartup, value)) return;
+
+            if (StartupManager.ToggleStartupTask(value, System.Windows.Forms.Application.ExecutablePath))
+                return;
+
+            // Revert without re-entering the setter.
+            _runOnStartup = !value;
+            OnPropertyChanged(nameof(RunOnStartup));
+            MessageBox.Show(
+                $"Could not {(value ? "enable" : "disable")} the startup task. See the Nitrous log for details.",
+                "Nitrous", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -429,97 +525,126 @@ public class DashboardViewModel : ObservableObject
     public ICommand ApplyGpuClocksCommand { get; }
     public ICommand ResetGpuClocksCommand { get; }
 
+    /// <summary>Pause WMI/NVML polling while the dashboard is hidden or minimized.</summary>
+    public void SetTelemetryEnabled(bool enabled)
+    {
+        _telemetryEnabled = enabled;
+        if (enabled) _telemetryErrorLogged = false;
+    }
+
+    public void StopTelemetryPolling()
+    {
+        try { _pollingCts?.Cancel(); } catch { }
+        _pollingCts?.Dispose();
+        _pollingCts = null;
+    }
+
     private void StartTelemetryPolling()
     {
-        _pollingCts?.Cancel();
+        StopTelemetryPolling();
         _pollingCts = new CancellationTokenSource();
         var token = _pollingCts.Token;
 
-        // Offload the loop entirely to a background ThreadPool thread
         Task.Run(async () =>
         {
             using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
 
-            while (!token.IsCancellationRequested)
+            try
             {
-                try
+                while (!token.IsCancellationRequested)
                 {
-                    // Run Acer WMI and Nvidia SMI concurrently in the background
-                    var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
-
-                    // Conditionally fetch deep NVML stats
-                    Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
-                    if (DeepGpuTelemetry)
+                    if (!_telemetryEnabled)
                     {
-                        // Use your instantiated _gpuManager and the new method name
-                        smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
-                        await Task.WhenAll(wmiTask, smiTask);
-                    }
-                    else
-                    {
-                        await wmiTask;
+                        await timer.WaitForNextTickAsync(token);
+                        continue;
                     }
 
-                    var telemetry = await wmiTask;
-                    var smi = smiTask != null ? await smiTask : null;
-
-                    // Push property changes asynchronously to the WPF UI Thread (non-blocking)
-                    _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+                    try
                     {
-                        // 1. Update WMI CPU/GPU Telemetry
-                        CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
-                        CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
-                        CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
+                        var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
 
-                        GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp} C" : "-- C";
-                        GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                        GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
-
-                        // 2. Update NVIDIA SMI Deep Telemetry
-                        if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                        Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
+                        if (DeepGpuTelemetry)
                         {
-                            GpuNameText = smi.Name;
-                            GpuArchText = smi.Architecture;
-
-                            GpuLoadText = $"{smi.GpuLoad}%";
-                            GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
-
-                            GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
-
-                            GpuDeepTempText = $"{smi.CoreTemp} C";
-                            GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
-
-                            GpuPStateText = smi.PState;
-                            GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
-                            GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
-
-                            if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
-                            {
-                                GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
-                            }
-                            else if (smi.EnforcedPowerLimitW > 0)
-                            {
-                                GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
-                            }
-                            else
-                            {
-                                GpuPowerText = $"{smi.PowerDrawW:0.0} W";
-                            }
+                            smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
+                            await Task.WhenAll(wmiTask, smiTask);
                         }
-                    }, System.Windows.Threading.DispatcherPriority.Background);
+                        else
+                        {
+                            await wmiTask;
+                        }
 
-                    // Wait asynchronously for the next 2-second interval tick
+                        var telemetry = await wmiTask;
+                        var smi = smiTask != null ? await smiTask : null;
+                        _telemetryErrorLogged = false;
+
+                        _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+                        {
+                            CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
+                            CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
+                            CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
+
+                            GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp} C" : "-- C";
+                            GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
+                            GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
+
+                            if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                            {
+                                GpuNameText = smi.Name;
+                                GpuArchText = smi.Architecture;
+
+                                GpuLoadText = $"{smi.GpuLoad}%";
+                                GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
+
+                                GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
+
+                                GpuDeepTempText = $"{smi.CoreTemp} C";
+                                GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
+
+                                GpuPStateText = smi.PState;
+                                GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
+                                GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
+
+                                if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
+                                    GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
+                                else if (smi.EnforcedPowerLimitW > 0)
+                                    GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
+                                else
+                                    GpuPowerText = $"{smi.PowerDrawW:0.0} W";
+                            }
+                        }, System.Windows.Threading.DispatcherPriority.Background);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!_telemetryErrorLogged)
+                        {
+                            Logger.Warn("Telemetry: poll failed; will retry.", ex);
+                            _telemetryErrorLogged = true;
+                        }
+                    }
+
                     await timer.WaitForNextTickAsync(token);
                 }
-                catch (OperationCanceledException)
-                {
-                    break; // Gracefully exit when token is cancelled
-                }
-                catch
-                {
-                    // Silently absorb loop exceptions to prevent background thread crash
-                }
             }
+            catch (OperationCanceledException) { }
         }, token);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        StopTelemetryPolling();
+
+        // Persist the last slider position even if the window is closed before the 250 ms
+        // debounce elapses.
+        _fanDebouncer.Flush();
+        _fanDebouncer.Dispose();
+        _gpuManager.Dispose();
     }
 }

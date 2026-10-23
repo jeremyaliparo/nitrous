@@ -32,7 +32,7 @@ public partial class FanCurveWindow : Window
 
     private const double MinTemp = 30.0;
     private const double MaxTemp = 100.0;
-    private const double MinSpeed = 0.0;
+    private const double MinSpeed = FanSafety.MinPercent;
     private const double MaxSpeed = 100.0;
 
     public FanCurveWindow(DashboardViewModel viewModel)
@@ -107,7 +107,14 @@ public partial class FanCurveWindow : Window
         FanCurveHelper.SaveCurveToRegistry($"CpuCurve_{suffix}", _cpuPoints);
         FanCurveHelper.SaveCurveToRegistry($"GpuCurve_{suffix}", _gpuPoints);
 
+        // Saving a curve is a custom-fan action; keep AutoSwitch's AC/DC memory in sync too,
+        // otherwise the next power transition silently restores Auto.
         SettingsManager.Save("LastFanMode", "Medium");
+        var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+                       System.Windows.Forms.PowerLineStatus.Online;
+        SettingsManager.Save(isOnline ? "LastAcFanMode" : "LastDcFanMode", "Medium");
+        _viewModel.IsCustomFanEnabled = true;
+
         Close();
     }
 
@@ -133,6 +140,8 @@ public partial class FanCurveWindow : Window
         _pointHandles.Clear();
 
         var points = ActivePoints;
+        if (points.Count == 0) return;
+
         var pointCollection = new PointCollection();
 
         // 1. Extend flat line to the left edge if the first point > 30C
@@ -221,13 +230,14 @@ public partial class FanCurveWindow : Window
         double newTemp = XToTemp(pos.X);
         double newSpeed = YToSpeed(pos.Y);
 
-        newSpeed = Math.Max(MinSpeed, Math.Min(MaxSpeed, newSpeed));
+        // Keep curve points within the supported 1-100% range; 0% is not a valid request.
+        newSpeed = Math.Clamp(newSpeed, FanSafety.MinPercent, MaxSpeed);
 
         // 1. Apply Snap to Grid logic (Rounds to nearest 5)
         if (TogSnapToGrid.IsChecked == true)
         {
             newTemp = Math.Round(newTemp / 5.0) * 5.0;
-            newSpeed = Math.Round(newSpeed / 5.0) * 5.0;
+            newSpeed = Math.Max(FanSafety.MinPercent, Math.Round(newSpeed / 5.0) * 5.0);
         }
 
         // 2. Constrain X (Temperature) dynamically based on neighbors

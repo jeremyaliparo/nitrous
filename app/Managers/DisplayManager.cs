@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using Nitrous.Diagnostics;
 using Nitrous.Enums;
 
 namespace Nitrous.Managers;
@@ -9,6 +10,14 @@ public static class DisplayManager
     public const int ENUM_CURRENT_SETTINGS = -1;
     public const int DM_DISPLAYFREQUENCY = 0x00400000;
     public const int CDS_UPDATEREGISTRY = 0x00000001;
+
+    private const int DispChangeSuccessful = 0;
+    private const int DispChangeRestart = 1;
+    private const int DispChangeFailed = -1;
+    private const int DispChangeBadMode = -2;
+    private const int DispChangeNotUpdated = -3;
+    private const int DispChangeBadFlags = -4;
+    private const int DispChangeBadParam = -5;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct DEVMODEW
@@ -37,6 +46,14 @@ public static class DisplayManager
         public int dmPelsHeight;
         public int dmDisplayFlags;
         public int dmDisplayFrequency;
+        public int dmICMMethod;
+        public int dmICMIntent;
+        public int dmMediaType;
+        public int dmDitherType;
+        public int dmReserved1;
+        public int dmReserved2;
+        public int dmPanningWidth;
+        public int dmPanningHeight;
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -47,28 +64,31 @@ public static class DisplayManager
 
     public static int GetPrimaryMaxRefreshRate()
     {
-        int maxHz = 60;
+        var maxHz = 60;
         try
         {
             var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode))
-            {
-                int currentWidth = mode.dmPelsWidth;
-                int currentHeight = mode.dmPelsHeight;
-                int i = 0;
+            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode)) return maxHz;
 
-                var testMode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-                while (EnumDisplaySettingsW(null, i++, ref testMode))
+            var currentWidth = mode.dmPelsWidth;
+            var currentHeight = mode.dmPelsHeight;
+
+            var testMode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            for (var i = 0; EnumDisplaySettingsW(null, i, ref testMode); i++)
+            {
+                if (testMode.dmPelsWidth == currentWidth &&
+                    testMode.dmPelsHeight == currentHeight &&
+                    testMode.dmDisplayFrequency > maxHz)
                 {
-                    if (testMode.dmPelsWidth == currentWidth && testMode.dmPelsHeight == currentHeight)
-                    {
-                        if (testMode.dmDisplayFrequency > maxHz)
-                            maxHz = testMode.dmDisplayFrequency;
-                    }
+                    maxHz = testMode.dmDisplayFrequency;
                 }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not enumerate refresh rates.", ex);
+        }
+
         return maxHz;
     }
 
@@ -76,8 +96,8 @@ public static class DisplayManager
     {
         try
         {
-            int maxHz = GetPrimaryMaxRefreshRate();
-            int targetHz = profile switch
+            var maxHz = GetPrimaryMaxRefreshRate();
+            var targetHz = profile switch
             {
                 RefreshProfile.Hz60 => 60,
                 RefreshProfile.MaxHz => maxHz,
@@ -86,13 +106,64 @@ public static class DisplayManager
             };
 
             var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode) && mode.dmDisplayFrequency != targetHz)
+            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode))
             {
-                mode.dmFields = DM_DISPLAYFREQUENCY;
-                mode.dmDisplayFrequency = targetHz;
-                ChangeDisplaySettingsExW(null, ref mode, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+                Logger.Warn("Display: could not read the current display mode.");
+                return;
+            }
+
+            if (mode.dmDisplayFrequency == targetHz) return;
+
+            // Do not ask the driver for a mode it did not advertise. This used to fail silently
+            // on panels that do not expose 60 Hz at the current resolution.
+            if (!IsRefreshSupported(mode.dmPelsWidth, mode.dmPelsHeight, targetHz))
+            {
+                Logger.Warn($"Display: {targetHz} Hz is not supported at " +
+                            $"{mode.dmPelsWidth}x{mode.dmPelsHeight}; leaving the current mode unchanged.");
+                return;
+            }
+
+            mode.dmFields = DM_DISPLAYFREQUENCY;
+            mode.dmDisplayFrequency = targetHz;
+
+            var result = ChangeDisplaySettingsExW(null, ref mode, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            if (result != DispChangeSuccessful)
+            {
+                Logger.Warn($"Display: ChangeDisplaySettingsExW returned {DescribeResult(result)} " +
+                            $"while switching to {targetHz} Hz.");
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: refresh-profile change failed.", ex);
+        }
     }
+
+    private static bool IsRefreshSupported(int width, int height, int targetHz)
+    {
+        var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+        for (var i = 0; EnumDisplaySettingsW(null, i, ref mode); i++)
+        {
+            if (mode.dmPelsWidth == width &&
+                mode.dmPelsHeight == height &&
+                mode.dmDisplayFrequency == targetHz)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string DescribeResult(int result) => result switch
+    {
+        DispChangeSuccessful => "success",
+        DispChangeRestart => "restart required",
+        DispChangeFailed => "failed",
+        DispChangeBadMode => "bad mode",
+        DispChangeNotUpdated => "not updated",
+        DispChangeBadFlags => "bad flags",
+        DispChangeBadParam => "bad parameter",
+        _ => $"unknown ({result})"
+    };
 }

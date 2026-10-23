@@ -169,8 +169,8 @@
                             <TextBlock Grid.Row="2" Text="50%" Foreground="#475569" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
                             <TextBlock Grid.Row="3" Text="25%" Foreground="#475569" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
                         </Grid>
-                        <!-- 0% label at absolute bottom -->
-                        <TextBlock Grid.Column="0" Grid.Row="0" Text="0%" Foreground="#64748b" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,5,-7"/>
+                        <!-- 1% label at absolute bottom (0% is not a valid request) -->
+                        <TextBlock Grid.Column="0" Grid.Row="0" Text="1%" Foreground="#64748b" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,5,-7"/>
 
                         <!-- PLOT AREA -->
                         <Grid Grid.Column="1" Grid.Row="0">
@@ -187,7 +187,7 @@
                                 <Border Grid.Row="2" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
                                 <Border Grid.Row="3" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
                             </Grid>
-                            <!-- Baseline 0% line -->
+                            <!-- Baseline 1% line -->
                             <Border BorderBrush="#1c2333" BorderThickness="0,0,0,1" VerticalAlignment="Bottom"/>
 
                             <!-- Vertical Grid Lines (30, 45, 60, 75, 90, 100) -->

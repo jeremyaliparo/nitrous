@@ -9,6 +9,7 @@ namespace Nitrous.Ui;
 public class OsdForm : Form
 {
     private readonly System.Windows.Forms.Timer _fadeTimer;
+    private readonly System.Windows.Forms.Timer _holdTimer;
     private string _profileText = "PROFILE";
     private Color _accentColor = Color.White;
     private PowerProfile _activeProfile = PowerProfile.Balanced;
@@ -21,52 +22,66 @@ public class OsdForm : Form
 
     public OsdForm()
     {
-        this.FormBorderStyle = FormBorderStyle.None;
-        this.BackColor = Color.FromArgb(24, 24, 27);
-        this.TopMost = true;
-        this.ShowInTaskbar = false;
+        FormBorderStyle = FormBorderStyle.None;
+        BackColor = Color.FromArgb(24, 24, 27);
+        TopMost = true;
+        ShowInTaskbar = false;
 
-        this.Size = new Size(280, 70);
+        Size = new Size(280, 70);
 
         var screen = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1920, 1080);
-        this.StartPosition = FormStartPosition.Manual;
-        this.Location = new Point((screen.Width - this.Width) / 2, screen.Height - 160);
+        StartPosition = FormStartPosition.Manual;
+        Location = new Point((screen.Width - Width) / 2, screen.Height - 160);
 
-        // Clip the form's corners based on the specified radius
-        this.Region = new Region(GetRoundedPath(new Rectangle(0, 0, this.Width, this.Height), _cornerRadius));
+        using (var path = GetRoundedPath(new Rectangle(0, 0, Width, Height), _cornerRadius))
+            Region = new Region(path);
 
         _fadeTimer = new System.Windows.Forms.Timer { Interval = 30 };
         _fadeTimer.Tick += FadeTimer_Tick;
+
+        _holdTimer = new System.Windows.Forms.Timer { Interval = 1500 };
+        _holdTimer.Tick += (_, _) =>
+        {
+            _holdTimer.Stop();
+            _fadeTimer.Start();
+        };
     }
 
     public void ShowProfile(string profileName, Color color, PowerProfile profile)
     {
-        _profileText = profileName.ToUpper();
+        if (IsDisposed) return;
+
+        if (InvokeRequired)
+        {
+            try { BeginInvoke(new Action(() => ShowProfile(profileName, color, profile))); }
+            catch (InvalidOperationException) { /* handle not created or already disposed; ignore */ }
+            return;
+        }
+
+        _profileText = profileName.ToUpperInvariant();
         _accentColor = color;
         _activeProfile = profile;
 
         // Reset to the subtle peak opacity
         _opacity = 0.85;
-        this.Opacity = _opacity;
+        Opacity = _opacity;
 
-        this.Invalidate();
-        this.Show();
+        Invalidate();
+        Show();
 
         _fadeTimer.Stop();
-        System.Threading.Tasks.Task.Delay(1500).ContinueWith(_ =>
-        {
-            this.Invoke(new Action(() => _fadeTimer.Start()));
-        });
+        _holdTimer.Stop();
+        _holdTimer.Start();
     }
 
     private void FadeTimer_Tick(object? sender, EventArgs e)
     {
         _opacity -= 0.05;
-        this.Opacity = _opacity;
+        Opacity = _opacity;
         if (_opacity <= 0)
         {
             _fadeTimer.Stop();
-            this.Hide();
+            Hide();
         }
     }
 
@@ -78,11 +93,11 @@ public class OsdForm : Form
         // 1. Accent bar (Form region automatically trims the top/bottom left corners)
         using (var brush = new SolidBrush(_accentColor))
         {
-            e.Graphics.FillRectangle(brush, 0, 0, 8, this.Height);
+            e.Graphics.FillRectangle(brush, 0, 0, 8, Height);
         }
 
         // 2. Draw Rounded Border perfectly tracing the form's curved edge
-        using (var path = GetRoundedPath(new Rectangle(0, 0, this.Width - 1, this.Height - 1), _cornerRadius))
+        using (var path = GetRoundedPath(new Rectangle(0, 0, Width - 1, Height - 1), _cornerRadius))
         using (var pen = new Pen(Color.FromArgb(48, 48, 54), 1))
         {
             e.Graphics.DrawPath(pen, path);
@@ -92,25 +107,23 @@ public class OsdForm : Form
         DrawSpeedometerIcon(e.Graphics, new Rectangle(25, 17, 36, 36), _accentColor, _activeProfile);
 
         // 4. Draw Text
-        using (var font = new Font("Segoe UI", 16, FontStyle.Bold))
-        using (var textBrush = new SolidBrush(Color.White))
+        using var font = new Font("Segoe UI", 16, FontStyle.Bold);
+        using var textBrush = new SolidBrush(Color.White);
+        using var format = new StringFormat
         {
-            StringFormat format = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
 
-            Rectangle textRect = new Rectangle(65, 0, this.Width - 65, this.Height);
-            e.Graphics.DrawString(_profileText, font, textBrush, textRect, format);
-        }
+        var textRect = new Rectangle(65, 0, Width - 65, Height);
+        e.Graphics.DrawString(_profileText, font, textBrush, textRect, format);
     }
 
     // Helper method to generate standard geometric curves for rounded edges
     private GraphicsPath GetRoundedPath(Rectangle rect, int radius)
     {
-        GraphicsPath path = new GraphicsPath();
-        int d = radius * 2;
+        var path = new GraphicsPath();
+        var d = radius * 2;
 
         path.AddArc(rect.X, rect.Y, d, d, 180, 90); // Top-Left
         path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90); // Top-Right
@@ -125,10 +138,11 @@ public class OsdForm : Form
     {
         using var thickPen = new Pen(color, 2.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
         using var thinPen = new Pen(color, 2f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        using var dotBrush = new SolidBrush(color);
 
-        int cx = bounds.X + bounds.Width / 2;
-        int cy = bounds.Y + bounds.Height / 2;
-        int r = bounds.Width / 2;
+        var cx = bounds.X + bounds.Width / 2;
+        var cy = bounds.Y + bounds.Height / 2;
+        var r = bounds.Width / 2;
 
         g.DrawArc(thickPen, cx - r, cy - r, r * 2, r * 2, 135, 270);
 
@@ -141,11 +155,11 @@ public class OsdForm : Form
             case PowerProfile.Turbo: angle = 45; break;
         }
 
-        g.FillEllipse(new SolidBrush(color), cx - 3, cy - 3, 6, 6);
+        g.FillEllipse(dotBrush, cx - 3, cy - 3, 6, 6);
 
-        double rad = angle * Math.PI / 180.0;
-        int nx = cx + (int)((r - 2) * Math.Cos(rad));
-        int ny = cy + (int)((r - 2) * Math.Sin(rad));
+        var rad = angle * Math.PI / 180.0;
+        var nx = cx + (int)((r - 2) * Math.Cos(rad));
+        var ny = cy + (int)((r - 2) * Math.Sin(rad));
 
         g.DrawLine(thinPen, cx, cy, nx, ny);
     }
@@ -154,10 +168,23 @@ public class OsdForm : Form
     {
         get
         {
-            CreateParams cp = base.CreateParams;
+            var cp = base.CreateParams;
             cp.ExStyle |= 0x00000020;
             cp.ExStyle |= 0x08000000;
             return cp;
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _holdTimer.Stop();
+            _fadeTimer.Stop();
+            _holdTimer.Dispose();
+            _fadeTimer.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 }
