@@ -31,6 +31,19 @@ public class NvidiaGpuManager : IDisposable
             BindingFlags.Instance | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("NvAPIWrapper performance state layout changed.");
 
+    private const int CurrentOffsetDefaultsRevision = 1;
+    private const string OffsetDefaultsRevisionKey = "GpuOffsetDefaultsRevision";
+
+    // These were the automatic per-profile offsets before GPU OC became opt-in. Existing
+    // installs may have saved them through APPLY/RESET, so migrate exact matches to stock.
+    private static readonly (PowerProfile Profile, int Core, int Memory)[] LegacyDefaultOffsets =
+    {
+        (PowerProfile.Quiet, -100, -200),
+        (PowerProfile.Balanced, 0, 0),
+        (PowerProfile.Performance, 100, 150),
+        (PowerProfile.Turbo, 150, 300)
+    };
+
     private readonly object _gate = new();
     private volatile bool _disposed;
     private PhysicalGPU? _internalGpu;
@@ -53,7 +66,32 @@ public class NvidiaGpuManager : IDisposable
 
     public NvidiaGpuManager()
     {
+        MigrateLegacyDefaultOffsets();
         InitializeNvAPI();
+    }
+
+    private static void MigrateLegacyDefaultOffsets()
+    {
+        if (SettingsManager.Get(OffsetDefaultsRevisionKey, 0) >= CurrentOffsetDefaultsRevision)
+            return;
+
+        foreach (var legacy in LegacyDefaultOffsets)
+        {
+            var coreKey = $"GpuCore_{legacy.Profile}";
+            var memoryKey = $"GpuMemory_{legacy.Profile}";
+            var core = SettingsManager.Get(coreKey, int.MinValue);
+            var memory = SettingsManager.Get(memoryKey, int.MinValue);
+
+            // Only remove an exact legacy pair. A partially customized pair is left alone.
+            if (core != legacy.Core || memory != legacy.Memory)
+                continue;
+
+            SettingsManager.Delete(coreKey);
+            SettingsManager.Delete(memoryKey);
+            Logger.Info($"GPU OC: migrated legacy {legacy.Profile} offsets ({core}/{memory}) to stock.");
+        }
+
+        SettingsManager.Save(OffsetDefaultsRevisionKey, CurrentOffsetDefaultsRevision);
     }
 
     private void InitializeNvAPI()
@@ -650,21 +688,11 @@ public class NvidiaGpuManager : IDisposable
         });
     }
 
-    public int GetDefaultCore(PowerProfile profile) => profile switch
-    {
-        PowerProfile.Quiet => -100,
-        PowerProfile.Performance => 100,
-        PowerProfile.Turbo => 150,
-        _ => 0
-    };
+    // GPU offsets are opt-in. A profile only changes the firmware power/thermal mode;
+    // it must not assume that a universal overclock (or underclock) is stable on every VBIOS.
+    public int GetDefaultCore(PowerProfile profile) => 0;
 
-    public int GetDefaultMemory(PowerProfile profile) => profile switch
-    {
-        PowerProfile.Quiet => -200,
-        PowerProfile.Performance => 150,
-        PowerProfile.Turbo => 300,
-        _ => 0
-    };
+    public int GetDefaultMemory(PowerProfile profile) => 0;
 
     public void SaveCustomProfileOc(PowerProfile profile, int core, int memory)
     {

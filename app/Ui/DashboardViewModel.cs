@@ -546,6 +546,20 @@ public class DashboardViewModel : ObservableObject, IDisposable
         return _gpuManager.GetDiagnosticsSnapshotAsync(cancellationToken);
     }
 
+    private static string FormatGpuName(string name)
+    {
+        var display = name.Trim();
+
+        if (display.StartsWith("NVIDIA ", StringComparison.OrdinalIgnoreCase))
+            display = display["NVIDIA ".Length..].TrimStart();
+        if (display.StartsWith("GeForce ", StringComparison.OrdinalIgnoreCase))
+            display = display["GeForce ".Length..].TrimStart();
+        if (display.EndsWith(" GPU", StringComparison.OrdinalIgnoreCase))
+            display = display[..^" GPU".Length].TrimEnd();
+
+        return string.IsNullOrWhiteSpace(display) ? "NVIDIA GPU" : display;
+    }
+
     private void StartTelemetryPolling()
     {
         StopTelemetryPolling();
@@ -597,7 +611,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                             if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                             {
-                                GpuNameText = smi.Name;
+                                GpuNameText = FormatGpuName(smi.Name);
                                 GpuArchText = smi.Architecture;
 
                                 GpuLoadText = $"{smi.GpuLoad}%";

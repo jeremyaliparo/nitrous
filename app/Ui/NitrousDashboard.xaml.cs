@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
@@ -21,12 +22,26 @@ public partial class NitrousDashboard : Window
 {
     private bool _isDialogOpen;
     private bool _isDiagnosticsExporting;
+    private readonly DispatcherTimer _profileSyncTimer;
+    private PowerProfile? _lastSyncedPowerMode;
+    private FanProfile? _lastSyncedFanMode;
+    private RefreshProfile? _lastSyncedRefreshMode;
 
     public NitrousDashboard()
     {
         InitializeComponent();
 
         DataContext = new DashboardViewModel();
+
+        // The tray process owns the global hotkey and writes the active profile to
+        // settings. Poll that cross-process state so the dashboard follows hotkey,
+        // auto-switch, and AC/DC changes without being reopened.
+        _profileSyncTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _profileSyncTimer.Tick += (_, _) => SyncProfileFromSettings();
+        _profileSyncTimer.Start();
 
         DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text =
             $"Nitrous {UpdateManager.CurrentVersion}";
@@ -58,6 +73,29 @@ public partial class NitrousDashboard : Window
 
         // The dashboard is a transient UI process; stop hammering WMI/NVML when minimized.
         vm.SetTelemetryEnabled(WindowState != WindowState.Minimized && IsVisible);
+
+        // A hotkey may have changed the profile while the window was minimized.
+        if (WindowState != WindowState.Minimized && IsVisible)
+            RefreshDashboardState();
+    }
+
+    private void SyncProfileFromSettings()
+    {
+        if (!IsVisible || WindowState == WindowState.Minimized || DataContext is not DashboardViewModel)
+            return;
+
+        var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+        var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile fan)
+            ? fan
+            : FanProfile.Auto;
+        var activeRefresh = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
+
+        if (activeMode == _lastSyncedPowerMode &&
+            activeFan == _lastSyncedFanMode &&
+            activeRefresh == _lastSyncedRefreshMode)
+            return;
+
+        RefreshDashboardState();
     }
 
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
@@ -141,6 +179,10 @@ public partial class NitrousDashboard : Window
             TxtHkCycle.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_CyclePower", ""));
             TxtHkDash.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_Dashboard", ""));
         }
+
+        _lastSyncedPowerMode = activeMode;
+        _lastSyncedFanMode = activeFan;
+        _lastSyncedRefreshMode = activeRefresh;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -172,6 +214,7 @@ public partial class NitrousDashboard : Window
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
+        _profileSyncTimer.Stop();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         StateChanged -= Window_StateChanged;
         SettingsManager.Save("WindowTop", (int)Top);
