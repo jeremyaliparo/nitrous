@@ -19,7 +19,8 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
-        Logger.Initialize();
+        var isUi = args.Any(arg => string.Equals(arg, "--ui", StringComparison.OrdinalIgnoreCase));
+        Logger.Initialize(isUi ? "dashboard" : "tray");
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             Logger.Error("Unhandled exception.", e.ExceptionObject as Exception);
@@ -32,6 +33,7 @@ static class Program
 
         if (!IsAdministrator())
         {
+            Logger.Warn("Elevation: administrator=false; exiting.");
             MessageBox.Show(
                 "Nitrous needs administrator privileges to access the Acer EC (fans, power modes, " +
                 "battery limit) and Windows power plans.\n\nPlease run Nitrous as administrator.",
@@ -39,8 +41,10 @@ static class Program
             return;
         }
 
+        Logger.Info("Elevation: administrator=true.");
+
         // TRANSIENT UI MODE: run the dashboard in its own process.
-        if (args.Any(arg => string.Equals(arg, "--ui", StringComparison.OrdinalIgnoreCase)))
+        if (isUi)
         {
             RunDashboard();
             return;

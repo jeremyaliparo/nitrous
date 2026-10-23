@@ -59,7 +59,7 @@ public class TrayApplication : ApplicationContext
 
     public TrayApplication()
     {
-        Logger.Initialize();
+        // Logger is initialized once in Program.Main, which also records the tray/dashboard role.
 
         // Force creation of the marshaling handle on the tray/UI thread.
         _ = _uiInvoker.Handle;

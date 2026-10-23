@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Security;
@@ -15,6 +16,25 @@ public static class StartupManager
     {
         var result = RunSchtasks($"/query /tn \"{TaskName}\"");
         return result.ExitCode == 0;
+    }
+
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var query = RunSchtasks($"/query /tn \"{TaskName}\" /v /fo LIST");
+            result["taskExists"] = query.ExitCode == 0;
+            result["exitCode"] = query.ExitCode;
+            result["query"] = query.Output.Trim();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Startup: diagnostics query failed.", ex);
+            result["error"] = ex.Message;
+        }
+
+        return result;
     }
 
     public static bool ToggleStartupTask(bool enable, string exePath)

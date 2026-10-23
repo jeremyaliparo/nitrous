@@ -511,7 +511,9 @@
 					</StackPanel>
 				</StackPanel>
 				<!-- 2. SETTINGS PAGE (Bound to Properties) -->
-				<StackPanel x:Name="SettingsPage" Visibility="Collapsed" Margin="20,10,20,0">
+				<ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" Margin="20,10,20,0"
+				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+					<StackPanel Margin="0,0,4,10">
 					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
@@ -607,7 +609,33 @@
 							<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
 					</Border>
-				</StackPanel>
+					<!-- Diagnostics -->
+					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,10,0,0" Padding="15,12">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Diagnostics" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. Nothing is uploaded automatically."
+							           Foreground="#888890" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
+							<Grid>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<Button x:Name="ExportDiagnosticsButton" Content="EXPORT DIAGNOSTICS" Click="ExportDiagnostics_Click"
+								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+								        HorizontalAlignment="Left"/>
+								<Button Grid.Column="1" Content="OPEN LOGS" Click="OpenLogFolder_Click"
+								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+								        Margin="8,0,0,0"/>
+							</Grid>
+							<TextBlock x:Name="ExportDiagnosticsStatus" Foreground="#888890" FontSize="10"
+							           TextWrapping="Wrap" Margin="0,8,0,0"/>
+						</StackPanel>
+					</Border>
+					</StackPanel>
+				</ScrollViewer>
 				<!-- 3. GPU PAGE -->
 				<StackPanel x:Name="GpuPage" Visibility="Collapsed" Margin="20,10,20,0">
 					<!-- Compact Hero Banner -->

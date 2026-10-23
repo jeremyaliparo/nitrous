@@ -1,0 +1,87 @@
+name: Bug report
+description: Report a Nitrous bug and attach an Export Diagnostics bundle.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem.
+
+        Before submitting, open **Nitrous → Settings → Diagnostics → Export Diagnostics**.
+        After creating the issue, drag the newest `Nitrous-Diagnostics-*.zip` from
+        `%LOCALAPPDATA%\Nitrous\diagnostics` into a comment. The bundle is redacted and is
+        not uploaded automatically.
+
+  - type: input
+    id: nitrous-version
+    attributes:
+      label: Nitrous version
+      description: Shown at the top of the Settings page (for example, 0.8.0).
+      placeholder: "0.8.0"
+    validations:
+      required: true
+
+  - type: input
+    id: laptop-model
+    attributes:
+      label: Laptop model
+      description: The exact Acer model name, for example AN16S-61.
+      placeholder: "Acer Nitro AN16S-61"
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: For example Windows 11 24H2 build 26100.
+      placeholder: "Windows 11 24H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do immediately before the problem appeared?
+      placeholder: |
+        1. Open Nitrous
+        2. Switch to Performance
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include any error text shown by Nitrous or Windows.
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Recent changes, other tuning tools, sleep/resume, driver updates, or anything else that may be relevant.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Diagnostics
+      options:
+        - label: I will attach the newest Nitrous diagnostics ZIP in a comment.
+          required: true
+        - label: I understand that the bundle is redacted and that I can inspect it before sharing.
+          required: true

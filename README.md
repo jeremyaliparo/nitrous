@@ -31,7 +31,7 @@ Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly
 * **Dynamic Power Profiles:** Toggle instantly between Quiet, Balanced, Performance, and Turbo TDP modes.
 * **Silent Boot & System Tray:** Starts through Task Scheduler without a UAC prompt on every boot, with restart support in the tray menu.
 * **Verified Auto-Updater:** Downloads GitHub release assets and verifies a SHA-256 digest before installing. If a release does not publish a digest or checksum, the updater refuses the automatic install and offers the release page instead.
-* **Diagnostics:** Hardware, power-plan, update, and startup failures are written to a rotating log instead of being silently swallowed.
+* **Diagnostics:** Hardware, power-plan, update, and startup failures are written to a rotating log, and **Settings → Diagnostics → Export Diagnostics** creates a redacted ZIP with the system, hardware, and log context needed for a bug report.
 
 ### Requirements
 
@@ -130,9 +130,22 @@ Checksums protect against a corrupted or tampered download; they are not a subst
 
 * That release did not publish a GitHub asset digest or a checksum asset. Open the release page and update manually after verifying the hash.
 
+**Sending a diagnostics bundle**
+
+If you are reporting a bug, attach a diagnostics bundle to the issue:
+
+1. Open **Settings → Diagnostics** and click **Export Diagnostics**.
+2. Nitrous writes a ZIP to `%LOCALAPPDATA%\Nitrous\diagnostics` and opens it in Explorer.
+3. After creating the issue, attach the newest `Nitrous-Diagnostics-*.zip` in a comment.
+
+The bundle includes the Nitrous version, Windows build, laptop model/BIOS, CPU/RAM/GPU details, Acer WMI availability and sensor probes, current GPU offset and driver ranges, CPU power limits and backups, display mode, startup task, updater state, recent redacted logs, and bounded excerpts from the System and Application event logs. Nothing is uploaded automatically.
+
+The current username, machine name, serial numbers, system UUIDs, user-profile paths, SIDs, email addresses, and IP/MAC addresses are redacted before the ZIP is written. You can inspect the ZIP before sharing it; `summary.txt` is the best place to start, and `errors.txt` lists any sections that could not be collected.
+
 **Logs and settings**
 
-* Log: `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` (rotated at 1 MB, up to 3 older files).
+* Log: `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` (rotated at 1 MB, up to 3 older files). Each line includes the process role and PID so tray and dashboard entries can be told apart.
+* Diagnostics: `%LOCALAPPDATA%\Nitrous\diagnostics`.
 * Settings: `HKCU\Software\Nitrous`.
 
 ### Compatibility

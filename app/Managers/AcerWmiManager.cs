@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Management;
 using System.Threading.Tasks;
 using Nitrous.Diagnostics;
@@ -189,6 +191,150 @@ public static class AcerWmiManager
             }
 
             return default;
+        }
+    }
+
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var errors = new List<string>();
+
+        try { result["hardwareSupported"] = IsHardwareSupported(); }
+        catch (Exception ex) { errors.Add($"hardwareSupported: {ex.Message}"); }
+
+        try { result["turboSupported"] = IsTurboModeSupported(); }
+        catch (Exception ex) { errors.Add($"turboSupported: {ex.Message}"); }
+
+        try
+        {
+            var telemetry = GetSystemTelemetry();
+            result["telemetry"] = new Dictionary<string, object?>
+            {
+                ["cpuTemperatureC"] = telemetry.CpuTemp,
+                ["cpuFanRpm"] = telemetry.CpuRpm,
+                ["gpuTemperatureC"] = telemetry.GpuTemp,
+                ["gpuFanRpm"] = telemetry.GpuRpm
+            };
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"telemetry: {ex.Message}");
+            Logger.Warn("WMI: diagnostics telemetry read failed.", ex);
+        }
+
+        result["gamingClassAvailable"] = false;
+        result["batteryClassAvailable"] = false;
+
+        lock (Gate)
+        {
+            try
+            {
+                var gaming = GetGamingInstanceLocked();
+                result["gamingClassAvailable"] = gaming != null;
+                if (gaming != null)
+                {
+                    result["gamingClassPath"] = gaming.ClassPath?.ToString();
+                    result["gamingMethods"] = GetClassMethods(AcerWmiProtocol.GamingClass);
+                    result["supportedProfiles"] = ReadSupportedProfilesLocked(gaming);
+
+                    var probes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                    AddSensorProbe(probes, "cpuTemperature", gaming,
+                        AcerWmiProtocol.CpuTemperature, AcerWmiProtocol.ByteMask);
+                    AddSensorProbe(probes, "cpuFanRpm", gaming,
+                        AcerWmiProtocol.CpuFanRpm, AcerWmiProtocol.WordMask);
+                    AddSensorProbe(probes, "gpuTemperaturePrimary", gaming,
+                        AcerWmiProtocol.GpuTemperaturePrimary, AcerWmiProtocol.ByteMask);
+                    AddSensorProbe(probes, "gpuTemperatureFallbackA", gaming,
+                        AcerWmiProtocol.GpuTemperatureFallbackA, AcerWmiProtocol.ByteMask);
+                    AddSensorProbe(probes, "gpuTemperatureFallbackB", gaming,
+                        AcerWmiProtocol.GpuTemperatureFallbackB, AcerWmiProtocol.ByteMask);
+                    AddSensorProbe(probes, "gpuFanRpm", gaming,
+                        AcerWmiProtocol.GpuFanRpm, AcerWmiProtocol.WordMask);
+                    result["sensorProbes"] = probes;
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"gamingClass: {ex.Message}");
+                Logger.Warn("WMI: diagnostics gaming-class probe failed.", ex);
+            }
+
+            try
+            {
+                var battery = GetBatteryInstanceLocked();
+                result["batteryClassAvailable"] = battery != null;
+                if (battery != null)
+                {
+                    result["batteryClassPath"] = battery.ClassPath?.ToString();
+                    result["batteryMethods"] = GetClassMethods(AcerWmiProtocol.BatteryClass);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"batteryClass: {ex.Message}");
+                Logger.Warn("WMI: diagnostics battery-class probe failed.", ex);
+            }
+        }
+
+        result["errors"] = errors;
+        return result;
+    }
+
+    private static Dictionary<string, object?>? ReadSupportedProfilesLocked(ManagementObject instance)
+    {
+        try
+        {
+            using var inParams = instance.GetMethodParameters(AcerWmiProtocol.GetGamingMiscSetting);
+            inParams["gmInput"] = AcerWmiProtocol.SupportedProfilesSetting;
+
+            using var outParams = instance.InvokeMethod(AcerWmiProtocol.GetGamingMiscSetting, inParams, null);
+            var rawValue = outParams?.Properties["gmOutput"]?.Value ?? outParams?.Properties["outValue"]?.Value;
+            if (rawValue == null) return null;
+
+            var raw = Convert.ToUInt64(rawValue);
+            var bitmap = (int)((raw >> 8) & 0xFF);
+            return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["raw"] = raw,
+                ["bitmap"] = bitmap,
+                ["turboBit"] = AcerWmiProtocol.TurboProfileBit,
+                ["turboSupported"] = (bitmap & (1 << AcerWmiProtocol.TurboProfileBit)) != 0
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("WMI: diagnostics supported-profile query failed.", ex);
+            return null;
+        }
+    }
+
+    private static void AddSensorProbe(
+        Dictionary<string, object?> probes,
+        string name,
+        ManagementObject instance,
+        uint address,
+        ulong bitmask)
+    {
+        probes[$"{name}Value"] = ReadAcerSensor(instance, address, bitmask);
+        probes[$"{name}Address"] = $"0x{address:X4}";
+    }
+
+    private static string[] GetClassMethods(string className)
+    {
+        try
+        {
+            using var managementClass = new ManagementClass(
+                AcerWmiProtocol.WmiNamespace, className, null);
+            return managementClass.Methods
+                .Cast<MethodData>()
+                .Select(method => method.Name)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"WMI: could not enumerate methods for {className}.", ex);
+            return Array.Empty<string>();
         }
     }
 

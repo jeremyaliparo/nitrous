@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -537,6 +538,12 @@ public class DashboardViewModel : ObservableObject, IDisposable
         try { _pollingCts?.Cancel(); } catch { }
         _pollingCts?.Dispose();
         _pollingCts = null;
+    }
+
+    public Task<Dictionary<string, object?>> GetGpuDiagnosticsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return _gpuManager.GetDiagnosticsSnapshotAsync(cancellationToken);
     }
 
     private void StartTelemetryPolling()

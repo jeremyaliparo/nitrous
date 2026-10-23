@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -195,6 +196,169 @@ public class NvidiaGpuManager : IDisposable
                 error = ex.Message;
                 InvalidateGpuLocked();
                 return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Read-only NVAPI/NVML state for diagnostics. It never writes an offset; a failed read is
+    /// reported as an error so a sleeping dGPU is not mistaken for a 0/0 configuration.
+    /// </summary>
+    public Dictionary<string, object?> GetOffsetDiagnostics()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["configuredCoreRangeMhz"] = new Dictionary<string, object?>
+            {
+                ["min"] = MinCoreOffset,
+                ["max"] = MaxCoreOffset
+            },
+            ["configuredMemoryRangeMhz"] = new Dictionary<string, object?>
+            {
+                ["min"] = MinMemoryOffset,
+                ["max"] = MaxMemoryOffset
+            }
+        };
+
+        lock (_gate)
+        {
+            result["disposed"] = _disposed;
+            result["nvapiInitialized"] = _internalGpu != null;
+            result["nvmlInitialized"] = _nvmlInitialized;
+            result["nvmlDeviceHandleAcquired"] = _nvmlDeviceHandle != IntPtr.Zero;
+            result["architecture"] = _cachedArchName;
+
+            try
+            {
+                if (_disposed)
+                {
+                    result["error"] = "The GPU manager has been disposed.";
+                    return result;
+                }
+
+                if (_internalGpu == null) InitializeNvAPI();
+                result["nvapiInitialized"] = _internalGpu != null;
+                if (_internalGpu == null)
+                {
+                    result["error"] = "NVAPI is not initialized (GPU asleep or driver unavailable).";
+                    return result;
+                }
+
+                var states = GPUApi.GetPerformanceStates20(_internalGpu.Handle);
+                result["statesEditable"] = states.IsEditable;
+
+                if (!states.Clocks.TryGetValue(PerformanceStateId.P0_3DPerformance, out var p0Clocks))
+                {
+                    result["error"] = "P0 performance state is unavailable.";
+                    return result;
+                }
+
+                var coreEntry = p0Clocks.FirstOrDefault(c =>
+                                    c.DomainId == PublicClockDomain.Graphics && c.IsEditable)
+                                ?? p0Clocks.FirstOrDefault(c =>
+                                    c.DomainId == PublicClockDomain.Graphics);
+                var memoryEntry = p0Clocks.FirstOrDefault(c =>
+                                      c.DomainId == PublicClockDomain.Memory && c.IsEditable)
+                                  ?? p0Clocks.FirstOrDefault(c =>
+                                      c.DomainId == PublicClockDomain.Memory);
+
+                if (coreEntry == null || memoryEntry == null)
+                {
+                    result["error"] = "Graphics/memory P0 clock entries are unavailable.";
+                    return result;
+                }
+
+                result["coreEditable"] = coreEntry.IsEditable;
+                result["coreOffsetMhz"] = coreEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                var coreRange = coreEntry.FrequencyDeltaInkHz.DeltaRange;
+                result["coreDriverRangeMhz"] = new Dictionary<string, object?>
+                {
+                    ["min"] = coreRange.Minimum / 1000,
+                    ["max"] = coreRange.Maximum / 1000
+                };
+
+                result["memoryEditable"] = memoryEntry.IsEditable;
+                result["memoryOffsetMhz"] = memoryEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                var memoryRange = memoryEntry.FrequencyDeltaInkHz.DeltaRange;
+                result["memoryDriverRangeMhz"] = new Dictionary<string, object?>
+                {
+                    ["min"] = memoryRange.Minimum / 1000,
+                    ["max"] = memoryRange.Maximum / 1000
+                };
+            }
+            catch (Exception ex)
+            {
+                result["error"] = ex.Message;
+                InvalidateGpuLocked();
+                result["nvapiInitialized"] = _internalGpu != null;
+                Logger.Warn("GPU OC: diagnostics read failed.", ex);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<Dictionary<string, object?>> GetDiagnosticsSnapshotAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["offsets"] = GetOffsetDiagnostics()
+        };
+
+        try
+        {
+            var telemetry = await GetNvmlTelemetryAsync(cancellationToken).ConfigureAwait(false);
+            result["nvml"] = new Dictionary<string, object?>
+            {
+                ["name"] = telemetry.Name,
+                ["architecture"] = telemetry.Architecture,
+                ["coreTemperatureC"] = telemetry.CoreTemp,
+                ["gpuLoadPercent"] = telemetry.GpuLoad,
+                ["vramUsedMb"] = telemetry.VramUsedMb,
+                ["vramTotalMb"] = telemetry.VramTotalMb,
+                ["pState"] = telemetry.PState,
+                ["currentCoreClockMhz"] = telemetry.CurrentCoreClock,
+                ["currentMemoryClockMhz"] = telemetry.CurrentMemoryClock,
+                ["powerDrawW"] = telemetry.PowerDrawW,
+                ["minPowerLimitW"] = telemetry.MinPowerLimitW,
+                ["maxPowerLimitW"] = telemetry.MaxPowerLimitW,
+                ["enforcedPowerLimitW"] = telemetry.EnforcedPowerLimitW
+            };
+
+            var driverVersion = GetNvmlDriverVersion();
+            if (!string.IsNullOrWhiteSpace(driverVersion))
+                result["nvmlDriverVersion"] = driverVersion;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            result["nvmlError"] = ex.Message;
+            Logger.Warn("NVML: diagnostics telemetry failed.", ex);
+        }
+
+        return result;
+    }
+
+    private string? GetNvmlDriverVersion()
+    {
+        lock (_gate)
+        {
+            if (_disposed || !_nvmlInitialized) return null;
+
+            try
+            {
+                var version = new StringBuilder(80);
+                return NativeNvml.SystemGetDriverVersion(version, (uint)version.Capacity) == NvmlReturn.Success
+                    ? version.ToString()
+                    : null;
+            }
+            catch
+            {
+                return null;
             }
         }
     }
@@ -758,6 +922,9 @@ public class NvidiaGpuManager : IDisposable
 
         [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetArchitecture")]
         public static extern NvmlReturn DeviceGetArchitecture(IntPtr device, out NvmlDeviceArchitecture arch);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlSystemGetDriverVersion", CharSet = CharSet.Ansi)]
+        public static extern NvmlReturn SystemGetDriverVersion(StringBuilder version, uint length);
     }
     #endregion
 }

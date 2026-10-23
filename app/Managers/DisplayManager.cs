@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
@@ -137,6 +139,49 @@ public static class DisplayManager
         {
             Logger.Warn("Display: refresh-profile change failed.", ex);
         }
+    }
+
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref current))
+            {
+                result["error"] = "EnumDisplaySettingsW could not read the current display mode.";
+                return result;
+            }
+
+            var supported = new SortedSet<int>();
+            var test = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            for (var i = 0; i < 1024 && EnumDisplaySettingsW(null, i, ref test); i++)
+            {
+                if (test.dmPelsWidth == current.dmPelsWidth &&
+                    test.dmPelsHeight == current.dmPelsHeight &&
+                    test.dmDisplayFrequency > 0)
+                {
+                    supported.Add(test.dmDisplayFrequency);
+                }
+            }
+
+            result["current"] = new Dictionary<string, object?>
+            {
+                ["width"] = current.dmPelsWidth,
+                ["height"] = current.dmPelsHeight,
+                ["refreshHz"] = current.dmDisplayFrequency,
+                ["bitsPerPixel"] = current.dmBitsPerPel
+            };
+            result["supportedRefreshHz"] = supported.ToArray();
+            result["maxRefreshHz"] = supported.Count > 0 ? supported.Max : current.dmDisplayFrequency;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: diagnostics snapshot failed.", ex);
+            result["error"] = ex.Message;
+        }
+
+        return result;
     }
 
     private static bool IsRefreshSupported(int width, int height, int targetHz)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,48 @@ public static class UpdateManager
 
     private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromSeconds(45) };
     private static readonly SemaphoreSlim CheckGate = new(1, 1);
+
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["currentVersion"] = CurrentVersion,
+            ["updateCheckInProgress"] = CheckGate.CurrentCount == 0
+        };
+
+        try
+        {
+            var executable = Environment.ProcessPath;
+            result["executablePath"] = executable;
+
+            if (!string.IsNullOrWhiteSpace(executable) && File.Exists(executable))
+            {
+                var info = new FileInfo(executable);
+                result["executableBytes"] = info.Length;
+                result["fileVersion"] = FileVersionInfo.GetVersionInfo(executable).FileVersion;
+
+                using var stream = File.OpenRead(executable);
+                result["sha256"] = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+
+                var directory = info.DirectoryName;
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    result["updateArtifacts"] = Directory
+                        .GetFiles(directory, "Nitrous.exe.*")
+                        .Select(Path.GetFileName)
+                        .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            result["error"] = ex.Message;
+            Logger.Warn("Updater: diagnostics snapshot failed.", ex);
+        }
+
+        return result;
+    }
 
     static UpdateManager()
     {

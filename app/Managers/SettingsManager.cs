@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security;
 using Microsoft.Win32;
 using Nitrous.Diagnostics;
@@ -48,6 +50,32 @@ public static class SettingsManager
             Logger.Warn("Settings: failed to enumerate values.", ex);
             return Array.Empty<string>();
         }
+    }
+
+    /// <summary>
+    /// Returns only Nitrous' own registry values for the diagnostics export. This deliberately
+    /// does not expose the rest of HKCU.
+    /// </summary>
+    public static Dictionary<string, object?> GetAllValues()
+    {
+        var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using RegistryKey? regKey = Registry.CurrentUser.OpenSubKey(RegPath);
+            if (regKey == null) return values;
+
+            foreach (var name in regKey.GetValueNames().OrderBy(n => n, StringComparer.OrdinalIgnoreCase))
+            {
+                var value = regKey.GetValue(name);
+                if (value != null) values[name] = value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Settings: failed to read values for diagnostics.", ex);
+        }
+
+        return values;
     }
 
     public static void Delete(string key)

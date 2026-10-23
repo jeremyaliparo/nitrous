@@ -343,6 +343,52 @@ public static class CpuPowerManager
         return result;
     }
 
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var errors = new List<string>();
+
+        try
+        {
+            var scheme = GetActiveSchemeGuid();
+            result["activeSchemeGuid"] = scheme;
+            result["manageCpuPower"] = SettingsManager.Get("ManageCpuPower", 0) == 1;
+
+            if (scheme != null)
+            {
+                result["ac"] = new Dictionary<string, object?>
+                {
+                    ["min"] = ReadSetting(scheme, MinSetting, isOnline: true),
+                    ["max"] = ReadSetting(scheme, MaxSetting, isOnline: true)
+                };
+                result["dc"] = new Dictionary<string, object?>
+                {
+                    ["min"] = ReadSetting(scheme, MinSetting, isOnline: false),
+                    ["max"] = ReadSetting(scheme, MaxSetting, isOnline: false)
+                };
+            }
+
+            result["backups"] = ReadBackups()
+                .Select(b => new Dictionary<string, object?>
+                {
+                    ["key"] = b.Key,
+                    ["schemeGuid"] = b.SchemeGuid,
+                    ["side"] = b.Side,
+                    ["kind"] = b.Kind,
+                    ["value"] = b.Value
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex.Message);
+            Logger.Warn("CPU power: diagnostics snapshot failed.", ex);
+        }
+
+        result["errors"] = errors;
+        return result;
+    }
+
     private static string? GetActiveSchemeGuid()
     {
         // PowerGetActiveScheme is locale-independent; parsing localized powercfg output is not.

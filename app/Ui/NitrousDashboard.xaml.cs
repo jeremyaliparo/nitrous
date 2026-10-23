@@ -12,6 +12,7 @@ using Nitrous.Managers;
 
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using MessageBox = System.Windows.MessageBox;
 using TextBox = System.Windows.Controls.TextBox;
 
 namespace Nitrous.Ui;
@@ -19,6 +20,7 @@ namespace Nitrous.Ui;
 public partial class NitrousDashboard : Window
 {
     private bool _isDialogOpen;
+    private bool _isDiagnosticsExporting;
 
     public NitrousDashboard()
     {
@@ -216,6 +218,61 @@ public partial class NitrousDashboard : Window
 
         _isDialogOpen = true;
         _activeCurveWindow.Show();
+    }
+
+    private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isDiagnosticsExporting) return;
+
+        _isDiagnosticsExporting = true;
+        ExportDiagnosticsButton.IsEnabled = false;
+        ExportDiagnosticsStatus.Text = "Collecting diagnostics...";
+
+        try
+        {
+            var progress = new Progress<string>(message => ExportDiagnosticsStatus.Text = message);
+            var result = DataContext is DashboardViewModel vm
+                ? await DiagnosticsCollector.ExportAsync(vm.GetGpuDiagnosticsAsync, progress)
+                : await DiagnosticsCollector.ExportAsync(progress: progress);
+
+            ExportDiagnosticsStatus.Text = result.ErrorCount == 0
+                ? "Diagnostics exported."
+                : $"Diagnostics exported with {result.ErrorCount} section error(s); see errors.txt.";
+
+            DiagnosticsCollector.OpenInExplorer(result.ZipPath);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Diagnostics: export failed.", ex);
+            ExportDiagnosticsStatus.Text = "Export failed. See the log for details.";
+            MessageBox.Show(
+                $"Could not export diagnostics:\n\n{ex.Message}",
+                "Nitrous Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _isDiagnosticsExporting = false;
+            ExportDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(Logger.LogDirectory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Logger.LogDirectory)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Diagnostics: could not open the log folder.", ex);
+            MessageBox.Show(
+                $"Could not open the log folder:\n\n{ex.Message}",
+                "Nitrous Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void Hotkey_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
