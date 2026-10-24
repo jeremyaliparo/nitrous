@@ -119,6 +119,20 @@ public static class DiagnosticsCollector
                 WriteJson(temporaryDirectory, "cpu-power.json", cpuPower);
             }
 
+            progress?.Report("Inspecting Acer services...");
+            var acerServices = await CollectSectionAsync(
+                "acer-services",
+                () => Task.Run(AcerServiceManager.GetDiagnosticsSnapshot, cancellationToken),
+                WmiTimeout,
+                errors,
+                cancellationToken).ConfigureAwait(false);
+
+            if (acerServices != null)
+            {
+                report["acer-services"] = acerServices;
+                WriteJson(temporaryDirectory, "acer-services.json", acerServices);
+            }
+
             progress?.Report("Reading display mode...");
             var display = await CollectSectionAsync(
                 "display",
@@ -461,6 +475,26 @@ public static class DiagnosticsCollector
                            $"managed={Text(cpuPower, "manageCpuPower")}");
         builder.AppendLine($"CPU backups retained: {Rows(cpuPower, "backups").Count}");
 
+        var boost = Section(cpuPower, "boost");
+        if (boost.Count > 0)
+        {
+            builder.AppendLine($"CPU boost: AC {Text(boost, "ac")}, DC {Text(boost, "dc")}, " +
+                               $"options {Rows(boost, "options").Count}, " +
+                               $"fallback={Text(boost, "usedFallback")}");
+        }
+
+        var acerServices = Section(report, "acer-services");
+        var acerServiceRows = Rows(acerServices, "services");
+        builder.AppendLine($"Acer services: {acerServiceRows.Count} detected; " +
+                           $"enabled={Text(acerServices, "enabledCount")}, " +
+                           $"running={Text(acerServices, "runningCount")}, " +
+                           $"backup={Text(acerServices, "backupExists")}");
+
+        var batteryPower = Section(system, "batteryPower");
+        builder.AppendLine($"Battery power: AC={Text(batteryPower, "powerOnline")}, " +
+                           $"charge={Text(batteryPower, "chargeRateMw")} mW, " +
+                           $"discharge={Text(batteryPower, "dischargeRateMw")} mW");
+
         var gpuReport = Section(report, "gpu");
         var offsets = Section(gpuReport, "offsets");
         var coreRange = Section(offsets, "coreDriverRangeMhz");
@@ -532,8 +566,9 @@ public static class DiagnosticsCollector
                system.json              OS, CPU, GPU, memory, battery, display, and device info.
                nitrous-settings.json    Values under HKCU\Software\Nitrous only.
                acer-wmi.json            Acer WMI class availability, sensor probes, and telemetry.
+               acer-services.json       Detected OEM services, start modes, and backup state.
                gpu.json                 NVAPI offsets, driver ranges, and NVML telemetry.
-               cpu-power.json           Active scheme, current min/max, and Nitrous backups.
+               cpu-power.json           Active scheme, current min/max, boost modes, and backups.
                display.json             Current and supported refresh modes.
                startup.json             Scheduled-task query output.
                updates.json             Version, executable hash, and updater artifacts.

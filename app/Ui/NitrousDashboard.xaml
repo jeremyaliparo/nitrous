@@ -231,6 +231,130 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SetupCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#1C1C1F"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="BorderBrush" Value="#2A2A30"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="MinHeight" Value="58"/>
+        </Style>
+
+        <Style x:Key="SetupSectionLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#888890"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="4,4,0,6"/>
+        </Style>
+
+        <Style x:Key="SetupActionButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostBtn}">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Height" Value="28"/>
+        </Style>
+
+        <Style x:Key="CompactComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#2A2A30"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemBorder" Property="Background" Value="#1A1225"/>
+                                <Setter Property="Foreground" Value="#B388FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CompactComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Background" Value="#26262A"/>
+            <Setter Property="BorderBrush" Value="#2A2A30"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="ItemContainerStyle" Value="{StaticResource CompactComboBoxItemStyle}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"/>
+                            <Grid Margin="8,0,7,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0"
+                                                  Content="{TemplateBinding SelectionBoxItem}"
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                  ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                  TextElement.Foreground="{TemplateBinding Foreground}"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalAlignment="Left"
+                                                  IsHitTestVisible="False"/>
+                                <Path Grid.Column="1" Data="M7,10L12,15L17,10H7Z" Fill="#888890" Stretch="Uniform" Width="8" Height="6" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                            </Grid>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border Background="#1C1C1F"
+                                        BorderBrush="#2A2A30"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Margin="0,2,0,0"
+                                        Width="{TemplateBinding ActualWidth}">
+                                    <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter Margin="2"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#45454D"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#B388FF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="AccentBtn" TargetType="Button">
             <Setter Property="Foreground" Value="#121214"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -359,7 +483,8 @@
 				<!-- Right Side: Power Pill, Pin to Top & Close -->
 				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
 					<!-- 1. Dynamic Power State Pill -->
-                    <Border x:Name="DashPowerPillBorder" BorderBrush="#FF453A" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0">
+                    <Border x:Name="DashPowerPillBorder" BorderBrush="#FF453A" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0"
+                            ToolTip="Measured battery charge/discharge rate. Windows does not expose the adapter's rated wattage.">
                         <Grid>
                             <!-- Auto-tinting subtle background -->
                             <Border Background="{Binding BorderBrush, ElementName=DashPowerPillBorder}" Opacity="0.15" CornerRadius="5"/>
@@ -368,6 +493,9 @@
                                 <!-- Updated to an AC Power Plug icon -->
                                 <Path x:Name="DashPowerPillIcon" Fill="#FF453A" Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0" Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z"/>
                                 <TextBlock x:Name="DashPowerPillText" Text="AC POWER" Foreground="#FF453A" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding PowerPillWattsText}"
+                                           Foreground="{Binding Foreground, ElementName=DashPowerPillText}"
+                                           FontSize="9" FontWeight="Bold" VerticalAlignment="Center" Margin="4,0,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -579,7 +707,7 @@
 						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,10">
-					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,10" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
@@ -590,99 +718,185 @@
 							</StackPanel>
 						</StackPanel>
 					</Border>
+
+					<TextBlock Text="POWER &amp; PERFORMANCE" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,0,0,6"/>
+
 					<!-- Manage CPU Power Toggle -->
-					<Border Background="#1C1C1F" CornerRadius="10" Height="70" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,0,0,10">
+					<Border Style="{StaticResource SetupCardStyle}">
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
 									<!-- CPU Icon Path -->
 									<Path Data="M7,4V6H5C3.89,6 3,6.89 3,8V10H1V12H3V14H1V16H3V18C3,19.1 3.89,20 5,20H7V22H9V20H11V22H13V20H15V22H17V20H19C20.1,20 21,19.1 21,18V16H23V14H21V12H23V10H21V8C21,6.89 20.1,6 19,6H17V4H15V6H13V4H11V6H9V4H7M5,8H19V18H5V8M7,10V16H17V10H7M9,12H15V14H9V12Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 									<TextBlock Text="Manage CPU Power Limits" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Automatically adjust Windows CPU power limits based on the active profile." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
+								<TextBlock Text="Automatically adjust Windows CPU power limits based on the active profile." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogManageCpu" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding ManageCpuPower, UpdateSourceTrigger=PropertyChanged}"/>
+							<CheckBox Grid.Column="1" x:Name="TogManageCpu" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding ManageCpuPower, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
 					</Border>
-					<Border Background="#1C1C1F" CornerRadius="10" Height="70" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1">
+
+					<!-- Processor Boost Mode -->
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+								<Path Data="M13,3V9H9V3H7V9H3V11H7V17H9V11H13V17H15V11H17V9H15V3H13M5,19H19V21H5V19Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Processor Boost Mode" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Windows processor performance boost, applied to the active power plan." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="Plugged in" Foreground="#A0A0A8" FontSize="10" VerticalAlignment="Center"/>
+								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
+								          Style="{StaticResource CompactComboBoxStyle}"
+								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
+								          SelectedItem="{Binding BoostAcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								          IsEnabled="{Binding IsBoostSupported}"
+								          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
+							</Grid>
+							<Grid Margin="0,6,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="On battery" Foreground="#A0A0A8" FontSize="10" VerticalAlignment="Center"/>
+								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
+								          Style="{StaticResource CompactComboBoxStyle}"
+								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
+								          SelectedItem="{Binding BoostDcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+								          IsEnabled="{Binding IsBoostSupported}"
+								          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
+							</Grid>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0" Text="{Binding BoostStatusText}" Foreground="#888890" FontSize="9"
+								           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+								<Button Grid.Column="1" Content="RESTORE" Command="{Binding RestoreBoostCommand}"
+								        Style="{StaticResource SetupActionButtonStyle}"
+								        ToolTip="Restore the boost values Windows had before Nitrous changed them."
+								        IsEnabled="{Binding IsBoostSupported}"/>
+							</Grid>
+						</StackPanel>
+					</Border>
+
+					<Border Style="{StaticResource SetupCardStyle}">
 					    <Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
 									<Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="White" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 									<TextBlock Text="80% Battery Limit" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Extends battery lifespan by capping max charge." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
+								<TextBlock Text="Extends battery lifespan by capping max charge." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
+							<CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
 					</Border>
-					<Border Background="#1C1C1F" CornerRadius="10" Height="70" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1">
+
+					<Border Style="{StaticResource SetupCardStyle}">
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
 									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="White" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 									<TextBlock Text="Auto-Switch Power" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
+								<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
+							<CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
 					</Border>
-					<Border Background="#1C1C1F" CornerRadius="10" Height="70" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1">
+
+					<TextBlock Text="SYSTEM" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
+
+					<Border Style="{StaticResource SetupCardStyle}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <!-- Eye / Monitoring Icon -->
                                     <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" Fill="White" Stretch="Uniform" Width="14" Height="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="Deep GPU Telemetry" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="Live NVIDIA statistics." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
+                                <TextBlock Text="Live NVIDIA statistics." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
                             </StackPanel>
-                            <!-- Bound to the new DeepGpuTelemetry property -->
-                            <CheckBox Grid.Column="1" x:Name="TogGpuTelemetry" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding DeepGpuTelemetry, UpdateSourceTrigger=PropertyChanged}"/>
+                            <CheckBox Grid.Column="1" x:Name="TogGpuTelemetry" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding DeepGpuTelemetry, UpdateSourceTrigger=PropertyChanged}"/>
                         </Grid>
                     </Border>
-					<Border Background="#1C1C1F" CornerRadius="10" Height="70" BorderBrush="#2A2A30" BorderThickness="1">
+
+					<Border Style="{StaticResource SetupCardStyle}">
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="15,0,10,0">
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
 									<Path Data="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 									<TextBlock Text="Run on Startup" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Launch nitrous engine silently at boot." Foreground="#888890" FontSize="11" TextWrapping="Wrap"/>
+								<TextBlock Text="Launch Nitrous silently at boot." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,15,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
+							<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
 					</Border>
+
+					<TextBlock Text="ACER SERVICES" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
+
+					<!-- Acer Services -->
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+								<Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.66 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.02L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.02C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.66 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="White" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Acer Background Services" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Stops OEM services and background telemetry. Original start types are backed up." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+							<TextBlock Text="{Binding AcerServicesStatusText}" Foreground="#E0E0E0" FontSize="10" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap"/>
+							<TextBlock Text="{Binding AcerServicesDetailText}" Foreground="#888890" FontSize="9" Margin="0,2,0,0" TextWrapping="Wrap"/>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="8"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+								<Button Content="DISABLE ALL" Command="{Binding DisableAcerServicesCommand}"
+								        Style="{StaticResource SetupActionButtonStyle}"
+								        IsEnabled="{Binding CanDisableAcerServices}"/>
+								<Button Grid.Column="2" Content="RESTORE" Command="{Binding RestoreAcerServicesCommand}"
+								        Style="{StaticResource SetupActionButtonStyle}"
+								        IsEnabled="{Binding CanRestoreAcerServices}"/>
+							</Grid>
+						</StackPanel>
+					</Border>
+
 					<!-- Diagnostics -->
-					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,10,0,0" Padding="15,12">
+					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
 						<StackPanel>
 							<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
 								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 								<TextBlock Text="Diagnostics" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 							</StackPanel>
 							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. Nothing is uploaded automatically."
-							           Foreground="#888890" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
+							           Foreground="#888890" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>

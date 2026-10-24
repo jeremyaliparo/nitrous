@@ -11,17 +11,21 @@ public static class SettingsManager
 {
     private const string RegPath = @"Software\Nitrous";
 
-    public static void Save(string key, object value)
+    public static bool TrySave(string key, object value)
     {
         try
         {
             using RegistryKey regKey = Registry.CurrentUser.CreateSubKey(RegPath);
             regKey.SetValue(key, value);
+            return true;
         }
         catch (UnauthorizedAccessException ex) { Logger.Warn($"Settings: access denied saving '{key}'.", ex); }
         catch (SecurityException ex) { Logger.Warn($"Settings: security restriction saving '{key}'.", ex); }
         catch (Exception ex) { Logger.Warn($"Settings: failed to save '{key}'.", ex); }
+        return false;
     }
+
+    public static void Save(string key, object value) => TrySave(key, value);
 
     public static T Get<T>(string key, T defaultValue)
     {

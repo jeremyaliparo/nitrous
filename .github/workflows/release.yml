@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]*"
+      - "[0-9]*"
 
 permissions:
   contents: write
@@ -28,8 +29,9 @@ jobs:
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
-          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
-            throw "Release tags must look like vMAJOR.MINOR.PATCH (got '$tag')."
+          $version = $tag -replace '^v', ''
+          if ($version -notmatch '^(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tags must look like MAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH (got '$tag')."
           }
           $version = $Matches.version
 
@@ -69,7 +71,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $version = $tag.Substring(1)
+          $version = $tag -replace '^v', ''
 
           $notes = @(
             "## Nitrous $version",

@@ -25,6 +25,9 @@ Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly
 * **Persistent GPU OC:** A background watchdog re-reads the applied P0 offsets and repairs drift every 30 seconds, after sleep/resume, and after a driver reset. A failed read (for example, a sleeping dGPU) is never treated as "0 MHz".
 * **Auto-Apply OC Profiles:** Re-applies saved custom GPU offsets for the active power profile, with a longer retry window at boot. Built-in profile defaults are stock `0/0`, so overclocking is opt-in.
 * **CPU Power Management:** Per-profile CPU min/max power states with **backup and exact restore**. The original AC and DC values are captured per power scheme before the first write, changes are serialized across the tray and dashboard processes, and the originals are restored when the feature is disabled or the app exits. Correct write ordering prevents `min > max` during dead-band changes.
+* **Processor Boost Mode:** Enumerates the Windows `PERFBOOSTMODE` values actually exposed by your model and lets you choose separate AC and battery modes. The original values are backed up and can be restored from Setup.
+* **Acer Service Control:** Detects Acer/Predator/NitroSense services and can stop and disable them in one action. The original start types, delayed-auto flags, and running state are saved to `%LOCALAPPDATA%\Nitrous\acer-services-backup.json` so they can be restored exactly.
+* **Charging Telemetry:** Shows the measured battery charge or discharge rate beside the AC/BATTERY pill. This is the rate reported by Windows, not the charger's rated wattage.
 * **Dedicated Keyboard Tab & Hotkeys:** Customizable shortcuts for cycling power profiles and opening the dashboard. Hotkey edits are picked up by the tray engine without a restart.
 * **Smart Automation:** Apply quiet modes and 60 Hz refresh on battery, then restore performance and the high refresh rate on AC power.
 * **Battery Protection:** Hardware-level charge limit to extend battery lifespan; re-asserted after resume.
@@ -83,11 +86,13 @@ Visual Studio users can use the checked-in profile at `app/Properties/PublishPro
 
 ### Releases and Update Verification
 
-The release workflow runs on tags matching `vMAJOR.MINOR.PATCH` and publishes:
+The release workflow accepts both `MAJOR.MINOR.PATCH` and `vMAJOR.MINOR.PATCH` tags and publishes:
 
 * `Nitrous.exe` — framework-dependent single-file executable.
 * `SHA256SUMS` — standard checksum line for the executable.
 * `Nitrous.exe.sha256` — the same checksum in a single-file form.
+
+The `0.8.1` release is published with a numeric tag because 0.7.2 passed the raw tag directly to `Version.TryParse`; a leading `v` made its update check exit silently. Numeric tags keep that legacy updater path working, and current builds accept either form.
 
 The executable is **not code-signed**. The updater therefore verifies integrity before replacing anything:
 
@@ -102,6 +107,9 @@ Checksums protect against a corrupted or tampered download; they are not a subst
 
 * **Fan floor:** Manual speeds and curves are clamped to **1%**. The UI slider and curve editor enforce it, and the WMI layer clamps again so stale registry values cannot bypass it.
 * **CPU limits:** Original AC/DC min/max values are backed up under `HKCU\Software\Nitrous` as `CpuPowerBackup_<scheme>_{AC|DC}_{Min|Max}`. They are restored when the feature is turned off or the app exits. If the app is terminated abruptly, the backups remain and are restored on the next run. Do not delete these values while the feature is enabled unless you intend to lose the original defaults.
+* **Boost mode:** Original AC/DC boost values are backed up separately under `HKCU\Software\Nitrous` as `CpuBoostBackup_<scheme>_{AC|DC}`. The selected boost mode is a preference, so it is not reverted on exit; use **Setup → Processor Boost Mode → RESTORE** to return to the values Windows had before Nitrous changed them. The available modes come from Windows and may differ by model or build.
+* **Acer services:** Disabling Acer/Predator services is opt-in and requires confirmation. OEM hotkeys, lighting, fan controls, and Acer Care may stop working. Nitrous saves the original start types, delayed-auto flags, and running state first. Use **Setup → Acer Background Services → RESTORE** to put them back. The backup is kept if a restore is only partially successful.
+* **Charging telemetry:** The value next to the power pill is the battery charge or discharge rate reported by Windows. Windows does not expose the adapter's rated wattage, so Nitrous does not claim to display it.
 * **GPU offsets:** Built-in profile defaults are stock `0/0`; positive and negative offsets are applied only after the user chooses them. Values are checked against the driver's advertised range and read back after applying. The watchdog only re-applies after a successful read, so it does not wake a sleeping dGPU just to compare offsets. A stock `0/0` profile is treated as "no override" during automatic startup, resume, AC/DC switching, and watchdog repairs, so it will not wipe an offset applied manually or by another tool; selecting the profile or pressing **APPLY**/**RESET** still writes the saved values explicitly. Exact legacy automatic-offset values are migrated to `0/0` on first run.
 * **Unsupported hardware:** Nitrous refuses to start on machines that do not expose the required Acer WMI class.
 
@@ -119,6 +127,16 @@ Checksums protect against a corrupted or tampered download; they are not a subst
 * The app restores the exact values captured before it first changed the scheme, not a hard-coded `5/100`.
 * Check the log for `CPU power:` entries. If a restore could not complete, the backup values are retained and a later run will retry.
 * If you need to reset manually, turn the CPU power feature off, wait for the log entry, then exit Nitrous.
+
+**Acer hotkeys or lighting stopped working**
+
+* Check whether **Setup → Acer Background Services** disabled the OEM services. Use **RESTORE** to re-enable them and start the services that were running before.
+* If only some services were restored, the backup file is intentionally kept at `%LOCALAPPDATA%\Nitrous\acer-services-backup.json` so a later restore can retry. Check the log for `Acer services:` entries.
+
+**Boost mode is unavailable or shows different names**
+
+* The list comes from the active Windows power plan and the model's firmware. If Windows exposes no values, Nitrous falls back to the standard documented modes.
+* Use **RESTORE** to return to the original AC and DC values. Boost changes are applied to the active power plan.
 
 **Fans are not following the curve**
 
@@ -138,7 +156,7 @@ If you are reporting a bug, attach a diagnostics bundle to the issue:
 2. Nitrous writes a ZIP to `%LOCALAPPDATA%\Nitrous\diagnostics` and opens it in Explorer.
 3. After creating the issue, attach the newest `Nitrous-Diagnostics-*.zip` in a comment.
 
-The bundle includes the Nitrous version, Windows build, laptop model/BIOS, CPU/RAM/GPU details, Acer WMI availability and sensor probes, current GPU offset and driver ranges, CPU power limits and backups, display mode, startup task, updater state, recent redacted logs, and bounded excerpts from the System and Application event logs. Nothing is uploaded automatically.
+The bundle includes the Nitrous version, Windows build, laptop model/BIOS, CPU/RAM/GPU details, Acer WMI availability and sensor probes, Acer service state and backup status, current GPU offset and driver ranges, CPU power limits, boost modes and backups, battery power telemetry, display mode, startup task, updater state, recent redacted logs, and bounded excerpts from the System and Application event logs. Nothing is uploaded automatically.
 
 The current username, machine name, serial numbers, system UUIDs, user-profile paths, SIDs, email addresses, and IP/MAC addresses are redacted before the ZIP is written. You can inspect the ZIP before sharing it; `summary.txt` is the best place to start, and `errors.txt` lists any sections that could not be collected.
 
@@ -146,6 +164,7 @@ The current username, machine name, serial numbers, system UUIDs, user-profile p
 
 * Log: `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` (rotated at 1 MB, up to 3 older files). Each line includes the process role and PID so tray and dashboard entries can be told apart.
 * Diagnostics: `%LOCALAPPDATA%\Nitrous\diagnostics`.
+* Acer service backup: `%LOCALAPPDATA%\Nitrous\acer-services-backup.json`.
 * Settings: `HKCU\Software\Nitrous`.
 
 ### Compatibility

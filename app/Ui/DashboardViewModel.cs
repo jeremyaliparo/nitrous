@@ -24,6 +24,29 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private bool _isApplyingClocks;
     private bool _disposed;
 
+    private bool _loadingBoostModes;
+    private bool _boostRestoreInProgress;
+    private IReadOnlyList<CpuPowerManager.BoostModeOption> _boostModes =
+        Array.Empty<CpuPowerManager.BoostModeOption>();
+    private CpuPowerManager.BoostModeOption? _boostAcMode;
+    private CpuPowerManager.BoostModeOption? _boostDcMode;
+    private bool _isBoostSupported;
+    private string _boostStatusText = "Reading supported Windows boost modes...";
+
+    private bool _acerServiceRefreshInProgress;
+    private bool _acerServiceOperationInProgress;
+    private string _acerServicesStatusText = "Scanning Acer services...";
+    private string _acerServicesDetailText = "";
+    private bool _canDisableAcerServices;
+    private bool _canRestoreAcerServices;
+
+    private string _powerPillWattsText = "";
+    public string PowerPillWattsText
+    {
+        get => _powerPillWattsText;
+        set => SetProperty(ref _powerPillWattsText, value);
+    }
+
     private string _cpuTempText = "--°C";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
 
@@ -156,6 +179,70 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 }
             });
         }
+    }
+
+    public IReadOnlyList<CpuPowerManager.BoostModeOption> BoostModes
+    {
+        get => _boostModes;
+        private set => SetProperty(ref _boostModes, value);
+    }
+
+    public CpuPowerManager.BoostModeOption? BoostAcMode
+    {
+        get => _boostAcMode;
+        set
+        {
+            if (!SetProperty(ref _boostAcMode, value)) return;
+            if (_loadingBoostModes || value == null) return;
+            _ = ApplyBoostModeAsync(isOnline: true, value.Value);
+        }
+    }
+
+    public CpuPowerManager.BoostModeOption? BoostDcMode
+    {
+        get => _boostDcMode;
+        set
+        {
+            if (!SetProperty(ref _boostDcMode, value)) return;
+            if (_loadingBoostModes || value == null) return;
+            _ = ApplyBoostModeAsync(isOnline: false, value.Value);
+        }
+    }
+
+    public bool IsBoostSupported
+    {
+        get => _isBoostSupported;
+        private set => SetProperty(ref _isBoostSupported, value);
+    }
+
+    public string BoostStatusText
+    {
+        get => _boostStatusText;
+        private set => SetProperty(ref _boostStatusText, value);
+    }
+
+    public string AcerServicesStatusText
+    {
+        get => _acerServicesStatusText;
+        private set => SetProperty(ref _acerServicesStatusText, value);
+    }
+
+    public string AcerServicesDetailText
+    {
+        get => _acerServicesDetailText;
+        private set => SetProperty(ref _acerServicesDetailText, value);
+    }
+
+    public bool CanDisableAcerServices
+    {
+        get => _canDisableAcerServices;
+        private set => SetProperty(ref _canDisableAcerServices, value);
+    }
+
+    public bool CanRestoreAcerServices
+    {
+        get => _canRestoreAcerServices;
+        private set => SetProperty(ref _canRestoreAcerServices, value);
     }
 
     public bool IsManualSliderEnabled => IsCustomFanEnabled && !IsCurveModeEnabled;
@@ -358,6 +445,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
             }
         });
 
+        RestoreBoostCommand = new RelayCommand(async _ => await RestoreBoostAsync());
+        DisableAcerServicesCommand = new RelayCommand(async _ => await DisableAcerServicesAsync());
+        RestoreAcerServicesCommand = new RelayCommand(async _ => await RestoreAcerServicesAsync());
+
+        _ = LoadBoostModesAsync();
+        _ = RefreshAcerServicesAsync();
+
         StartTelemetryPolling();
     }
 
@@ -525,6 +619,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
     public ICommand SetRefreshCommand { get; }
     public ICommand ApplyGpuClocksCommand { get; }
     public ICommand ResetGpuClocksCommand { get; }
+    public ICommand RestoreBoostCommand { get; }
+    public ICommand DisableAcerServicesCommand { get; }
+    public ICommand RestoreAcerServicesCommand { get; }
 
     /// <summary>Pause WMI/NVML polling while the dashboard is hidden or minimized.</summary>
     public void SetTelemetryEnabled(bool enabled)
@@ -546,18 +643,304 @@ public class DashboardViewModel : ObservableObject, IDisposable
         return _gpuManager.GetDiagnosticsSnapshotAsync(cancellationToken);
     }
 
+    private async Task LoadBoostModesAsync()
+    {
+        try
+        {
+            var snapshot = await Task.Run(CpuPowerManager.GetBoostModeSnapshot);
+
+            await RunOnUiAsync(() =>
+            {
+                _loadingBoostModes = true;
+                BoostModes = snapshot.Options;
+                IsBoostSupported = snapshot.Options.Count > 0 && snapshot.SchemeGuid != null;
+                BoostAcMode = snapshot.Options.FirstOrDefault(option => option.Value == snapshot.AcValue);
+                BoostDcMode = snapshot.Options.FirstOrDefault(option => option.Value == snapshot.DcValue);
+
+                BoostStatusText = snapshot.Error != null
+                    ? snapshot.Error
+                    : snapshot.SchemeGuid == null
+                        ? "Could not determine the active Windows power plan."
+                        : snapshot.UsedFallback
+                            ? "Windows did not expose the supported list; using the standard modes."
+                            : "Applies to the active Windows power plan.";
+
+                _loadingBoostModes = false;
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("CPU boost: could not load the mode state.", ex);
+            await RunOnUiAsync(() =>
+            {
+                IsBoostSupported = false;
+                BoostStatusText = "Could not read the Windows boost modes.";
+            });
+        }
+    }
+
+    private async Task ApplyBoostModeAsync(bool isOnline, int value)
+    {
+        try
+        {
+            var result = await CpuPowerManager.ApplyBoostModeAsync(isOnline, value);
+            if (!result.Success)
+                await LoadBoostModesAsync();
+
+            await RunOnUiAsync(() => BoostStatusText = result.Message);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("CPU boost: apply command failed.", ex);
+            await RunOnUiAsync(() => BoostStatusText = ex.Message);
+        }
+    }
+
+    private async Task RestoreBoostAsync()
+    {
+        if (_boostRestoreInProgress) return;
+        _boostRestoreInProgress = true;
+
+        try
+        {
+            await RunOnUiAsync(() => BoostStatusText = "Restoring the original boost values...");
+            var result = await CpuPowerManager.RestoreBoostOriginalAsync();
+            await LoadBoostModesAsync();
+            await RunOnUiAsync(() => BoostStatusText = result.Message);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("CPU boost: restore command failed.", ex);
+            await RunOnUiAsync(() => BoostStatusText = ex.Message);
+        }
+        finally
+        {
+            _boostRestoreInProgress = false;
+        }
+    }
+
+    private async Task RefreshAcerServicesAsync()
+    {
+        if (_acerServiceRefreshInProgress) return;
+        _acerServiceRefreshInProgress = true;
+
+        try
+        {
+            var state = await Task.Run(AcerServiceManager.GetState);
+            await RunOnUiAsync(() =>
+            {
+                if (state.Error != null)
+                {
+                    AcerServicesStatusText = state.Services.Count > 0
+                        ? $"{state.Services.Count} Acer service(s) detected"
+                        : "Could not read Acer services.";
+                    AcerServicesDetailText = state.Error;
+                    CanDisableAcerServices = false;
+                    CanRestoreAcerServices = false;
+                    return;
+                }
+
+                AcerServicesStatusText = state.Services.Count == 0
+                    ? "No Acer-related services were found."
+                    : $"{state.Services.Count} Acer service(s) detected";
+
+                var details = new List<string>
+                {
+                    $"{state.EnabledCount} enabled",
+                    $"{state.RunningCount} running"
+                };
+                if (state.BackupExists) details.Add("backup ready");
+                AcerServicesDetailText = string.Join(" · ", details);
+
+                CanDisableAcerServices = state.CanDisable;
+                CanRestoreAcerServices = state.CanRestore;
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Acer services: refresh failed.", ex);
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = "Could not read Acer services.";
+                AcerServicesDetailText = ex.Message;
+                CanDisableAcerServices = false;
+                CanRestoreAcerServices = false;
+            });
+        }
+        finally
+        {
+            _acerServiceRefreshInProgress = false;
+        }
+    }
+
+    private async Task DisableAcerServicesAsync()
+    {
+        if (_acerServiceOperationInProgress) return;
+
+        try
+        {
+            var state = await Task.Run(AcerServiceManager.GetState);
+            if (state.Error != null)
+            {
+                await RunOnUiAsync(() =>
+                {
+                    AcerServicesStatusText = state.Services.Count > 0
+                        ? $"{state.Services.Count} Acer service(s) detected"
+                        : "Could not read Acer services.";
+                    AcerServicesDetailText = state.Error;
+                });
+                return;
+            }
+
+            if (state.Services.Count == 0)
+            {
+                await RunOnUiAsync(() =>
+                {
+                    AcerServicesStatusText = "No Acer-related services were found.";
+                    AcerServicesDetailText = "";
+                });
+                return;
+            }
+
+            var names = string.Join(Environment.NewLine, state.Services.Select(service =>
+                $"  • {service.DisplayName} ({service.Name})"));
+
+            if (MessageBox.Show(
+                    $"Stop and disable these Acer services?\n\n{names}\n\n" +
+                    "OEM hotkeys, lighting, fan tools, or Acer Care may stop working. " +
+                    "Nitrous saves their original start types and can restore them later.",
+                    "Disable Acer services", MessageBoxButton.YesNo, MessageBoxImage.Warning) !=
+                MessageBoxResult.Yes)
+                return;
+
+            _acerServiceOperationInProgress = true;
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = "Stopping and disabling Acer services...";
+                AcerServicesDetailText = "This can take a few seconds.";
+                CanDisableAcerServices = false;
+                CanRestoreAcerServices = false;
+            });
+
+            var result = await AcerServiceManager.DisableAllAsync();
+            await RefreshAcerServicesAsync();
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = result.Success
+                    ? "Acer services disabled."
+                    : "Acer service change incomplete.";
+                AcerServicesDetailText = result.Message;
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Acer services: disable command failed.", ex);
+            await RefreshAcerServicesAsync();
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = "Could not disable Acer services.";
+                AcerServicesDetailText = ex.Message;
+            });
+        }
+        finally
+        {
+            _acerServiceOperationInProgress = false;
+        }
+    }
+
+    private async Task RestoreAcerServicesAsync()
+    {
+        if (_acerServiceOperationInProgress) return;
+
+        try
+        {
+            if (MessageBox.Show(
+                    "Restore the Acer services to the start types and running state saved by Nitrous?",
+                    "Restore Acer services", MessageBoxButton.YesNo, MessageBoxImage.Question) !=
+                MessageBoxResult.Yes)
+                return;
+
+            _acerServiceOperationInProgress = true;
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = "Restoring Acer services...";
+                AcerServicesDetailText = "This can take a few seconds.";
+                CanDisableAcerServices = false;
+                CanRestoreAcerServices = false;
+            });
+
+            var result = await AcerServiceManager.RestoreAllAsync();
+            await RefreshAcerServicesAsync();
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = result.Success
+                    ? "Acer services restored."
+                    : "Acer service restore incomplete.";
+                AcerServicesDetailText = result.Message;
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Acer services: restore command failed.", ex);
+            await RefreshAcerServicesAsync();
+            await RunOnUiAsync(() =>
+            {
+                AcerServicesStatusText = "Could not restore Acer services.";
+                AcerServicesDetailText = ex.Message;
+            });
+        }
+        finally
+        {
+            _acerServiceOperationInProgress = false;
+        }
+    }
+
+    private static string FormatBatteryPower(SystemInfoManager.BatteryPowerTelemetry battery)
+    {
+        if (battery.PowerOnline && battery.Charging && battery.ChargeRateMw > 500)
+            return $"· {Math.Round(battery.ChargeRateMw / 1000.0, MidpointRounding.AwayFromZero):0} W";
+
+        if (!battery.PowerOnline && battery.Discharging && battery.DischargeRateMw > 500)
+            return $"· {Math.Round(battery.DischargeRateMw / 1000.0, MidpointRounding.AwayFromZero):0} W";
+
+        return "";
+    }
+
+    private static Task RunOnUiAsync(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return dispatcher.InvokeAsync(action).Task;
+    }
+
     private static string FormatGpuName(string name)
     {
         var display = name.Trim();
 
-        if (display.StartsWith("NVIDIA ", StringComparison.OrdinalIgnoreCase))
-            display = display["NVIDIA ".Length..].TrimStart();
-        if (display.StartsWith("GeForce ", StringComparison.OrdinalIgnoreCase))
+        if (display.StartsWith("NVIDIA GeForce ", StringComparison.OrdinalIgnoreCase))
+            display = "NVIDIA " + display["NVIDIA GeForce ".Length..];
+        else if (display.StartsWith("GeForce ", StringComparison.OrdinalIgnoreCase))
             display = display["GeForce ".Length..].TrimStart();
+
         if (display.EndsWith(" GPU", StringComparison.OrdinalIgnoreCase))
             display = display[..^" GPU".Length].TrimEnd();
 
-        return string.IsNullOrWhiteSpace(display) ? "NVIDIA GPU" : display;
+        if (string.IsNullOrWhiteSpace(display))
+            return "NVIDIA GPU";
+
+        if (display.StartsWith("NVIDIA ", StringComparison.OrdinalIgnoreCase))
+            return display;
+
+        if (display.StartsWith("RTX ", StringComparison.OrdinalIgnoreCase) ||
+            display.StartsWith("GTX ", StringComparison.OrdinalIgnoreCase))
+            return "NVIDIA " + display;
+
+        return display;
     }
 
     private void StartTelemetryPolling()
@@ -583,24 +966,28 @@ public class DashboardViewModel : ObservableObject, IDisposable
                     try
                     {
                         var wmiTask = Task.Run(() => AcerWmiManager.GetSystemTelemetry(), token);
+                        var batteryTask = Task.Run(() => SystemInfoManager.GetBatteryPowerTelemetry(), token);
 
                         Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
                         if (DeepGpuTelemetry)
                         {
                             smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
-                            await Task.WhenAll(wmiTask, smiTask);
+                            await Task.WhenAll(wmiTask, batteryTask, smiTask);
                         }
                         else
                         {
-                            await wmiTask;
+                            await Task.WhenAll(wmiTask, batteryTask);
                         }
 
                         var telemetry = await wmiTask;
+                        var battery = await batteryTask;
                         var smi = smiTask != null ? await smiTask : null;
                         _telemetryErrorLogged = false;
 
                         _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
                         {
+                            PowerPillWattsText = FormatBatteryPower(battery);
+
                             CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
                             CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
                             CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
