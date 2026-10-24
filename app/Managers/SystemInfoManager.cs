@@ -11,9 +11,6 @@ public static class SystemInfoManager
     private static string? _cachedModel;
 
     private static readonly object BatteryPowerGate = new();
-    private static ManagementObjectSearcher? _batteryPowerSearcher;
-    private static ManagementObjectCollection? _batteryPowerCollection;
-    private static ManagementObject? _batteryPowerInstance;
     private static bool _batteryPowerFailureLogged;
 
     public sealed record BatteryPowerTelemetry(
@@ -47,6 +44,8 @@ public static class SystemInfoManager
     /// <summary>
     /// Reads the battery's measured charge/discharge rate. Windows does not expose the adapter's
     /// rated wattage through this class, so callers must label these values accordingly.
+    /// BatteryStatus is a keyless WMI singleton, so it cannot be refreshed with
+    /// <see cref="ManagementObject.Get"/>; query it again on every poll instead.
     /// </summary>
     public static BatteryPowerTelemetry GetBatteryPowerTelemetry()
     {
@@ -54,32 +53,30 @@ public static class SystemInfoManager
         {
             try
             {
-                if (_batteryPowerInstance == null)
-                {
-                    _batteryPowerSearcher = new ManagementObjectSearcher(
-                        @"root\wmi",
-                        "SELECT PowerOnline, Charging, Discharging, ChargeRate, DischargeRate, Voltage " +
-                        "FROM BatteryStatus");
-                    _batteryPowerCollection = _batteryPowerSearcher.Get();
+                using var searcher = new ManagementObjectSearcher(
+                    @"root\wmi",
+                    "SELECT PowerOnline, Charging, Discharging, ChargeRate, DischargeRate, Voltage " +
+                    "FROM BatteryStatus");
+                using var collection = searcher.Get();
 
-                    foreach (ManagementBaseObject item in _batteryPowerCollection)
+                foreach (ManagementBaseObject item in collection)
+                {
+                    using (item)
                     {
                         if (item is not ManagementObject instance) continue;
-                        _batteryPowerInstance = instance;
-                        break;
+
+                        _batteryPowerFailureLogged = false;
+                        return new BatteryPowerTelemetry(
+                            ReadBool(instance, "PowerOnline"),
+                            ReadBool(instance, "Charging"),
+                            ReadBool(instance, "Discharging"),
+                            ReadInt(instance, "ChargeRate"),
+                            ReadInt(instance, "DischargeRate"),
+                            ReadInt(instance, "Voltage"));
                     }
                 }
 
-                if (_batteryPowerInstance == null)
-                    return new BatteryPowerTelemetry(false, false, false, 0, 0, 0);
-
-                return new BatteryPowerTelemetry(
-                    ReadBool(_batteryPowerInstance, "PowerOnline"),
-                    ReadBool(_batteryPowerInstance, "Charging"),
-                    ReadBool(_batteryPowerInstance, "Discharging"),
-                    ReadInt(_batteryPowerInstance, "ChargeRate"),
-                    ReadInt(_batteryPowerInstance, "DischargeRate"),
-                    ReadInt(_batteryPowerInstance, "Voltage"));
+                return new BatteryPowerTelemetry(false, false, false, 0, 0, 0);
             }
             catch (Exception ex)
             {
@@ -89,7 +86,6 @@ public static class SystemInfoManager
                     _batteryPowerFailureLogged = true;
                 }
 
-                DisposeBatteryPowerLocked();
                 return new BatteryPowerTelemetry(false, false, false, 0, 0, 0);
             }
         }
@@ -129,15 +125,6 @@ public static class SystemInfoManager
         {
             return 0;
         }
-    }
-
-    private static void DisposeBatteryPowerLocked()
-    {
-        try { _batteryPowerCollection?.Dispose(); } catch { }
-        try { _batteryPowerSearcher?.Dispose(); } catch { }
-        _batteryPowerCollection = null;
-        _batteryPowerSearcher = null;
-        _batteryPowerInstance = null;
     }
 
     private static Dictionary<string, object?> GetHardwareSnapshot()

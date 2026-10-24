@@ -880,10 +880,14 @@
 								</Grid.ColumnDefinitions>
 								<Button Content="DISABLE ALL" Command="{Binding DisableAcerServicesCommand}"
 								        Style="{StaticResource SetupActionButtonStyle}"
-								        IsEnabled="{Binding CanDisableAcerServices}"/>
+								        IsEnabled="{Binding CanDisableAcerServices}"
+								        ToolTip="Stops and disables all detected Acer services. Already-disabled services are left alone."
+								        ToolTipService.ShowOnDisabled="True"/>
 								<Button Grid.Column="2" Content="RESTORE" Command="{Binding RestoreAcerServicesCommand}"
 								        Style="{StaticResource SetupActionButtonStyle}"
-								        IsEnabled="{Binding CanRestoreAcerServices}"/>
+								        IsEnabled="{Binding CanRestoreAcerServices}"
+								        ToolTip="Restores the start types and running state saved by Nitrous. Available after Nitrous disables services."
+								        ToolTipService.ShowOnDisabled="True"/>
 							</Grid>
 						</StackPanel>
 					</Border>

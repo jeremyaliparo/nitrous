@@ -749,7 +749,11 @@ public class DashboardViewModel : ObservableObject, IDisposable
                     $"{state.EnabledCount} enabled",
                     $"{state.RunningCount} running"
                 };
-                if (state.BackupExists) details.Add("backup ready");
+                if (state.BackupExists)
+                    details.Add("backup ready");
+                else if (state.EnabledCount == 0 && state.RunningCount == 0)
+                    details.Add("already disabled; no Nitrous backup to restore");
+
                 AcerServicesDetailText = string.Join(" · ", details);
 
                 CanDisableAcerServices = state.CanDisable;
