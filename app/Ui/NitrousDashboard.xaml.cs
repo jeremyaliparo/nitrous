@@ -172,6 +172,11 @@ public partial class NitrousDashboard : Window
         {
             vm.ActivePowerProfile = activeMode;
             vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
+
+            // The tray applies the new profile's offsets on a hotkey or AC/DC change.
+            // Reflect the live values so the sliders match what is actually applied.
+            if (vm.ManageGpuClocks)
+                vm.RefreshGpuOffsets();
         }
 
         if (TxtHkCycle != null)

@@ -499,12 +499,17 @@ public static class DiagnosticsCollector
         var offsets = Section(gpuReport, "offsets");
         var coreRange = Section(offsets, "coreDriverRangeMhz");
         var memoryRange = Section(offsets, "memoryDriverRangeMhz");
+        var lastApplied = Section(offsets, "lastAppliedOffsets");
         builder.AppendLine($"GPU offsets: core {Text(offsets, "coreOffsetMhz")} MHz " +
                            $"[{Text(coreRange, "min")}..{Text(coreRange, "max")}], " +
                            $"memory {Text(offsets, "memoryOffsetMhz")} MHz " +
                            $"[{Text(memoryRange, "min")}..{Text(memoryRange, "max")}]; " +
                            $"NvAPI={Text(offsets, "nvapiInitialized")}, " +
                            $"editable={Text(offsets, "statesEditable")}");
+        builder.AppendLine($"GPU clock management: {Text(offsets, "gpuClockManagement")}; " +
+                           $"last applied {Text(lastApplied, "coreMhz")}/{Text(lastApplied, "memoryMhz")} MHz; " +
+                           $"voltage overrides={Text(offsets, "voltageOverridesDetected")}, " +
+                           $"P0 base voltage entries={Text(offsets, "baseVoltageCount")}");
         if (offsets.TryGetValue("error", out var gpuError))
             builder.AppendLine($"GPU offset error: {gpuError}");
 

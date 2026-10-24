@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -76,6 +78,92 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     private int _gpuMemoryOffset;
     public int GpuMemoryOffset { get => _gpuMemoryOffset; set => SetProperty(ref _gpuMemoryOffset, value); }
+
+    private bool _manageGpuClocks;
+    /// <summary>
+    /// Explicit ownership switch for GPU core/memory clock writes. Off means read-only:
+    /// every write path is gated inside NvidiaGpuManager, not just here.
+    /// </summary>
+    public bool ManageGpuClocks
+    {
+        get => _manageGpuClocks;
+        set
+        {
+            if (_manageGpuClocks == value) return;
+
+            if (value)
+            {
+                if (!ConfirmEnableGpuClockManagement())
+                {
+                    OnPropertyChanged(nameof(ManageGpuClocks));
+                    return;
+                }
+
+                // Save before applying so the tray watchdog (a separate process) sees the
+                // new ownership immediately.
+                SettingsManager.Save(NvidiaGpuManager.ManageGpuClocksKey, 1);
+                _manageGpuClocks = true;
+                GpuClockStatusText = "Nitrous manages GPU clocks. Applying the active profile offsets...";
+                OnPropertyChanged(nameof(ManageGpuClocks));
+                _ = ApplyGpuClockManagementAsync();
+                return;
+            }
+
+            var clearOffsets = false;
+            if (_gpuManager.TryGetAppliedOffsets(out var appliedCore, out var appliedMemory))
+            {
+                var choice = MessageBox.Show(
+                    $"Nitrous recorded these GPU offsets from its last write:\n\n" +
+                    $"Core: {appliedCore:+#;-#;0} MHz\n" +
+                    $"Memory: {appliedMemory:+#;-#;0} MHz\n\n" +
+                    "Clear them back to 0/0 now?\n\n" +
+                    "Yes: write 0/0 once (only if the GPU still shows these values)\n" +
+                    "No: leave them as they are\n" +
+                    "Cancel: keep GPU clock management on",
+                    "Nitrous GPU clocks",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (choice == MessageBoxResult.Cancel)
+                {
+                    OnPropertyChanged(nameof(ManageGpuClocks));
+                    return;
+                }
+
+                clearOffsets = choice == MessageBoxResult.Yes;
+            }
+
+            // Persist first so the tray watchdog stops writing immediately. Turning the
+            // switch off is otherwise read-only.
+            SettingsManager.Save(NvidiaGpuManager.ManageGpuClocksKey, 0);
+            _manageGpuClocks = false;
+            OnPropertyChanged(nameof(ManageGpuClocks));
+
+            if (clearOffsets)
+            {
+                var cleared = _gpuManager.TryClearAppliedOffsets(out var message);
+                Logger.Info($"GPU OC: disable cleanup: {message}");
+                GpuClockStatusText = cleared
+                    ? "GPU clock management is off. Nitrous cleared its offsets to 0/0."
+                    : $"GPU clock management is off. {message}";
+            }
+            else
+            {
+                GpuClockStatusText =
+                    "GPU clock management is off. Nitrous will not write GPU clocks. " +
+                    "Current offsets are left as they are.";
+            }
+
+            RefreshGpuOffsets();
+        }
+    }
+
+    private string _gpuClockStatusText = "";
+    public string GpuClockStatusText
+    {
+        get => _gpuClockStatusText;
+        private set => SetProperty(ref _gpuClockStatusText, value);
+    }
 
     private string _gpuNameText = "NVIDIA GPU";
     public string GpuNameText { get => _gpuNameText; set => SetProperty(ref _gpuNameText, value); }
@@ -261,6 +349,14 @@ public class DashboardViewModel : ObservableObject, IDisposable
         _isCurveModeEnabled = SettingsManager.Get("IsCurveModeEnabled", 0) == 1;
         _manageCpuPower = SettingsManager.Get("ManageCpuPower", 0) == 1;
 
+        // GPU clock writes are opt-in. Default off for existing installs so an update never
+        // starts writing clocks on a machine that has been tuned by another tool.
+        _manageGpuClocks = NvidiaGpuManager.IsClockManagementEnabled();
+        _gpuClockStatusText = _manageGpuClocks
+            ? "Nitrous manages GPU clocks. Per-profile offsets apply at startup, profile switches, AC/DC, resume, and the 30-second watchdog."
+            : "Nitrous is not managing GPU clocks. Offsets below are read from the driver and are never written. " +
+              "Enable the switch to apply per-profile core and memory offsets.";
+
         _deepGpuTelemetry = SettingsManager.Get("DeepGpuTelemetry", 1) == 1;
         if (!_deepGpuTelemetry) ClearDeepTelemetryUI();
 
@@ -323,7 +419,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 if (ManageCpuPower)
                     await CpuPowerManager.ApplyProfileLimitsAsync(mode, isOnline);
 
-                await _gpuManager.ApplyPowerProfileOcAsync(mode, allowStockReset: true);
+                await _gpuManager.ApplyPowerProfileOcAsync(mode, allowStockReset: true, source: "profile-click");
 
                 if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
                 {
@@ -394,7 +490,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
 
                 _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
-                var applied = _gpuManager.TrySetClocks(GpuCoreOffset, GpuMemoryOffset, out var error);
+                var applied = _gpuManager.TrySetClocks(GpuCoreOffset, GpuMemoryOffset, out var error, "apply");
 
                 if (applied)
                 {
@@ -427,7 +523,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
             try
             {
                 var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
-                await _gpuManager.ResetProfileToDefaultsAsync(currentProfile);
+                await _gpuManager.ResetProfileToDefaultsAsync(currentProfile, "reset");
 
                 if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
                 {
@@ -908,6 +1004,142 @@ public class DashboardViewModel : ObservableObject, IDisposable
             return $"· {Math.Round(battery.DischargeRateMw / 1000.0, MidpointRounding.AwayFromZero):0} W";
 
         return "";
+    }
+
+    private async Task ApplyGpuClockManagementAsync()
+    {
+        try
+        {
+            var profile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+            await _gpuManager.ApplyPowerProfileOcAsync(profile, allowStockReset: true, source: "enable");
+
+            var (ok, core, memory, error) = await Task.Run(() =>
+            {
+                var read = _gpuManager.TryGetClocks(out var c, out var m, out var readError);
+                return (read, c, m, readError);
+            });
+
+            await RunOnUiAsync(() =>
+            {
+                if (ok)
+                {
+                    GpuCoreOffset = core;
+                    GpuMemoryOffset = memory;
+                    GpuClockStatusText =
+                        $"Nitrous manages GPU clocks. {profile} is active at " +
+                        $"{core:+#;-#;0}/{memory:+#;-#;0} MHz.";
+                }
+                else
+                {
+                    GpuClockStatusText =
+                        $"GPU clock management is on, but the offsets could not be read ({error}). " +
+                        "The GPU may be asleep; Nitrous will retry at the next profile change or watchdog tick.";
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("GPU OC: enabling clock management failed.", ex);
+            await RunOnUiAsync(() =>
+                GpuClockStatusText = $"GPU clock management is on, but applying the offsets failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Re-reads the live P0 offsets. Used after a profile change that happened outside this
+    /// window (tray hotkey, auto-switch, AC/DC) and after disabling clock management.
+    /// </summary>
+    public void RefreshGpuOffsets()
+    {
+        _ = Task.Run(() =>
+        {
+            var read = _gpuManager.TryGetClocks(out var core, out var memory, out var error);
+            if (!read)
+            {
+                Logger.Info($"GPU OC: could not read clocks for the offset display: {error}");
+                return;
+            }
+
+            _ = RunOnUiAsync(() =>
+            {
+                GpuCoreOffset = core;
+                GpuMemoryOffset = memory;
+            });
+        });
+    }
+
+    private bool ConfirmEnableGpuClockManagement()
+    {
+        var afterburnerRunning = IsAfterburnerRunning();
+        var afterburnerStarts = !afterburnerRunning && IsAfterburnerSetToStart();
+
+        var message = new System.Text.StringBuilder();
+        message.AppendLine("Nitrous will own the GPU core and memory clock offsets.");
+        message.AppendLine();
+        message.AppendLine("Per-profile offsets will be written at startup, profile switches, hotkeys, AC/DC changes, resume, and every 30 seconds.");
+        message.AppendLine("A profile set to 0/0 MHz returns the GPU to stock clocks.");
+        message.AppendLine("Nitrous writes only P0 clock deltas. It cannot preserve a voltage/frequency curve applied by another tool.");
+
+        if (afterburnerRunning)
+        {
+            message.AppendLine();
+            message.AppendLine("MSI Afterburner is running right now. Two tools writing GPU clocks will fight, and your mV curve may reset.");
+            message.AppendLine("Before enabling, set Afterburner's Core and Memory sliders to 0 or close Afterburner.");
+        }
+        else if (afterburnerStarts)
+        {
+            message.AppendLine();
+            message.AppendLine("MSI Afterburner is set to start with Windows. If it also applies clocks, the two tools will fight and your mV curve may reset.");
+        }
+
+        message.AppendLine();
+        message.Append("Enable GPU clock management?");
+
+        return MessageBox.Show(
+                   message.ToString(),
+                   "Nitrous GPU clocks",
+                   MessageBoxButton.YesNo,
+                   MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    private static bool IsAfterburnerRunning()
+    {
+        try
+        {
+            return Process.GetProcessesByName("MSIAfterburner").Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsAfterburnerSetToStart()
+    {
+        try
+        {
+            foreach (var hive in new[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine })
+            {
+                using var runKey = hive.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
+                if (runKey == null) continue;
+
+                foreach (var valueName in runKey.GetValueNames())
+                {
+                    var command = runKey.GetValue(valueName) as string;
+                    if (command != null &&
+                        command.Contains("MSIAfterburner", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Detection is advisory only; never block the toggle on a registry error.
+        }
+
+        return false;
     }
 
     private static Task RunOnUiAsync(Action action)

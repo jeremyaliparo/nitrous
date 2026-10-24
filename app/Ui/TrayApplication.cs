@@ -270,7 +270,10 @@ public class TrayApplication : ApplicationContext
                 await AcerWmiManager.SetChargeLimitAsync(chargeLimit);
             }
 
-            await _gpuManager.ApplyPowerProfileOcAsync(profile);
+            await _gpuManager.ApplyPowerProfileOcAsync(
+                profile,
+                allowStockReset: true,
+                source: isStartup ? "startup-apply" : "acdc");
             _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
         }
         catch (Exception ex)
@@ -353,7 +356,7 @@ public class TrayApplication : ApplicationContext
                 if (SettingsManager.Get("ManageCpuPower", 0) == 1)
                     await CpuPowerManager.ApplyProfileLimitsAsync(nextProfile, isOnline).ConfigureAwait(false);
 
-                await _gpuManager.ApplyPowerProfileOcAsync(nextProfile, allowStockReset: true).ConfigureAwait(false);
+                await _gpuManager.ApplyPowerProfileOcAsync(nextProfile, allowStockReset: true, source: "hotkey").ConfigureAwait(false);
                 _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
             }
             catch (Exception ex)

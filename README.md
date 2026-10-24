@@ -22,8 +22,9 @@ Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly
 * **Custom Fan Curves:** Per-profile fan curves with overridable defaults, plus manual control from **1% to 100%**, Auto, and Max modes. The 1% floor is enforced in the UI, the curve editor, curve storage, interpolation, and again at the WMI boundary. Low fan speeds reduce cooling, so use them with care.
 * **Optimized NVML Telemetry:** Direct `nvml.dll` integration instead of `nvidia-smi.exe` for high-performance telemetry with low CPU overhead. Deep telemetry can be disabled for older NVIDIA GPUs.
 * **Dedicated GPU OC/UC Tab:** Fine-tune core and memory offsets with real-time telemetry, clock speeds, usage, and thermal tracking. Offsets are validated against the driver's advertised range and verified after applying.
-* **Persistent GPU OC:** A background watchdog re-reads the applied P0 offsets and repairs drift every 30 seconds, after sleep/resume, and after a driver reset. A failed read (for example, a sleeping dGPU) is never treated as "0 MHz".
-* **Auto-Apply OC Profiles:** Re-applies saved custom GPU offsets for the active power profile, with a longer retry window at boot. Built-in profile defaults are stock `0/0`, so overclocking is opt-in.
+* **Explicit GPU Clock Ownership:** The **Nitrous manages GPU clocks** switch beside `CLOCK OFFSETS` is the only way Nitrous is allowed to write GPU clocks. It is **off by default**, and while it is off every startup, profile, hotkey, AC/DC, resume, watchdog, APPLY, and RESET path is read-only. Turning it on warns about MSI Afterburner and voltage/frequency curve conflicts, then applies the active profile's saved per-profile offsets.
+* **Persistent GPU OC:** While clock management is on, a background watchdog re-reads the applied P0 offsets and repairs drift every 30 seconds, after sleep/resume, and after a driver reset. A failed read (for example, a sleeping dGPU) is never treated as "0 MHz".
+* **Auto-Apply OC Profiles:** Re-applies saved custom GPU offsets for the active power profile, with a longer retry window at boot. Built-in profile defaults are stock `0/0`, so overclocking is opt-in; with clock management on, a `0/0` profile means "stock clocks for this profile".
 * **CPU Power Management:** Per-profile CPU min/max power states with **backup and exact restore**. The original AC and DC values are captured per power scheme before the first write, changes are serialized across the tray and dashboard processes, and the originals are restored when the feature is disabled or the app exits. Correct write ordering prevents `min > max` during dead-band changes.
 * **Processor Boost Mode:** Enumerates the Windows `PERFBOOSTMODE` values actually exposed by your model and lets you choose separate AC and battery modes. The original values are backed up and can be restored from Setup.
 * **Acer Service Control:** Detects Acer/Predator/NitroSense services and can stop and disable them in one action. The original start types, delayed-auto flags, and running state are saved to `%LOCALAPPDATA%\Nitrous\acer-services-backup.json` so they can be restored exactly.
@@ -110,17 +111,24 @@ Checksums protect against a corrupted or tampered download; they are not a subst
 * **Boost mode:** Original AC/DC boost values are backed up separately under `HKCU\Software\Nitrous` as `CpuBoostBackup_<scheme>_{AC|DC}`. The selected boost mode is a preference, so it is not reverted on exit; use **Setup → Processor Boost Mode → RESTORE** to return to the values Windows had before Nitrous changed them. The available modes come from Windows and may differ by model or build.
 * **Acer services:** Disabling Acer/Predator services is opt-in and requires confirmation. OEM hotkeys, lighting, fan controls, and Acer Care may stop working. Nitrous saves the original start types, delayed-auto flags, and running state first. Use **Setup → Acer Background Services → RESTORE** to put them back. The backup is kept if a restore is only partially successful. Nitrous only creates a restore baseline for services it disables itself; if they were already disabled before Nitrous ran, there is no baseline and Nitrous cannot guess their original start types.
 * **Charging telemetry:** The value next to the power pill is the battery charge or discharge rate reported by Windows. Windows does not expose the adapter's rated wattage, so Nitrous does not claim to display it.
-* **GPU offsets:** Built-in profile defaults are stock `0/0`; positive and negative offsets are applied only after the user chooses them. Values are checked against the driver's advertised range and read back after applying. The watchdog only re-applies after a successful read, so it does not wake a sleeping dGPU just to compare offsets. A stock `0/0` profile is treated as "no override" during automatic startup, resume, AC/DC switching, and watchdog repairs, so it will not wipe an offset applied manually or by another tool; selecting the profile or pressing **APPLY**/**RESET** still writes the saved values explicitly. Exact legacy automatic-offset values are migrated to `0/0` on first run.
+* **GPU offsets:** GPU clock writes are opt-in through **Nitrous manages GPU clocks** on the GPU page. The switch is off by default, including after upgrading, so an update never starts writing clocks on a machine tuned by another tool. While it is off, Nitrous only reads clocks and offsets; startup, profile switches, hotkeys, AC/DC, resume, the 30-second watchdog, APPLY, and RESET all skip the write. While it is on, saved per-profile offsets are applied and verified, a `0/0` profile means stock clocks for that profile, and the watchdog repairs drift after a successful read. Nitrous writes only P0 core/memory deltas and never voltage, so it cannot preserve an MSI Afterburner voltage/frequency curve; run one clock owner at a time. Turning the switch off never writes on its own, but it offers to clear the offsets Nitrous applied if the GPU still reports exactly those values. Exact legacy automatic-offset values are migrated to `0/0` on first run.
 * **Unsupported hardware:** Nitrous refuses to start on machines that do not expose the required Acer WMI class.
 
 ### Troubleshooting
 
 **The GPU offsets still reset to 0**
 
-* Make sure the tray process is running; the watchdog lives there.
-* Check `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` for `NVAPI`, `GPU OC`, or `NVML` warnings.
+* Make sure the tray process is running; while clock management is on, the watchdog lives there.
+* Confirm **Nitrous manages GPU clocks** is on. When it is off, Nitrous deliberately performs no GPU writes, so another tool or the driver is the only thing setting clocks.
+* Check `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` for `GPU OC`, `NVAPI`, or `NVML` warnings. Every write now logs its trigger (`startup`, `profile-click`, `hotkey`, `acdc`, `watchdog`, `apply`, `reset`) plus the old and new offsets.
 * A sleeping dGPU cannot be read or written. The watchdog waits for the next successful read instead of overwriting the saved offsets with 0.
-* If another overclocking tool clears the P0 performance state, Nitrous should repair it within 30 seconds.
+* If another overclocking tool clears the P0 performance state, Nitrous repairs it within 30 seconds while clock management is on.
+
+**MSI Afterburner's clock sliders or mV curve reset when Nitrous starts**
+
+* Nitrous and Afterburner must not both apply GPU clocks. Turn **Nitrous manages GPU clocks** off if Afterburner owns the clocks, or set Afterburner's Core/Memory sliders to `0` and let Nitrous own the per-profile offsets.
+* Nitrous writes a sparse P0 packet with `0` base-voltage entries. Even a clock-only write can replace the driver's P0 override and drop an external voltage/frequency curve, which is why the switch exists.
+* If an external voltage override is visible, `gpu.json` and the log report it as `voltageOverridesDetected` so a bug report shows whether Nitrous wrote while a curve was active.
 
 **CPU min/max values look wrong**
 

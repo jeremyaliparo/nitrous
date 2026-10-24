@@ -73,16 +73,49 @@ jobs:
           $tag = "${{ github.ref_name }}"
           $version = $tag -replace '^v', ''
 
-          $notes = @(
-            "## Nitrous $version",
+          $changelogPath = "CHANGELOG.md"
+          if (-not (Test-Path $changelogPath)) {
+            throw "CHANGELOG.md is missing; release notes cannot be generated."
+          }
+
+          $lines = Get-Content $changelogPath
+          $start = -1
+          $heading = '^##\s+\[?' + [regex]::Escape($version) + '\]?(\s|$)'
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match $heading) { $start = $i; break }
+          }
+          if ($start -lt 0) {
+            throw "CHANGELOG.md has no '## $version' section."
+          }
+
+          $end = $lines.Count
+          for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^##\s') { $end = $i; break }
+          }
+
+          $section = ($lines[$start..($end - 1)] -join "`n").TrimEnd()
+          if ([string]::IsNullOrWhiteSpace($section)) {
+            throw "The changelog section for $version is empty."
+          }
+
+          $hash = (Get-Content "dist/Nitrous.exe.sha256" -Raw).Trim().Split(' ')[0]
+          if ($hash -notmatch '^[0-9a-f]{64}$') {
+            throw "Could not read a SHA-256 digest for Nitrous.exe."
+          }
+
+          $footer = @(
             "",
-            'Requires the [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0).',
+            "---",
             "",
-            '- `Nitrous.exe` is a framework-dependent single-file build.',
-            '- Verify the download against `SHA256SUMS` or `Nitrous.exe.sha256`.',
-            '- The executable is not code-signed; the checksums are published so the updater can',
-            '  verify an automatic update and so users can verify a manual download.'
+            "### Download",
+            "",
+            "- ``Nitrous.exe`` is a framework-dependent single-file build for Windows x64.",
+            '- Requires the [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0).',
+            "- ``SHA256: $hash`` (also published in ``SHA256SUMS`` and ``Nitrous.exe.sha256``).",
+            '- The executable is not code-signed; the checksums are published so the updater can verify an automatic update and so users can verify a manual download.'
           ) -join "`n"
+
+          $notes = $section + "`n" + $footer
 
           gh release create "$tag" `
             "dist/Nitrous.exe" `

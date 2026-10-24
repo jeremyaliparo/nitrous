@@ -10,7 +10,7 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.8.2</Version>
+		<Version>0.8.3</Version>
 		<Product>Nitrous</Product>
 		<Company>Nitrous</Company>
 		<RepositoryUrl>https://github.com/jeremyaliparo/nitrous</RepositoryUrl>

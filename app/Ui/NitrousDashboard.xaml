@@ -920,7 +920,13 @@
 					</StackPanel>
 				</ScrollViewer>
 				<!-- 3. GPU PAGE -->
-				<StackPanel x:Name="GpuPage" Visibility="Collapsed" Margin="20,10,20,0">
+				<ScrollViewer x:Name="GpuPage" Visibility="Collapsed" Margin="20,10,20,0"
+				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
+					<ScrollViewer.Resources>
+						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+					</ScrollViewer.Resources>
+					<StackPanel Margin="0,0,4,16">
 					<!-- Compact Hero Banner -->
 					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -1005,27 +1011,34 @@
 					<!-- CLOCK OFFSETS SLIDERS -->
 					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Padding="16,12,16,16" Margin="0,0,0,16">
 						<StackPanel>
-							<TextBlock Text="CLOCK OFFSETS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+							<Grid Margin="0,0,0,10">
+								<TextBlock Text="CLOCK OFFSETS" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+									<TextBlock Text="Manage GPU clocks" Foreground="#C8C8D0" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Let Nitrous apply per-profile GPU core and memory offsets. When off, Nitrous never writes GPU clocks."/>
+									<CheckBox x:Name="TogManageGpuClocks" Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding ManageGpuClocks, UpdateSourceTrigger=PropertyChanged}" ToolTip="When off, Nitrous never writes GPU clocks or memory offsets."/>
+								</StackPanel>
+							</Grid>
+							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="#888890" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
 							<!-- Core Slider -->
 							<Grid Margin="0,0,0,4">
 								<TextBlock Text="Core Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<!-- Pill border removed, back to clean floating text -->
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF"/>
+									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
-							<Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="-250" Maximum="250" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" Margin="0,0,0,12"/>
+							<Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="-250" Maximum="250" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" Margin="0,0,0,12" IsEnabled="{Binding ManageGpuClocks}"/>
 							<!-- Memory Slider -->
 							<Grid Margin="0,0,0,4">
 								<TextBlock Text="Memory Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<!-- Pill border removed, back to clean floating text -->
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF"/>
+									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
-							<Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="-1000" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10"/>
+							<Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="-1000" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10" IsEnabled="{Binding ManageGpuClocks}"/>
 						</StackPanel>
 					</Border>
 					<!-- ACTION BUTTONS -->
@@ -1051,6 +1064,10 @@
 													<!-- Subtle lighter grey -->
 													<Setter Property="Foreground" Value="#E0E0E0"/>
 												</Trigger>
+												<Trigger Property="IsEnabled" Value="False">
+													<Setter TargetName="BtnBorder" Property="Opacity" Value="0.4"/>
+													<Setter Property="Cursor" Value="Arrow"/>
+												</Trigger>
 											</ControlTemplate.Triggers>
 										</ControlTemplate>
 									</Setter.Value>
@@ -1075,6 +1092,11 @@
 													<Setter TargetName="HoverOverlay" Property="Opacity" Value="0.15"/>
 													<!-- Slight brightness bump -->
 												</Trigger>
+												<Trigger Property="IsEnabled" Value="False">
+													<Setter TargetName="HoverOverlay" Property="Opacity" Value="0"/>
+													<Setter Property="Opacity" Value="0.4"/>
+													<Setter Property="Cursor" Value="Arrow"/>
+												</Trigger>
 											</ControlTemplate.Triggers>
 										</ControlTemplate>
 									</Setter.Value>
@@ -1088,11 +1110,12 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<!-- Secondary Action (Ghost Button) - Explicit Height and larger font -->
-						<Button Grid.Column="0" Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="12" FontWeight="Bold" Height="40"/>
+						<Button Grid.Column="0" Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="12" FontWeight="Bold" Height="40" IsEnabled="{Binding ManageGpuClocks}"/>
 						<!-- Primary Action (Accent Button) - Explicit Height and larger font -->
-						<Button Grid.Column="2" Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Style="{StaticResource AccentBtn}" FontSize="12" FontWeight="Heavy" Height="40"/>
+						<Button Grid.Column="2" Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Style="{StaticResource AccentBtn}" FontSize="12" FontWeight="Heavy" Height="40" IsEnabled="{Binding ManageGpuClocks}"/>
 					</Grid>
 				</StackPanel>
+				</ScrollViewer>
 
 				<!-- 4. KEYBOARD PAGE -->
                 <StackPanel x:Name="KeyboardPage" Visibility="Collapsed" Margin="20,10,20,0">
