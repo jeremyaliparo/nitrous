@@ -18,6 +18,8 @@
 
 Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly with your Acer Nitro's Embedded Controller (EC) via WMI. It gives you an ultra-fast, lightweight dashboard for raw, instant hardware control.
 
+Discord: https://discord.gg/PGWzb3mHbG
+
 ### Key Features
 * **Custom Fan Curves:** Per-profile fan curves with overridable defaults, plus manual control from **1% to 100%**, Auto, and Max modes. The 1% floor is enforced in the UI, the curve editor, curve storage, interpolation, and again at the WMI boundary. Low fan speeds reduce cooling, so use them with care.
 * **Optimized NVML Telemetry:** Direct `nvml.dll` integration instead of `nvidia-smi.exe` for high-performance telemetry with low CPU overhead. Deep telemetry can be disabled for older NVIDIA GPUs.
