@@ -6,6 +6,9 @@
 
 **Pure, zero-bloat hardware control for Acer Nitro laptops.**
 
+[![Latest Release](https://img.shields.io/github/v/release/YOUR-USERNAME/nitrous?style=for-the-badge&logo=github&label=Download&color=e60012)](https://github.com/jeremyaliparo/nitrous/releases/latest)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/PGWzb3mHbG)
+
 <p align="center">
   <img src="assets/dashboard.png" alt="Main Dashboard" width="30%" />
   <img src="assets/gpu.png" alt="GPU" width="30%" />
@@ -17,8 +20,6 @@
 </div>
 
 Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly with your Acer Nitro's Embedded Controller (EC) via WMI. It gives you an ultra-fast, lightweight dashboard for raw, instant hardware control.
-
-Discord: https://discord.gg/PGWzb3mHbG
 
 ### Key Features
 * **Custom Fan Curves:** Per-profile fan curves with overridable defaults, plus manual control from **1% to 100%**, Auto, and Max modes. The 1% floor is enforced in the UI, the curve editor, curve storage, interpolation, and again at the WMI boundary. Low fan speeds reduce cooling, so use them with care.
