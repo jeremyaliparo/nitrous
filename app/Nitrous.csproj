@@ -9,8 +9,13 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<!-- The DPI mode lives in app.manifest because it must be active before the CLR loads,
+		     which also covers the dashboard process. Application.SetHighDpiMode in Main is only a
+		     fallback for hosts that ignore manifests. WFO0003 suggests the project property, but
+		     that property is ignored when a custom manifest is supplied. -->
+		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.8.3</Version>
+		<Version>0.8.4</Version>
 		<Product>Nitrous</Product>
 		<Company>Nitrous</Company>
 		<RepositoryUrl>https://github.com/jeremyaliparo/nitrous</RepositoryUrl>
@@ -25,5 +30,9 @@
 
 	<ItemGroup>
 		<Resource Include="..\assets\logo.png" Link="assets\logo.png" />
+		<!-- The WinForms OSD loads the logo directly; using the WPF Resource would pull
+		     PresentationFramework into the tray process. -->
+		<EmbeddedResource Include="..\assets\logo.png" Link="assets\logo.png"
+		                  LogicalName="Nitrous.assets.logo.png" />
 	</ItemGroup>
 </Project>

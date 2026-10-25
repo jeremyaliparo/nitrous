@@ -3,6 +3,42 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.8.4 - 2026-10-25
+
+### Lower idle memory
+
+- NVML is now initialized on demand instead of at tray startup. The tray no longer maps the
+  ~23 MB NVIDIA driver image just to sit in the notification area; it loads only when the fan
+  curve engine needs the NVML temperature fallback or the dashboard requests deep telemetry.
+- Shutdown and re-initialization paths only touch NVML when this process actually loaded it,
+  so a normal tray exit cannot pull the driver in by accident.
+- The dashboard's software-rendering setup moved out of tray startup. Starting the tray no
+  longer creates a WPF composition device for a process that only hosts a WinForms tray icon.
+- Net effect: the idle tray process is roughly 20 MB smaller in private commit and working
+  set. Dashboard launch is unchanged or slightly faster, because NVML initialization now runs
+  off the UI thread alongside the existing telemetry polling.
+- Per-profile GPU offsets, the 0.8.3 clock-ownership switch, the 30-second watchdog, and the
+  diagnostics bundle behave exactly as before.
+
+### Redesigned power-profile overlay
+
+- The hotkey toast is a new card: Nitrous logo tile, `POWER PROFILE` caption, the profile name,
+  a per-profile accent bar, and a status dot. Quiet is green, Balanced blue, Performance amber,
+  Turbo red.
+- The card is rendered once per profile and resolution into a layered-window surface, then
+  animated by changing only its opacity and position. There is no per-frame text rendering and
+  no WPF dependency, so the overlay does not hitch the tray or the foreground app.
+- The overlay scales with the monitor's DPI and clamps to roughly 30% of the work area width on
+  small panels. It appears on the monitor that owns the active window, falling back to the
+  monitor under the cursor.
+- A second profile change while the card is visible swaps the content in place instead of
+  flashing the toast out and back in.
+- The toast is shown as soon as the hotkey saves the new profile, before the WMI/NVAPI writes
+  finish, so a sleeping dGPU no longer delays it. Surfaces are pre-warmed after boot, so the
+  first hotkey does not pay the first-render cost.
+- The app declares per-monitor V2 DPI awareness, and the overlay respects the reduced-motion
+  setting by skipping the fade when UI animations are disabled.
+
 ## 0.8.3 - 2026-10-24
 
 ### GPU clock ownership is now opt-in

@@ -19,6 +19,12 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // The tray OSD and context menu are WinForms, so opt into per-monitor DPI before
+        // any window exists. The manifest declares the same mode; this is a safety net for
+        // hosts that ignore the manifest setting.
+        try { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); }
+        catch (InvalidOperationException) { }
+
         var isUi = args.Any(arg => string.Equals(arg, "--ui", StringComparison.OrdinalIgnoreCase));
         Logger.Initialize(isUi ? "dashboard" : "tray");
 
@@ -28,8 +34,6 @@ static class Program
         Application.ThreadException += (_, e) =>
             Logger.Error("WinForms thread exception.", e.Exception);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-
-        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
         if (!IsAdministrator())
         {
@@ -104,6 +108,11 @@ static class Program
 
     private static void RunDashboard()
     {
+        // Keep WPF out of the background tray process. The dashboard is the only mode that
+        // uses WPF, and forcing software rendering here avoids a GPU composition device in
+        // a process that is only showing 2D UI.
+        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+
         var app = new System.Windows.Application();
         app.DispatcherUnhandledException += (_, e) =>
         {

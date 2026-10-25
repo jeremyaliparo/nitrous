@@ -28,8 +28,12 @@ public class TrayApplication : ApplicationContext
     private DateTime _lastOcWatchdogLog = DateTime.MinValue;
 
     private readonly GlobalHotkeyManager _hotkeys = new();
-    private readonly OsdForm _osd = new();
     private readonly Control _uiInvoker = new();
+
+    // Created on demand and pre-warmed in the background. Building it eagerly costs GDI+
+    // surfaces and a window handle in every tray session, including sessions that never
+    // press the profile hotkey.
+    private OsdForm? _osd;
 
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
@@ -92,6 +96,16 @@ public class TrayApplication : ApplicationContext
 
             var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
             await _gpuManager.ApplyOnBootAsync(GetActivePowerProfile(isOnline));
+
+            // Build the overlay cards while the machine is idle. This keeps the first hotkey
+            // instant without holding GDI+ surfaces for users who never switch profiles.
+            if (_shuttingDown) return;
+
+            // The OSD is only opened by the cycle hotkey. Without one there is nothing to
+            // pre-warm, so skip the extra window handle and surfaces entirely.
+            if (string.IsNullOrEmpty(SettingsManager.Get("Hotkey_CyclePower", ""))) return;
+
+            RunOnUi(() => EnsureOsd()?.Prewarm());
         });
 
         StartBackgroundEngine();
@@ -349,6 +363,10 @@ public class TrayApplication : ApplicationContext
             SettingsManager.Save("LastPowerMode", (int)nextProfile);
             SettingsManager.Save(acDcKey, (int)nextProfile);
 
+            // Show the toast before the hardware awaits: NVAPI/WMI writes can take a few
+            // hundred milliseconds on a sleeping dGPU, and the overlay should not wait for them.
+            ShowProfileOsd(nextProfile);
+
             try
             {
                 await AcerWmiManager.SetPowerModeAsync(nextProfile).ConfigureAwait(false);
@@ -363,8 +381,6 @@ public class TrayApplication : ApplicationContext
             {
                 Logger.Error($"Power: failed to cycle to {nextProfile}.", ex);
             }
-
-            ShowProfileOsd(nextProfile);
         }
         finally
         {
@@ -385,22 +401,55 @@ public class TrayApplication : ApplicationContext
             _ => Color.White
         };
 
-        void Show() => _osd.ShowProfile($"{profile} MODE", color, profile);
+        // The hardware awaits use ConfigureAwait(false), so this may run on a worker thread.
+        // Marshal through the control whose handle was created on the UI thread; the OSD form
+        // itself may not have a handle yet on its first show.
+        RunOnUi(() => EnsureOsd()?.ShowProfile(color, profile));
+    }
 
-        // The hardware awaits above use ConfigureAwait(false), so this may run on a
-        // worker thread. Marshal through the control whose handle was created on the
-        // UI thread; the OSD form itself may not have a handle yet on its first show.
+    private OsdForm? EnsureOsd()
+    {
+        if (_shuttingDown) return null;
+        if (_osd != null) return _osd;
+
+        // The form owns a WinForms timer, so it must be created on the tray/UI thread.
+        if (_uiInvoker.InvokeRequired)
+        {
+            OsdForm? created = null;
+            try { _uiInvoker.Invoke((Action)(() => created = EnsureOsd())); }
+            catch (ObjectDisposedException) { }
+            catch (InvalidOperationException) { }
+            return created;
+        }
+
+        try
+        {
+            _osd = new OsdForm();
+            return _osd;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("OSD: could not create the overlay window.", ex);
+            return null;
+        }
+    }
+
+    private void RunOnUi(Action action)
+    {
         try
         {
             if (_uiInvoker.IsDisposed) return;
 
             if (_uiInvoker.InvokeRequired)
-                _uiInvoker.BeginInvoke((Action)Show);
-            else
-                Show();
+            {
+                _uiInvoker.BeginInvoke(action);
+                return;
+            }
         }
-        catch (ObjectDisposedException) { }
-        catch (InvalidOperationException) { }
+        catch (ObjectDisposedException) { return; }
+        catch (InvalidOperationException) { return; }
+
+        action();
     }
 
     private void StartBackgroundEngine()
@@ -575,7 +624,7 @@ public class TrayApplication : ApplicationContext
         trayIcon.Visible = false;
         trayIcon.Dispose();
         _hotkeys.Dispose();
-        _osd.Dispose();
+        _osd?.Dispose();
         _uiInvoker.Dispose();
         _gpuManager.Dispose();
     }

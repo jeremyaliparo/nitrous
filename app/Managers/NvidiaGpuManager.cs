@@ -112,7 +112,6 @@ public class NvidiaGpuManager : IDisposable
         {
             if (_disposed) return;
             try { NVIDIA.Unload(); } catch { }
-            ResetNvmlLocked();
 
             _internalGpu = null;
 
@@ -131,7 +130,10 @@ public class NvidiaGpuManager : IDisposable
                 }
             }
 
-            InitializeNvmlLocked();
+            // NVML is deliberately not initialized here. Loading it maps a ~23 MB driver
+            // image into the process, and the tray does not need it unless the fan curve
+            // engine has to fall back to NVML telemetry or the dashboard asks for deep
+            // telemetry. GetNvmlTelemetryAsync initializes it on demand.
         }
     }
 
@@ -170,7 +172,13 @@ public class NvidiaGpuManager : IDisposable
 
     private void ResetNvmlLocked()
     {
-        try { NativeNvml.Shutdown(); } catch { }
+        // Never touch nvml.dll unless this process actually initialized it: calling
+        // Shutdown on a fresh process would map the driver image we are trying to avoid.
+        if (_nvmlInitialized)
+        {
+            try { NativeNvml.Shutdown(); } catch { }
+        }
+
         _nvmlInitialized = false;
         _nvmlDeviceHandle = IntPtr.Zero;
         _lastNvmlReset = DateTime.UtcNow;
@@ -918,7 +926,10 @@ public class NvidiaGpuManager : IDisposable
             _disposed = true;
 
             try { NVIDIA.Unload(); } catch { }
-            try { NativeNvml.Shutdown(); } catch { }
+            if (_nvmlInitialized)
+            {
+                try { NativeNvml.Shutdown(); } catch { }
+            }
             _internalGpu = null;
             _nvmlInitialized = false;
             _nvmlDeviceHandle = IntPtr.Zero;
