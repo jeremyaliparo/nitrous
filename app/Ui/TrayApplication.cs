@@ -28,7 +28,15 @@ public class TrayApplication : ApplicationContext
     private DateTime _lastOcWatchdogLog = DateTime.MinValue;
 
     private readonly GlobalHotkeyManager _hotkeys = new();
+    private readonly EventWaitHandle _hotkeyChanged = HotkeyChangeSignal.CreateReceiver();
     private readonly Control _uiInvoker = new();
+
+    // Serializes dashboard launches. A newly spawned dashboard needs a moment to create its
+    // window, so repeated hotkey presses must not be mistaken for "no dashboard is running".
+    private readonly object _dashboardGate = new();
+    private Process? _dashboardProcess;
+    private DateTime _dashboardLaunchUtc = DateTime.MinValue;
+    private static readonly TimeSpan DashboardLaunchCooldown = TimeSpan.FromSeconds(2);
 
     // Created on demand and pre-warmed in the background. Building it eagerly costs GDI+
     // surfaces and a window handle in every tray session, including sessions that never
@@ -115,6 +123,7 @@ public class TrayApplication : ApplicationContext
     {
         var menu = new ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = false };
         menu.Items.Add("Open Nitrous", null, (s, e) => ShowDashboard());
+        menu.Items.Add("Reset Dashboard Position", null, (s, e) => ResetDashboardPosition());
         menu.Items.Add("Check for Updates...", null, async (s, e) => await UpdateManager.CheckForUpdatesAsync(false, ExitFromAnyThread));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Restart", null, Restart);
@@ -128,38 +137,145 @@ public class TrayApplication : ApplicationContext
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+
     private void ShowDashboard()
     {
+        // The hotkey and the tray menu can fire in quick succession, and the dashboard takes a
+        // few hundred milliseconds to create its window. Without this gate, each press during
+        // that gap sees "no window" and spawns another dashboard process.
+        lock (_dashboardGate)
+        {
+            var current = Process.GetCurrentProcess();
+            var processName = current.ProcessName;
+            var currentId = current.Id;
+            current.Dispose();
+
+            var processes = Process.GetProcessesByName(processName);
+            try
+            {
+                foreach (var p in processes)
+                {
+                    if (p.Id == currentId) continue;
+
+                    // Found the existing UI process. Restore and bring to front.
+                    var hWnd = p.MainWindowHandle;
+                    if (hWnd != IntPtr.Zero)
+                    {
+                        const int SW_RESTORE = 9;
+                        ShowWindow(hWnd, SW_RESTORE);
+                        SetForegroundWindow(hWnd);
+                        return; // Prevent spawning a new instance
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var p in processes) p.Dispose();
+            }
+
+            // The dashboard is still starting, so its window does not exist yet. Ignore the
+            // extra press instead of starting a second copy.
+            if (_dashboardProcess != null)
+            {
+                if (!HasExited(_dashboardProcess))
+                    return;
+
+                _dashboardProcess.Dispose();
+                _dashboardProcess = null;
+            }
+
+            // A very recent launch that did not produce a process (for example, the shell
+            // handed the request to an existing instance) is also treated as a repeat.
+            if (DateTime.UtcNow - _dashboardLaunchUtc < DashboardLaunchCooldown)
+                return;
+
+            try
+            {
+                _dashboardProcess = Process.Start(
+                    new ProcessStartInfo(Application.ExecutablePath, "--ui") { UseShellExecute = true });
+                _dashboardLaunchUtc = DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Dashboard: could not start the UI process.", ex);
+            }
+        }
+    }
+
+    private static bool HasExited(Process process)
+    {
+        try { return process.HasExited; }
+        catch { return true; }
+    }
+
+    /// <summary>
+    /// Clears the saved dashboard position and, if the dashboard is already open (possibly on
+    /// a monitor that was just removed), moves its window back to the primary work area.
+    /// </summary>
+    private void ResetDashboardPosition()
+    {
+        SettingsManager.Delete("WindowTop");
+        SettingsManager.Delete("WindowLeft");
+
         var current = Process.GetCurrentProcess();
         var processName = current.ProcessName;
         var currentId = current.Id;
         current.Dispose();
 
-        var processes = Process.GetProcessesByName(processName);
-        try
-        {
-            foreach (var p in processes)
-            {
-                if (p.Id == currentId) continue;
+        var workArea = Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1280, 720);
 
-                // Found the existing UI process. Restore and bring to front.
-                var hWnd = p.MainWindowHandle;
-                if (hWnd != IntPtr.Zero)
-                {
-                    const int SW_RESTORE = 9;
-                    ShowWindow(hWnd, SW_RESTORE);
-                    SetForegroundWindow(hWnd);
-                    return; // Prevent spawning a new instance
-                }
+        foreach (var process in Process.GetProcessesByName(processName))
+        {
+            try
+            {
+                if (process.Id == currentId) continue;
+
+                var handle = process.MainWindowHandle;
+                if (handle == IntPtr.Zero || !GetWindowRect(handle, out var rect)) continue;
+
+                var width = Math.Max(1, rect.Right - rect.Left);
+                var height = Math.Max(1, rect.Bottom - rect.Top);
+                var x = workArea.Left + Math.Max(0, (workArea.Width - width) / 2);
+                var y = workArea.Top + Math.Max(0, (workArea.Height - height) / 2);
+
+                const int SW_RESTORE = 9;
+                ShowWindow(handle, SW_RESTORE);
+                SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                SetForegroundWindow(handle);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Dashboard: could not reset the window position.", ex);
+            }
+            finally
+            {
+                process.Dispose();
             }
         }
-        finally
-        {
-            foreach (var p in processes) p.Dispose();
-        }
 
-        // If no UI process is running, start a new one.
-        Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--ui") { UseShellExecute = true });
+        if (trayIcon.Visible)
+            trayIcon.ShowBalloonTip(3000, "Nitrous", "Dashboard position reset. It will open centered.", ToolTipIcon.Info);
     }
 
     private async void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
@@ -302,6 +418,8 @@ public class TrayApplication : ApplicationContext
 
     private void ReloadHotkeys()
     {
+        if (_shuttingDown) return;
+
         _hotkeys.UnregisterAll(HK_CYCLE_POWER, HK_DASHBOARD);
 
         RegisterSavedHotkey("Hotkey_CyclePower", HK_CYCLE_POWER);
@@ -454,6 +572,26 @@ public class TrayApplication : ApplicationContext
 
     private void StartBackgroundEngine()
     {
+        // Hotkey changes arrive immediately from the dashboard through a named event. The
+        // two-second registry poll below stays as a fallback (for example if the dashboard was
+        // started before this tray instance). Registration is marshaled to the tray thread that
+        // owns the hidden message window.
+        Task.Run(() =>
+        {
+            var handles = new WaitHandle[] { _hotkeyChanged, _engineCts.Token.WaitHandle };
+
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    if (WaitHandle.WaitAny(handles) != 0) break;
+                    RunOnUi(ReloadHotkeys);
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (OperationCanceledException) { }
+        });
+
         // Fan curve engine.
         Task.Run(async () =>
         {
@@ -471,7 +609,7 @@ public class TrayApplication : ApplicationContext
                         if (!string.Equals(cycleHotkey, _registeredCycleHotkey, StringComparison.Ordinal) ||
                             !string.Equals(dashboardHotkey, _registeredDashboardHotkey, StringComparison.Ordinal))
                         {
-                            ReloadHotkeys();
+                            RunOnUi(ReloadHotkeys);
                         }
 
                         var currentFanMode = SettingsManager.Get("LastFanMode", "Auto");
@@ -623,7 +761,15 @@ public class TrayApplication : ApplicationContext
 
         trayIcon.Visible = false;
         trayIcon.Dispose();
+
+        lock (_dashboardGate)
+        {
+            _dashboardProcess?.Dispose();
+            _dashboardProcess = null;
+        }
+
         _hotkeys.Dispose();
+        _hotkeyChanged.Dispose();
         _osd?.Dispose();
         _uiInvoker.Dispose();
         _gpuManager.Dispose();

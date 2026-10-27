@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,6 +24,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _pollingCts;
     private volatile bool _telemetryEnabled = true;
     private bool _telemetryErrorLogged;
+    private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
 
@@ -74,10 +76,75 @@ public class DashboardViewModel : ObservableObject, IDisposable
     public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
 
     private int _gpuCoreOffset;
-    public int GpuCoreOffset { get => _gpuCoreOffset; set => SetProperty(ref _gpuCoreOffset, value); }
+    public int GpuCoreOffset
+    {
+        get => _gpuCoreOffset;
+        set
+        {
+            value = Math.Clamp(value, NvidiaGpuManager.MinCoreOffset, NvidiaGpuManager.MaxCoreOffset);
+            if (!SetProperty(ref _gpuCoreOffset, value)) return;
+            OnPropertyChanged(nameof(GpuCoreOffsetText));
+        }
+    }
+
+    /// <summary>Signed display text for the core offset; positive values get a "+" prefix.</summary>
+    public string GpuCoreOffsetText
+    {
+        get => FormatOffset(_gpuCoreOffset);
+        set
+        {
+            if (TryParseOffset(value, NvidiaGpuManager.MaxCoreOffset, out var offset))
+                GpuCoreOffset = offset;
+        }
+    }
 
     private int _gpuMemoryOffset;
-    public int GpuMemoryOffset { get => _gpuMemoryOffset; set => SetProperty(ref _gpuMemoryOffset, value); }
+    public int GpuMemoryOffset
+    {
+        get => _gpuMemoryOffset;
+        set
+        {
+            value = Math.Clamp(value, NvidiaGpuManager.MinMemoryOffset, NvidiaGpuManager.MaxMemoryOffset);
+            if (!SetProperty(ref _gpuMemoryOffset, value)) return;
+            OnPropertyChanged(nameof(GpuMemoryOffsetText));
+        }
+    }
+
+    /// <summary>Signed display text for the memory offset; positive values get a "+" prefix.</summary>
+    public string GpuMemoryOffsetText
+    {
+        get => FormatOffset(_gpuMemoryOffset);
+        set
+        {
+            if (TryParseOffset(value, NvidiaGpuManager.MaxMemoryOffset, out var offset))
+                GpuMemoryOffset = offset;
+        }
+    }
+
+    private static string FormatOffset(int value) => value > 0 ? $"+{value}" : value.ToString(CultureInfo.InvariantCulture);
+
+    private static bool TryParseOffset(string? text, int maximum, out int value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        var trimmed = text.Trim();
+        if (trimmed.StartsWith("+", StringComparison.Ordinal))
+            trimmed = trimmed[1..];
+
+        if (!int.TryParse(trimmed, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            return false;
+
+        value = Math.Clamp(parsed, 0, maximum);
+        return true;
+    }
+
+    private void SetGpuOffsets(int core, int memory)
+    {
+        // Never show a value the sliders and the driver validation cannot represent.
+        GpuCoreOffset = core;
+        GpuMemoryOffset = memory;
+    }
 
     private bool _manageGpuClocks;
     /// <summary>
@@ -393,8 +460,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 // Never overwrite the user's saved offsets with 0 just because the GPU was asleep.
                 if (hasClocks)
                 {
-                    GpuCoreOffset = core;
-                    GpuMemoryOffset = memory;
+                    SetGpuOffsets(core, memory);
                 }
             });
         });
@@ -423,8 +489,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
                 {
-                    GpuCoreOffset = c;
-                    GpuMemoryOffset = m;
+                    SetGpuOffsets(c, m);
                 }
                 else
                 {
@@ -490,17 +555,23 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
 
                 _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
-                var applied = _gpuManager.TrySetClocks(GpuCoreOffset, GpuMemoryOffset, out var error, "apply");
+                var applied = _gpuManager.TrySetClocks(
+                    GpuCoreOffset, GpuMemoryOffset, out var error, "apply", forceProbe: true);
 
                 if (applied)
                 {
                     ApplyBtnText = "APPLIED!";
                     ApplyBtnColor = "#34C759";
+                    GpuClockStatusText =
+                        $"Applied {FormatOffset(GpuCoreOffset)} / {FormatOffset(GpuMemoryOffset)} MHz to {currentProfile}.";
                 }
                 else
                 {
                     ApplyBtnText = "ERROR";
                     ApplyBtnColor = "#FF453A";
+                    GpuClockStatusText = _gpuManager.IsGpuSleeping
+                        ? "The GPU is asleep. Nitrous saved the offsets but did not wake it to write them."
+                        : $"Could not apply GPU clocks: {error}";
                     Logger.Warn($"GPU OC: apply failed: {error}");
                 }
 
@@ -527,11 +598,14 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
                 {
-                    GpuCoreOffset = c;
-                    GpuMemoryOffset = m;
+                    SetGpuOffsets(c, m);
+                    GpuClockStatusText = $"Reset {currentProfile} to 0 / 0 MHz (stock).";
                 }
                 else
                 {
+                    GpuClockStatusText = _gpuManager.IsGpuSleeping
+                        ? "The GPU is asleep. Reset saved 0 / 0; Nitrous will write it after the GPU wakes."
+                        : $"Reset saved, but the clocks could not be read back: {error}";
                     Logger.Info($"GPU OC: could not read clocks after reset: {error}");
                 }
             }
@@ -676,7 +750,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     private void ClearDeepTelemetryUI()
     {
-        GpuNameText = "NVIDIA GPU (SLEEPING)";
+        GpuNameText = "NVIDIA GPU (NO DATA)";
         GpuArchText = "--";
         GpuLoadText = "-- %";
         GpuLoadColor = "#888890";
@@ -1023,8 +1097,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
             {
                 if (ok)
                 {
-                    GpuCoreOffset = core;
-                    GpuMemoryOffset = memory;
+                    SetGpuOffsets(core, memory);
                     GpuClockStatusText =
                         $"Nitrous manages GPU clocks. {profile} is active at " +
                         $"{core:+#;-#;0}/{memory:+#;-#;0} MHz.";
@@ -1057,13 +1130,19 @@ public class DashboardViewModel : ObservableObject, IDisposable
             if (!read)
             {
                 Logger.Info($"GPU OC: could not read clocks for the offset display: {error}");
+                if (_gpuManager.IsGpuSleeping)
+                {
+                    _ = RunOnUiAsync(() =>
+                        GpuClockStatusText =
+                            "The GPU is asleep. Offsets are hidden and GPU clock writes are paused until it wakes.");
+                }
+
                 return;
             }
 
             _ = RunOnUiAsync(() =>
             {
-                GpuCoreOffset = core;
-                GpuMemoryOffset = memory;
+                SetGpuOffsets(core, memory);
             });
         });
     }
@@ -1219,6 +1298,30 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var battery = await batteryTask;
                         var smi = smiTask != null ? await smiTask : null;
                         _telemetryErrorLogged = false;
+
+                        if (smi != null && !smi.HasData && DeepGpuTelemetry)
+                        {
+                            // A sleeping dGPU returns no NVML data. Turn the poller off instead
+                            // of retrying every two seconds, which can keep waking the GPU.
+                            if (++_deepTelemetryFailures >= 3)
+                            {
+                                _deepTelemetryFailures = 0;
+                                _ = RunOnUiAsync(() =>
+                                {
+                                    if (!DeepGpuTelemetry) return;
+
+                                    DeepGpuTelemetry = false;
+                                    GpuClockStatusText =
+                                        "The GPU is not responding (it may be asleep). Deep GPU Telemetry was " +
+                                        "turned off automatically, and GPU clock writes are paused.";
+                                    Logger.Info("GPU telemetry: dGPU stopped responding; Deep GPU Telemetry turned off automatically.");
+                                });
+                            }
+                        }
+                        else
+                        {
+                            _deepTelemetryFailures = 0;
+                        }
 
                         _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
                         {

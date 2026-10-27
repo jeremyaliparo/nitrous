@@ -13,8 +13,10 @@ namespace Nitrous;
 static class Program
 {
     private static Mutex? mutex;
+    private static Mutex? dashboardMutex;
 
     private const string MutexName = "Nitrous_SingleInstance_Mutex_Lock";
+    private const string DashboardMutexName = "Nitrous_Dashboard_SingleInstance_Mutex_Lock";
 
     [STAThread]
     static void Main(string[] args)
@@ -108,19 +110,56 @@ static class Program
 
     private static void RunDashboard()
     {
-        // Keep WPF out of the background tray process. The dashboard is the only mode that
-        // uses WPF, and forcing software rendering here avoids a GPU composition device in
-        // a process that is only showing 2D UI.
-        RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        // Hard backstop for every launch path (hotkey, tray menu, a manual --ui start): only one
+        // dashboard window may exist. The tray also debounces launches before they get here.
+        if (!AcquireDashboardSingleInstance())
+            return;
 
-        var app = new System.Windows.Application();
-        app.DispatcherUnhandledException += (_, e) =>
+        try
         {
-            Logger.Error("Dashboard thread exception.", e.Exception);
-            e.Handled = true;
-        };
+            // Keep WPF out of the background tray process. The dashboard is the only mode that
+            // uses WPF, and forcing software rendering here avoids a GPU composition device in
+            // a process that is only showing 2D UI.
+            RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
 
-        app.Run(new NitrousDashboard());
+            var app = new System.Windows.Application();
+            app.DispatcherUnhandledException += (_, e) =>
+            {
+                Logger.Error("Dashboard thread exception.", e.Exception);
+                e.Handled = true;
+            };
+
+            app.Run(new NitrousDashboard());
+        }
+        finally
+        {
+            try { dashboardMutex?.ReleaseMutex(); } catch { }
+            dashboardMutex?.Dispose();
+            dashboardMutex = null;
+        }
+    }
+
+    private static bool AcquireDashboardSingleInstance()
+    {
+        dashboardMutex = new Mutex(false, DashboardMutexName);
+
+        try
+        {
+            // A dashboard that was just closed may still be tearing down. Wait briefly so a
+            // quick reopen does not lose the race and exit without showing a window.
+            if (dashboardMutex.WaitOne(TimeSpan.FromSeconds(2)))
+                return true;
+        }
+        catch (AbandonedMutexException)
+        {
+            // A previous dashboard crashed; this process now owns the mutex.
+            return true;
+        }
+
+        Logger.Info("Another Nitrous dashboard is already running; exiting.");
+        dashboardMutex.Dispose();
+        dashboardMutex = null;
+        return false;
     }
 
     private static bool IsAdministrator()

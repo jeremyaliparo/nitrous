@@ -3,6 +3,46 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.8.5 - 2026-10-27
+
+### GPU page
+
+- `RESET` and `APPLY` now share one compact action row inside the `CLOCK OFFSETS` card instead
+  of a separate full-width button section, so the page uses less vertical space.
+- Clock offsets are positive-only. Core is `0..300 MHz`, memory is `0..1000 MHz`, and the
+  driver range check still rejects values the VBIOS does not advertise.
+- Positive offsets display with an explicit `+` prefix in the value box and status messages.
+  Saved negative offsets from older versions are clamped to `0` on first run.
+- A sleeping dGPU is now detected from NVAPI/NVML failures. Nitrous pauses automatic clock
+  writes instead of probing the GPU every few seconds, and only allows one wake probe per
+  minute. Explicit `APPLY` still retries once.
+- `Deep GPU Telemetry` turns itself off after three failed NVML polls and the GPU page explains
+  why, so a sleeping GPU is not held awake by a two-second telemetry loop.
+
+### Hotkeys apply immediately
+
+- Editing a hotkey on the `KB` page signals the tray process directly, so the new binding is
+  registered right away instead of requiring a Nitrous restart. The existing two-second
+  registry poll remains as a fallback, and registration now runs on the tray's message thread.
+- The page no longer says a restart is required.
+
+### Dashboard launch
+
+- Pressing the dashboard hotkey repeatedly no longer opens multiple dashboard windows. The tray
+  now remembers a dashboard that is still starting, ignores duplicate launch requests for two
+  seconds, and reuses the launched process. A dashboard single-instance mutex is also a hard
+  backstop for any other launch path.
+
+### Dashboard position recovery
+
+- The dashboard validates its saved position against the current monitor layout. If the title
+  bar has no reachable spot (for example, the external monitor it was on was removed), it
+  reopens centered on the primary display.
+- A `DisplaySettingsChanged` handler recovers a dashboard that is already open when a monitor
+  is unplugged.
+- The tray menu has a new **Reset Dashboard Position** item. It clears the saved coordinates
+  and, if the dashboard is open, moves it back to the primary work area.
+
 ## 0.8.4 - 2026-10-25
 
 ### Lower idle memory

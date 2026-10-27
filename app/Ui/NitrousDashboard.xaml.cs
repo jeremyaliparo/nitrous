@@ -1,7 +1,9 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -53,7 +55,15 @@ public partial class NitrousDashboard : Window
         });
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         StateChanged += Window_StateChanged;
+    }
+
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        // A monitor was added, removed, or rearranged. Let the compositor settle, then make
+        // sure the saved position still has a reachable title bar.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(EnsureWindowVisible));
     }
 
     private void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
@@ -207,6 +217,61 @@ public partial class NitrousDashboard : Window
         {
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
+
+        // The saved position can belong to a monitor that is no longer connected. Wait until
+        // layout has produced a real window rect, then recover if necessary.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(EnsureWindowVisible));
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Win32Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out Win32Rect rect);
+
+    private void EnsureWindowVisible()
+    {
+        if (WindowState != WindowState.Normal) return;
+
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero || !GetWindowRect(handle, out var rect)) return;
+
+        var width = rect.Right - rect.Left;
+        var height = rect.Bottom - rect.Top;
+        if (width <= 0 || height <= 0) return;
+
+        // The custom title bar is the top 50 px. Require a usable strip of it to be inside a
+        // monitor's work area; a fully off-screen or mostly hidden window gets recentered.
+        var titleHeight = Math.Min(50, height);
+        var titleTop = rect.Top;
+
+        foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+        {
+            var area = screen.WorkingArea;
+            var left = Math.Max(rect.Left, area.Left);
+            var right = Math.Min(rect.Right, area.Right);
+            var top = Math.Max(titleTop, area.Top);
+            var bottom = Math.Min(titleTop + titleHeight, area.Bottom);
+
+            if (right - left >= Math.Min(120, width) && bottom - top >= 24)
+                return;
+        }
+
+        // Nothing usable is on screen. Center on the primary work area in WPF's DIP space.
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        var workArea = SystemParameters.WorkArea;
+        var windowWidth = ActualWidth > 0 ? ActualWidth : Width;
+        var windowHeight = ActualHeight > 0 ? ActualHeight : Height;
+
+        Left = workArea.Left + Math.Max(0, (workArea.Width - windowWidth) / 2);
+        Top = workArea.Top + Math.Max(0, (workArea.Height - windowHeight) / 2);
+        Logger.Info($"Dashboard: recovered the window from ({rect.Left},{rect.Top}) to ({Left:0},{Top:0}).");
     }
 
     private void Window_Deactivated(object sender, EventArgs e)
@@ -221,6 +286,7 @@ public partial class NitrousDashboard : Window
         base.OnClosed(e);
         _profileSyncTimer.Stop();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         StateChanged -= Window_StateChanged;
         SettingsManager.Save("WindowTop", (int)Top);
         SettingsManager.Save("WindowLeft", (int)Left);
@@ -341,6 +407,7 @@ public partial class NitrousDashboard : Window
         {
             txt.Text = "None";
             SettingsManager.Save(settingKey, "");
+            HotkeyChangeSignal.Notify();
             Keyboard.ClearFocus();
             return;
         }
@@ -358,8 +425,28 @@ public partial class NitrousDashboard : Window
 
         var savedValue = HotkeyBinding.Create(modifiers, virtualKey);
         SettingsManager.Save(settingKey, savedValue);
+        HotkeyChangeSignal.Notify();
 
         txt.Text = HotkeyBinding.Format(savedValue);
         Keyboard.ClearFocus();
+    }
+
+    /// <summary>
+    /// Normalizes a typed offset when the box loses focus. A valid entry is re-rendered in the
+    /// signed form ("+50"); an entry that never reached the view model (letters, empty text) is
+    /// replaced with the last valid value. Typing a negative number clamps to 0 in the setter.
+    /// </summary>
+    private void GpuOffsetInput_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TextBox box) return;
+
+        // The text boxes commit on LostFocus so typing does not fight with the "+" formatting.
+        // Push the typed value through the setter first, then render the canonical value back.
+        var binding = box.GetBindingExpression(TextBox.TextProperty);
+        binding?.UpdateSource();
+        binding?.UpdateTarget();
+
+        if (DataContext is DashboardViewModel viewModel)
+            box.Text = box == GpuMemoryInput ? viewModel.GpuMemoryOffsetText : viewModel.GpuCoreOffsetText;
     }
 }

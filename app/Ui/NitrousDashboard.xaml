@@ -1009,9 +1009,9 @@
 						</StackPanel>
 					</Border>
 					<!-- CLOCK OFFSETS SLIDERS -->
-					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Padding="16,12,16,16" Margin="0,0,0,16">
+					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,16">
 						<StackPanel>
-							<Grid Margin="0,0,0,10">
+							<Grid Margin="0,0,0,8">
 								<TextBlock Text="CLOCK OFFSETS" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
 									<TextBlock Text="Manage GPU clocks" Foreground="#C8C8D0" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Let Nitrous apply per-profile GPU core and memory offsets. When off, Nitrous never writes GPU clocks."/>
@@ -1020,100 +1020,42 @@
 							</Grid>
 							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="#888890" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
 							<!-- Core Slider -->
-							<Grid Margin="0,0,0,4">
+							<Grid Margin="0,0,0,2">
 								<TextBlock Text="Core Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-								<!-- Pill border removed, back to clean floating text -->
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
+									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
-							<Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="-250" Maximum="250" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" Margin="0,0,0,12" IsEnabled="{Binding ManageGpuClocks}"/>
+							<Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="300" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" IsEnabled="{Binding ManageGpuClocks}"/>
+							<Grid Margin="0,2,0,10">
+								<TextBlock Text="0" Foreground="#6E6E76" FontSize="9"/>
+								<TextBlock Text="+300 MHz" Foreground="#6E6E76" FontSize="9" HorizontalAlignment="Right"/>
+							</Grid>
 							<!-- Memory Slider -->
-							<Grid Margin="0,0,0,4">
+							<Grid Margin="0,0,0,2">
 								<TextBlock Text="Memory Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-								<!-- Pill border removed, back to clean floating text -->
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="36" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
+									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
-							<Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="-1000" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10" IsEnabled="{Binding ManageGpuClocks}"/>
+							<Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10" IsEnabled="{Binding ManageGpuClocks}"/>
+							<Grid Margin="0,2,0,10">
+								<TextBlock Text="0" Foreground="#6E6E76" FontSize="9"/>
+								<TextBlock Text="+1000 MHz" Foreground="#6E6E76" FontSize="9" HorizontalAlignment="Right"/>
+							</Grid>
+							<Border Height="1" Background="#2A2A30" Margin="0,0,0,10"/>
+							<!-- Compact action row: ghost RESET beside the accent APPLY -->
+							<Grid>
+								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="#6E6E76" FontSize="9.5" VerticalAlignment="Center"/>
+								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+									<Button Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Height="30" Padding="14,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save 0 / 0 MHz for this profile and return the GPU to stock clocks when it is awake."/>
+									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="White" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save and apply these offsets to the active profile."/>
+								</StackPanel>
+							</Grid>
 						</StackPanel>
 					</Border>
-					<!-- ACTION BUTTONS -->
-					<Grid>
-						<Grid.Resources>
-							<!-- Ghost Button Style for RESET -->
-							<Style x:Key="GhostBtn" TargetType="Button">
-								<Setter Property="Background" Value="Transparent"/>
-								<Setter Property="Foreground" Value="#888890"/>
-								<Setter Property="BorderBrush" Value="#2A2A30"/>
-								<Setter Property="BorderThickness" Value="1"/>
-								<Setter Property="Cursor" Value="Hand"/>
-								<Setter Property="Template">
-									<Setter.Value>
-										<ControlTemplate TargetType="Button">
-											<Border x:Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
-												<!-- Added Margin binding to properly space the content -->
-												<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-											</Border>
-											<ControlTemplate.Triggers>
-												<Trigger Property="IsMouseOver" Value="True">
-													<Setter TargetName="BtnBorder" Property="Background" Value="#222226"/>
-													<!-- Subtle lighter grey -->
-													<Setter Property="Foreground" Value="#E0E0E0"/>
-												</Trigger>
-												<Trigger Property="IsEnabled" Value="False">
-													<Setter TargetName="BtnBorder" Property="Opacity" Value="0.4"/>
-													<Setter Property="Cursor" Value="Arrow"/>
-												</Trigger>
-											</ControlTemplate.Triggers>
-										</ControlTemplate>
-									</Setter.Value>
-								</Setter>
-							</Style>
-							<!-- Accent Button Style for APPLY (Preserves dynamic binding) -->
-							<Style x:Key="AccentBtn" TargetType="Button">
-								<Setter Property="Foreground" Value="#FFFFFF"/>
-								<Setter Property="Cursor" Value="Hand"/>
-								<Setter Property="Template">
-									<Setter.Value>
-										<ControlTemplate TargetType="Button">
-											<Border Background="{TemplateBinding Background}" CornerRadius="8">
-												<Grid>
-													<!-- Invisible overlay that lights up on hover -->
-													<Border x:Name="HoverOverlay" Background="White" Opacity="0" CornerRadius="8"/>
-													<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-												</Grid>
-											</Border>
-											<ControlTemplate.Triggers>
-												<Trigger Property="IsMouseOver" Value="True">
-													<Setter TargetName="HoverOverlay" Property="Opacity" Value="0.15"/>
-													<!-- Slight brightness bump -->
-												</Trigger>
-												<Trigger Property="IsEnabled" Value="False">
-													<Setter TargetName="HoverOverlay" Property="Opacity" Value="0"/>
-													<Setter Property="Opacity" Value="0.4"/>
-													<Setter Property="Cursor" Value="Arrow"/>
-												</Trigger>
-											</ControlTemplate.Triggers>
-										</ControlTemplate>
-									</Setter.Value>
-								</Setter>
-							</Style>
-						</Grid.Resources>
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="*"/>
-							<ColumnDefinition Width="12"/>
-							<!-- Slightly wider gap -->
-							<ColumnDefinition Width="*"/>
-						</Grid.ColumnDefinitions>
-						<!-- Secondary Action (Ghost Button) - Explicit Height and larger font -->
-						<Button Grid.Column="0" Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="12" FontWeight="Bold" Height="40" IsEnabled="{Binding ManageGpuClocks}"/>
-						<!-- Primary Action (Accent Button) - Explicit Height and larger font -->
-						<Button Grid.Column="2" Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Style="{StaticResource AccentBtn}" FontSize="12" FontWeight="Heavy" Height="40" IsEnabled="{Binding ManageGpuClocks}"/>
-					</Grid>
 				</StackPanel>
 				</ScrollViewer>
 
@@ -1134,7 +1076,7 @@
                     <!-- Custom Hotkeys Setup -->
                    <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
                         <StackPanel>
-                            <TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Restart Nitrous to apply changes." Foreground="#888890" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                            <TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." Foreground="#888890" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="Cycle Power Mode" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
                                 <TextBox x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>

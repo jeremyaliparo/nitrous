@@ -35,7 +35,7 @@ public class NvidiaGpuManager : IDisposable
     private const string LastAppliedCoreKey = "GpuLastAppliedCore";
     private const string LastAppliedMemoryKey = "GpuLastAppliedMemory";
 
-    private const int CurrentOffsetDefaultsRevision = 1;
+    private const int CurrentOffsetDefaultsRevision = 2;
     private const string OffsetDefaultsRevisionKey = "GpuOffsetDefaultsRevision";
 
     // These were the automatic per-profile offsets before GPU OC became opt-in. Existing
@@ -50,6 +50,7 @@ public class NvidiaGpuManager : IDisposable
 
     private readonly object _gate = new();
     private volatile bool _disposed;
+    private volatile bool _gpuSleeping;
     private PhysicalGPU? _internalGpu;
     private IntPtr _nvmlDeviceHandle = IntPtr.Zero;
     private bool _nvmlInitialized;
@@ -57,7 +58,15 @@ public class NvidiaGpuManager : IDisposable
     private int _nvmlConsecutiveFailures;
     private DateTime _lastNvmlReset = DateTime.MinValue;
     private DateTime _lastVoltageWarning = DateTime.MinValue;
+    private DateTime _lastSleepProbeUtc = DateTime.MinValue;
     private bool _initFailureLogged;
+
+    // A sleeping dGPU must not be poked every few seconds: each NVAPI/NVML initialization can
+    // power it back up. Once sleep is detected, allow one probe per minute so a manual action
+    // (or the watchdog) can still notice a wake without keeping the GPU awake.
+    private static readonly TimeSpan SleepProbeInterval = TimeSpan.FromSeconds(60);
+    private const string GpuSleepingError =
+        "The GPU is asleep. Nitrous skipped this clock operation to avoid waking it.";
 
     /// <summary>
     /// GPU clock writes are opt-in. The tray and dashboard are separate processes, so this is
@@ -71,36 +80,68 @@ public class NvidiaGpuManager : IDisposable
         get { lock (_gate) return !_disposed && _internalGpu != null; }
     }
 
-    public int MaxCoreOffset = 250;
-    public int MinCoreOffset = -250;
-    public int MaxMemoryOffset = 1000;
-    public int MinMemoryOffset = -1000;
+    public const int MinCoreOffset = 0;
+    public const int MaxCoreOffset = 300;
+    public const int MinMemoryOffset = 0;
+    public const int MaxMemoryOffset = 1000;
+
+    /// <summary>
+    /// True when the last NVAPI/NVML access failed in a way that suggests the dGPU is powered
+    /// down. Automatic clock writes are skipped until a later probe succeeds.
+    /// </summary>
+    public bool IsGpuSleeping => _gpuSleeping;
 
     public NvidiaGpuManager()
     {
         MigrateLegacyDefaultOffsets();
-        InitializeNvAPI();
+
+        // NVAPI is initialized lazily. Creating the manager at tray startup must not power up
+        // a sleeping dGPU just to sit in the notification area.
     }
 
     private static void MigrateLegacyDefaultOffsets()
     {
-        if (SettingsManager.Get(OffsetDefaultsRevisionKey, 0) >= CurrentOffsetDefaultsRevision)
+        var revision = SettingsManager.Get(OffsetDefaultsRevisionKey, 0);
+        if (revision >= CurrentOffsetDefaultsRevision)
             return;
 
-        foreach (var legacy in LegacyDefaultOffsets)
+        if (revision < 1)
         {
-            var coreKey = $"GpuCore_{legacy.Profile}";
-            var memoryKey = $"GpuMemory_{legacy.Profile}";
-            var core = SettingsManager.Get(coreKey, int.MinValue);
-            var memory = SettingsManager.Get(memoryKey, int.MinValue);
+            foreach (var legacy in LegacyDefaultOffsets)
+            {
+                var coreKey = $"GpuCore_{legacy.Profile}";
+                var memoryKey = $"GpuMemory_{legacy.Profile}";
+                var core = SettingsManager.Get(coreKey, int.MinValue);
+                var memory = SettingsManager.Get(memoryKey, int.MinValue);
 
-            // Only remove an exact legacy pair. A partially customized pair is left alone.
-            if (core != legacy.Core || memory != legacy.Memory)
+                // Only remove an exact legacy pair. A partially customized pair is left alone.
+                if (core != legacy.Core || memory != legacy.Memory)
+                    continue;
+
+                SettingsManager.Delete(coreKey);
+                SettingsManager.Delete(memoryKey);
+                Logger.Info($"GPU OC: migrated legacy {legacy.Profile} offsets ({core}/{memory}) to stock.");
+            }
+        }
+
+        // Offset support is positive-only. Clamp any surviving custom negative values so the
+        // dashboard sliders and the tray apply the same values.
+        foreach (var profile in Enum.GetValues<PowerProfile>())
+        {
+            var coreKey = $"GpuCore_{profile}";
+            var memoryKey = $"GpuMemory_{profile}";
+            var core = SettingsManager.Get(coreKey, 0);
+            var memory = SettingsManager.Get(memoryKey, 0);
+
+            var clampedCore = Math.Clamp(core, MinCoreOffset, MaxCoreOffset);
+            var clampedMemory = Math.Clamp(memory, MinMemoryOffset, MaxMemoryOffset);
+
+            if (clampedCore == core && clampedMemory == memory)
                 continue;
 
-            SettingsManager.Delete(coreKey);
-            SettingsManager.Delete(memoryKey);
-            Logger.Info($"GPU OC: migrated legacy {legacy.Profile} offsets ({core}/{memory}) to stock.");
+            SettingsManager.Save(coreKey, clampedCore);
+            SettingsManager.Save(memoryKey, clampedMemory);
+            Logger.Info($"GPU OC: clamped {profile} offsets from {core}/{memory} to {clampedCore}/{clampedMemory} MHz.");
         }
 
         SettingsManager.Save(OffsetDefaultsRevisionKey, CurrentOffsetDefaultsRevision);
@@ -198,6 +239,34 @@ public class NvidiaGpuManager : IDisposable
         }
     }
 
+    private bool CanAttemptGpuAccessLocked()
+    {
+        if (!_gpuSleeping) return true;
+
+        var now = DateTime.UtcNow;
+        if (now - _lastSleepProbeUtc < SleepProbeInterval) return false;
+
+        _lastSleepProbeUtc = now;
+        return true;
+    }
+
+    private void MarkGpuSleepingLocked()
+    {
+        if (!_gpuSleeping)
+            Logger.Info("GPU OC: the dGPU is not responding; clock operations are paused until it wakes.");
+
+        _gpuSleeping = true;
+        _lastSleepProbeUtc = DateTime.UtcNow;
+    }
+
+    private void MarkGpuAwakeLocked()
+    {
+        if (_gpuSleeping)
+            Logger.Info("GPU OC: the dGPU is responding again; clock operations are resumed.");
+
+        _gpuSleeping = false;
+    }
+
     public bool GetClocks(out int core, out int memory) => TryGetClocks(out core, out memory, out _);
 
     /// <summary>
@@ -220,9 +289,19 @@ public class NvidiaGpuManager : IDisposable
 
             try
             {
+                // A cached NVAPI handle can outlive a sleep. Gate every probe, not just the
+                // first initialization, so a sleeping dGPU is not touched by the watchdog.
+                if (_gpuSleeping && !CanAttemptGpuAccessLocked())
+                {
+                    error = GpuSleepingError;
+                    return false;
+                }
+
                 if (_internalGpu == null) InitializeNvAPI();
+
                 if (_internalGpu == null)
                 {
+                    MarkGpuSleepingLocked();
                     error = "NVAPI is not initialized (GPU asleep or driver unavailable).";
                     return false;
                 }
@@ -247,12 +326,14 @@ public class NvidiaGpuManager : IDisposable
 
                 core = coreEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
                 memory = memoryEntry.FrequencyDeltaInkHz.DeltaValue / 1000;
+                MarkGpuAwakeLocked();
                 return true;
             }
             catch (Exception ex)
             {
                 error = ex.Message;
                 InvalidateGpuLocked();
+                MarkGpuSleepingLocked();
                 return false;
             }
         }
@@ -514,7 +595,7 @@ public class NvidiaGpuManager : IDisposable
     /// per call (Graphics and Memory separately) and the editable bit set, which is the shape
     /// the driver accepts.
     /// </summary>
-    public bool TrySetClocks(int core, int memory, out string? error, string source = "manual")
+    public bool TrySetClocks(int core, int memory, out string? error, string source = "manual", bool forceProbe = false)
     {
         if (!IsClockManagementEnabled())
         {
@@ -522,10 +603,10 @@ public class NvidiaGpuManager : IDisposable
             return false;
         }
 
-        return TrySetClocksCore(core, memory, out error, source);
+        return TrySetClocksCore(core, memory, out error, source, forceProbe);
     }
 
-    private bool TrySetClocksCore(int core, int memory, out string? error, string source)
+    private bool TrySetClocksCore(int core, int memory, out string? error, string source, bool forceProbe = false)
     {
         error = null;
 
@@ -549,13 +630,24 @@ public class NvidiaGpuManager : IDisposable
                 return false;
             }
 
+            // Explicit APPLY may force a probe; automatic writes respect the cooldown even when
+            // a cached NVAPI handle survived the sleep. The cooldown is consumed once per call so
+            // the internal stale-handle retry below can still run.
+            if (_gpuSleeping && !forceProbe && !CanAttemptGpuAccessLocked())
+            {
+                error = GpuSleepingError;
+                return false;
+            }
+
             for (var attempt = 0; attempt < 2; attempt++)
             {
                 try
                 {
                     if (_internalGpu == null) InitializeNvAPI();
+
                     if (_internalGpu == null)
                     {
+                        MarkGpuSleepingLocked();
                         error = "NVAPI is not initialized (GPU asleep or driver unavailable).";
                         return false;
                     }
@@ -633,6 +725,7 @@ public class NvidiaGpuManager : IDisposable
                         appliedCore == core && appliedMemory == memory)
                     {
                         RecordAppliedOffsets(core, memory);
+                        MarkGpuAwakeLocked();
                         Logger.Info(
                             $"GPU OC: {source}: applied core {currentCore:+#;-#;0} -> {core:+#;-#;0} MHz, " +
                             $"memory {currentMemory:+#;-#;0} -> {memory:+#;-#;0} MHz.");
@@ -652,10 +745,12 @@ public class NvidiaGpuManager : IDisposable
                     if (attempt == 0)
                     {
                         // A sleeping/reset GPU leaves a stale NVAPI handle. Rebuild it and retry once.
+                        MarkGpuSleepingLocked();
                         InitializeNvAPI();
                         continue;
                     }
 
+                    MarkGpuSleepingLocked();
                     Logger.Warn("GPU OC: failed to apply offsets.", ex);
                 }
             }
@@ -825,6 +920,14 @@ public class NvidiaGpuManager : IDisposable
                 return;
             }
 
+            if (IsGpuSleeping && attempt >= 3)
+            {
+                // Each retry can power the dGPU up. Leave the profile to the 30-second watchdog,
+                // which probes again once per minute while the GPU is asleep.
+                Logger.Info($"GPU OC: startup: the dGPU is still asleep; {currentProfile} offsets will apply after it wakes.");
+                return;
+            }
+
             if (attempt == 1 || attempt % 5 == 0)
                 Logger.Warn($"GPU OC: boot apply {attempt}/{maxAttempts} failed for {currentProfile}: {error}");
 
@@ -940,6 +1043,7 @@ public class NvidiaGpuManager : IDisposable
     {
         public string Name { get; set; } = "Unknown";
         public string Architecture { get; set; } = "Unknown";
+        public bool HasData { get; set; }
         public int CoreTemp { get; set; }
         public int GpuLoad { get; set; }
         public int VramUsedMb { get; set; }
@@ -963,6 +1067,9 @@ public class NvidiaGpuManager : IDisposable
             {
                 if (_disposed) return telemetry;
 
+                if (_gpuSleeping && !CanAttemptGpuAccessLocked())
+                    return telemetry;
+
                 if (_nvmlDeviceHandle == IntPtr.Zero)
                 {
                     if (!_nvmlInitialized) InitializeNvmlLocked();
@@ -977,7 +1084,10 @@ public class NvidiaGpuManager : IDisposable
                 }
 
                 if (_nvmlDeviceHandle == IntPtr.Zero)
+                {
+                    MarkGpuSleepingLocked();
                     return telemetry;
+                }
 
                 var anySuccess = false;
 
@@ -1057,10 +1167,14 @@ public class NvidiaGpuManager : IDisposable
                 if (anySuccess)
                 {
                     _nvmlConsecutiveFailures = 0;
+                    telemetry.HasData = true;
+                    MarkGpuAwakeLocked();
                 }
                 else
                 {
                     _nvmlConsecutiveFailures++;
+                    MarkGpuSleepingLocked();
+
                     // Rebuild the NVML handle after ~30 seconds of total failure (e.g. after sleep),
                     // but never more often than once a minute.
                     if (_nvmlConsecutiveFailures >= 15 && DateTime.UtcNow - _lastNvmlReset > TimeSpan.FromMinutes(1))
