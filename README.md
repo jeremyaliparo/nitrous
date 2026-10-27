@@ -6,8 +6,6 @@
 
 **Pure, zero-bloat hardware control for Acer Nitro laptops.**
 
-[![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
-<br>
 [![Join our Discord](https://discordapp.com/api/guilds/1563801622356820050/widget.png?style=banner2)](https://discord.gg/PGWzb3mHbG)
 
 <p align="center">
