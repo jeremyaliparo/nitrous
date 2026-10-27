@@ -7,41 +7,26 @@ published from the matching section of this file.
 
 ### GPU page
 
-- `RESET` and `APPLY` now share one compact action row inside the `CLOCK OFFSETS` card instead
-  of a separate full-width button section, so the page uses less vertical space.
-- Clock offsets are positive-only. Core is `0..300 MHz`, memory is `0..1000 MHz`, and the
-  driver range check still rejects values the VBIOS does not advertise.
-- Positive offsets display with an explicit `+` prefix in the value box and status messages.
-  Saved negative offsets from older versions are clamped to `0` on first run.
-- A sleeping dGPU is now detected from NVAPI/NVML failures. Nitrous pauses automatic clock
-  writes instead of probing the GPU every few seconds, and only allows one wake probe per
-  minute. Explicit `APPLY` still retries once.
-- `Deep GPU Telemetry` turns itself off after three failed NVML polls and the GPU page explains
-  why, so a sleeping GPU is not held awake by a two-second telemetry loop.
+- `RESET` and `APPLY` share one compact action row inside `CLOCK OFFSETS`.
+- Offsets are positive-only: core `0..300 MHz`, memory `0..1000 MHz`, displayed with a `+`
+  prefix. Negative values saved by older versions are clamped to `0` on first run.
+- A sleeping dGPU is detected from its Windows power state instead of by probing it, so Nitrous
+  no longer wakes the GPU just to find out that it is asleep.
+- The clock watchdog skips its check when the active profile is `0/0` and Nitrous owns no
+  offset. On battery this removes the wake that used to happen every two minutes.
+- `Deep GPU Telemetry` polls only while the GPU page is open, and an asleep GPU shows `Asleep`
+  instead of stale readings. It still turns itself off automatically if the GPU is powered but
+  NVML stops responding.
 
-### Hotkeys apply immediately
+### Hotkeys
 
-- Editing a hotkey on the `KB` page signals the tray process directly, so the new binding is
-  registered right away instead of requiring a Nitrous restart. The existing two-second
-  registry poll remains as a fallback, and registration now runs on the tray's message thread.
-- The page no longer says a restart is required.
+- Editing a hotkey on the `KB` page applies immediately. The "restart required" note is gone.
 
-### Dashboard launch
+### Dashboard
 
-- Pressing the dashboard hotkey repeatedly no longer opens multiple dashboard windows. The tray
-  now remembers a dashboard that is still starting, ignores duplicate launch requests for two
-  seconds, and reuses the launched process. A dashboard single-instance mutex is also a hard
-  backstop for any other launch path.
-
-### Dashboard position recovery
-
-- The dashboard validates its saved position against the current monitor layout. If the title
-  bar has no reachable spot (for example, the external monitor it was on was removed), it
-  reopens centered on the primary display.
-- A `DisplaySettingsChanged` handler recovers a dashboard that is already open when a monitor
-  is unplugged.
-- The tray menu has a new **Reset Dashboard Position** item. It clears the saved coordinates
-  and, if the dashboard is open, moves it back to the primary work area.
+- Pressing the dashboard hotkey repeatedly now reuses one window instead of opening several.
+- A saved off-screen position is recovered onto the primary display, including when a monitor
+  is unplugged. New **Reset Dashboard Position** tray item.
 
 ## 0.8.4 - 2026-10-25
 

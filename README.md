@@ -22,7 +22,7 @@ Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly
 
 ### Key Features
 * **Custom Fan Curves:** Per-profile fan curves with overridable defaults, plus manual control from **1% to 100%**, Auto, and Max modes. The 1% floor is enforced in the UI, the curve editor, curve storage, interpolation, and again at the WMI boundary. Low fan speeds reduce cooling, so use them with care.
-* **Optimized NVML Telemetry:** Direct `nvml.dll` integration instead of `nvidia-smi.exe` for high-performance telemetry with low CPU overhead. Deep telemetry can be disabled for older NVIDIA GPUs.
+* **Optimized NVML Telemetry:** Direct `nvml.dll` integration instead of `nvidia-smi.exe` for high-performance telemetry with low CPU overhead. Deep telemetry can be disabled for older NVIDIA GPUs, and it is only polled while the GPU page is on screen so an idle dashboard does not keep the dGPU awake.
 * **Dedicated GPU OC/UC Tab:** Fine-tune core and memory offsets with real-time telemetry, clock speeds, usage, and thermal tracking. Offsets are positive-only (`0..300 MHz` core, `0..1000 MHz` memory) and are validated against the driver's advertised range and verified after applying.
 * **Explicit GPU Clock Ownership:** The **Nitrous manages GPU clocks** switch beside `CLOCK OFFSETS` is the only way Nitrous is allowed to write GPU clocks. It is **off by default**, and while it is off every startup, profile, hotkey, AC/DC, resume, watchdog, APPLY, and RESET path is read-only. Turning it on warns about MSI Afterburner and voltage/frequency curve conflicts, then applies the active profile's saved per-profile offsets.
 * **Persistent GPU OC:** While clock management is on, a background watchdog re-reads the applied P0 offsets and repairs drift every 30 seconds, after sleep/resume, and after a driver reset. A failed read (for example, a sleeping dGPU) is never treated as "0 MHz".
@@ -123,7 +123,7 @@ Checksums protect against a corrupted or tampered download; they are not a subst
 * Make sure the tray process is running; while clock management is on, the watchdog lives there.
 * Confirm **Nitrous manages GPU clocks** is on. When it is off, Nitrous deliberately performs no GPU writes, so another tool or the driver is the only thing setting clocks.
 * Check `%LOCALAPPDATA%\Nitrous\logs\nitrous.log` for `GPU OC`, `NVAPI`, or `NVML` warnings. Every write now logs its trigger (`startup`, `profile-click`, `hotkey`, `acdc`, `watchdog`, `apply`, `reset`) plus the old and new offsets.
-* A sleeping dGPU cannot be read or written. The watchdog waits for the next successful read instead of overwriting the saved offsets with 0.
+* A sleeping dGPU cannot be read or written. Nitrous reads the device's Windows PnP power state (a free, non-waking query) and skips the GPU entirely while it is in D3, so it never overwrites the saved offsets with 0 and never powers the GPU up just to check on it.
 * If another overclocking tool clears the P0 performance state, Nitrous repairs it within 30 seconds while clock management is on.
 
 **MSI Afterburner's clock sliders or mV curve reset when Nitrous starts**

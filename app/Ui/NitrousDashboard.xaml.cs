@@ -83,6 +83,7 @@ public partial class NitrousDashboard : Window
 
         // The dashboard is a transient UI process; stop hammering WMI/NVML when minimized.
         vm.SetTelemetryEnabled(WindowState != WindowState.Minimized && IsVisible);
+        UpdateGpuTelemetryScope();
 
         // A hotkey may have changed the profile while the window was minimized.
         if (WindowState != WindowState.Minimized && IsVisible)
@@ -115,8 +116,12 @@ public partial class NitrousDashboard : Window
 
     private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
 
+    private int _activeNavIndex;
+
     private void SetActiveNav(int index)
     {
+        _activeNavIndex = index;
+
         var pages = new UIElement[] { DashPage, GpuPage, KeyboardPage, SettingsPage };
         var icons = new Shape[] { NavDashIcon, NavGpuIcon, NavKeyboardIcon, NavSetIcon };
         var labels = new TextBlock[] { NavDashText, NavGpuText, NavKeyboardText, NavSetText };
@@ -130,6 +135,25 @@ public partial class NitrousDashboard : Window
             icons[i].Fill = i == index ? activeBrush : inactiveBrush;
             labels[i].Foreground = i == index ? activeBrush : inactiveBrush;
         }
+
+        UpdateGpuTelemetryScope();
+
+        // Entering the GPU page should show live values immediately rather than the previous
+        // page's last snapshot.
+        if (index == 1 && DataContext is DashboardViewModel vm)
+            vm.RefreshGpuOffsets();
+    }
+
+    /// <summary>
+    /// NVML polling is only allowed while the GPU page is the visible page. Reading NVML wakes
+    /// the dGPU, and no other page displays its values.
+    /// </summary>
+    private void UpdateGpuTelemetryScope()
+    {
+        if (DataContext is not DashboardViewModel vm) return;
+
+        var visible = Visibility == Visibility.Visible && WindowState != WindowState.Minimized;
+        vm.SetGpuTelemetryActive(visible && _activeNavIndex == 1);
     }
 
     private void NavDashBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(0);
@@ -141,6 +165,8 @@ public partial class NitrousDashboard : Window
     {
         if (DataContext is DashboardViewModel vm)
             vm.SetTelemetryEnabled(Visibility == Visibility.Visible && WindowState != WindowState.Minimized);
+
+        UpdateGpuTelemetryScope();
 
         if (Visibility == Visibility.Visible) RefreshDashboardState();
     }

@@ -23,6 +23,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private readonly NvidiaGpuManager _gpuManager = new();
     private CancellationTokenSource? _pollingCts;
     private volatile bool _telemetryEnabled = true;
+    private volatile bool _gpuPageActive;
     private bool _telemetryErrorLogged;
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
@@ -556,7 +557,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
                 var applied = _gpuManager.TrySetClocks(
-                    GpuCoreOffset, GpuMemoryOffset, out var error, "apply", forceProbe: true);
+                    GpuCoreOffset, GpuMemoryOffset, out var error, "apply");
 
                 if (applied)
                 {
@@ -798,6 +799,19 @@ public class DashboardViewModel : ObservableObject, IDisposable
     {
         _telemetryEnabled = enabled;
         if (enabled) _telemetryErrorLogged = false;
+    }
+
+    /// <summary>
+    /// NVML telemetry is only polled while the GPU page is on screen. Reading NVML wakes the
+    /// dGPU, and the rest of the dashboard does not display any of its values, so polling from
+    /// another page would keep an idle GPU out of RTD3 for no visible benefit.
+    /// </summary>
+    public void SetGpuTelemetryActive(bool active)
+    {
+        if (_gpuPageActive == active) return;
+
+        _gpuPageActive = active;
+        if (active) _deepTelemetryFailures = 0;
     }
 
     public void StopTelemetryPolling()
@@ -1121,9 +1135,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Re-reads the live P0 offsets. Used after a profile change that happened outside this
     /// window (tray hotkey, auto-switch, AC/DC) and after disabling clock management.
+    /// The read is skipped off the GPU page and while the dGPU is in D3, because both would
+    /// touch NVAPI without showing the result.
     /// </summary>
     public void RefreshGpuOffsets()
     {
+        if (!_gpuPageActive) return;
+
         _ = Task.Run(() =>
         {
             var read = _gpuManager.TryGetClocks(out var core, out var memory, out var error);
@@ -1134,7 +1152,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 {
                     _ = RunOnUiAsync(() =>
                         GpuClockStatusText =
-                            "The GPU is asleep. Offsets are hidden and GPU clock writes are paused until it wakes.");
+                            "The GPU is asleep, so there are no live clocks to show. " +
+                            "GPU clock writes stay paused until it wakes.");
                 }
 
                 return;
@@ -1284,7 +1303,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var batteryTask = Task.Run(() => SystemInfoManager.GetBatteryPowerTelemetry(), token);
 
                         Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
-                        if (DeepGpuTelemetry)
+                        if (DeepGpuTelemetry && _gpuPageActive)
                         {
                             smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
                             await Task.WhenAll(wmiTask, batteryTask, smiTask);
@@ -1297,14 +1316,22 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var telemetry = await wmiTask;
                         var battery = await batteryTask;
                         var smi = smiTask != null ? await smiTask : null;
+                        var gpuAsleep = _gpuManager.IsGpuSleeping;
                         _telemetryErrorLogged = false;
 
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {
-                            // A sleeping dGPU returns no NVML data. Turn the poller off instead
-                            // of retrying every two seconds, which can keep waking the GPU.
-                            if (++_deepTelemetryFailures >= 3)
+                            if (gpuAsleep)
                             {
+                                // Expected on battery: the device is in D3 and Nitrous does not
+                                // wake it to read sensors. This is not a driver failure.
+                                _deepTelemetryFailures = 0;
+                            }
+                            else if (++_deepTelemetryFailures >= 3)
+                            {
+                                // The device is powered but NVML still returns nothing (for
+                                // example a driver whose power sensors stopped working after a
+                                // resume). Stop polling and say so.
                                 _deepTelemetryFailures = 0;
                                 _ = RunOnUiAsync(() =>
                                 {
@@ -1312,9 +1339,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                                     DeepGpuTelemetry = false;
                                     GpuClockStatusText =
-                                        "The GPU is not responding (it may be asleep). Deep GPU Telemetry was " +
-                                        "turned off automatically, and GPU clock writes are paused.";
-                                    Logger.Info("GPU telemetry: dGPU stopped responding; Deep GPU Telemetry turned off automatically.");
+                                        "The GPU is powered but NVML stopped returning data. Deep GPU Telemetry " +
+                                        "was turned off automatically.";
+                                    Logger.Info("GPU telemetry: dGPU is awake but NVML returned no data; telemetry turned off automatically.");
                                 });
                             }
                         }
@@ -1358,6 +1385,18 @@ public class DashboardViewModel : ObservableObject, IDisposable
                                     GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
                                 else
                                     GpuPowerText = $"{smi.PowerDrawW:0.0} W";
+                            }
+                            else if (smi != null)
+                            {
+                                // No NVML data. The GPU is either in D3 (expected, and Nitrous
+                                // deliberately does not wake it) or NVML is not reporting yet.
+                                GpuLoadText = "--";
+                                GpuVramText = "-- / -- MB";
+                                GpuDeepTempText = "-- C";
+                                GpuPStateText = gpuAsleep ? "Asleep" : "--";
+                                GpuCoreClockText = "-- MHz";
+                                GpuMemClockText = "-- MHz";
+                                GpuPowerText = "-- W";
                             }
                         }, System.Windows.Threading.DispatcherPriority.Background);
                     }

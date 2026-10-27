@@ -622,8 +622,11 @@ public class TrayApplication : ApplicationContext
                             var effectiveGpuTemp = telemetry.GpuTemp;
                             var deepTelemetry = SettingsManager.Get("DeepGpuTelemetry", 1) == 1;
 
-                            if (effectiveGpuTemp == 0 && deepTelemetry)
+                            if (effectiveGpuTemp == 0 && deepTelemetry && _gpuManager.IsGpuAwake)
                             {
+                                // Only ask NVML while Windows reports the device as powered. The
+                                // Acer EC returns 0 for an idle dGPU, and waking it every two
+                                // seconds just for a fan curve is not worth the battery.
                                 var smi = await _gpuManager.GetNvmlTelemetryAsync(_engineCts.Token);
                                 if (smi.CoreTemp > 0) effectiveGpuTemp = smi.CoreTemp;
                             }
@@ -698,8 +701,10 @@ public class TrayApplication : ApplicationContext
 
                         if (!await _gpuManager.EnsureClocksAppliedAsync(profile))
                         {
-                            // A sleeping dGPU is expected on battery; do not spam the log.
-                            if (DateTime.UtcNow - _lastOcWatchdogLog > TimeSpan.FromMinutes(5))
+                            // A sleeping dGPU is expected on battery: the probe is skipped
+                            // without waking it, so there is nothing to warn about.
+                            if (!_gpuManager.IsGpuSleeping &&
+                                DateTime.UtcNow - _lastOcWatchdogLog > TimeSpan.FromMinutes(5))
                             {
                                 Logger.Warn($"GPU OC: watchdog could not verify/apply {profile} offsets.");
                                 _lastOcWatchdogLog = DateTime.UtcNow;

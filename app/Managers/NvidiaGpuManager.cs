@@ -14,6 +14,7 @@ using NvAPIWrapper.Native.GPU.Structures;
 using NvAPIWrapper.Native.Interfaces.GPU;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
+using Nitrous.Helpers;
 
 namespace Nitrous.Managers;
 
@@ -58,13 +59,12 @@ public class NvidiaGpuManager : IDisposable
     private int _nvmlConsecutiveFailures;
     private DateTime _lastNvmlReset = DateTime.MinValue;
     private DateTime _lastVoltageWarning = DateTime.MinValue;
-    private DateTime _lastSleepProbeUtc = DateTime.MinValue;
     private bool _initFailureLogged;
 
-    // A sleeping dGPU must not be poked every few seconds: each NVAPI/NVML initialization can
-    // power it back up. Once sleep is detected, allow one probe per minute so a manual action
-    // (or the watchdog) can still notice a wake without keeping the GPU awake.
-    private static readonly TimeSpan SleepProbeInterval = TimeSpan.FromSeconds(60);
+    // A powered-down dGPU must never be poked: initializing NVAPI or NVML is what brings the
+    // rail back up. The Windows PnP power state is a cached value that costs nothing to read
+    // and does not wake the device, so every GPU entry point consults it first instead of
+    // probing optimistically.
     private const string GpuSleepingError =
         "The GPU is asleep. Nitrous skipped this clock operation to avoid waking it.";
 
@@ -86,10 +86,14 @@ public class NvidiaGpuManager : IDisposable
     public const int MaxMemoryOffset = 1000;
 
     /// <summary>
-    /// True when the last NVAPI/NVML access failed in a way that suggests the dGPU is powered
-    /// down. Automatic clock writes are skipped until a later probe succeeds.
+    /// True when Windows reports the dGPU in D3, or when the last GPU access failed because it
+    /// was powered down. Every clock/telemetry entry point checks this before touching NVAPI
+    /// or NVML, so an asleep GPU is never woken just to be measured.
     /// </summary>
-    public bool IsGpuSleeping => _gpuSleeping;
+    public bool IsGpuSleeping => _gpuSleeping || GpuPowerState.IsAsleep;
+
+    /// <summary>True when the dGPU is known to be powered up (D0).</summary>
+    public bool IsGpuAwake => !IsGpuSleeping;
 
     public NvidiaGpuManager()
     {
@@ -241,28 +245,44 @@ public class NvidiaGpuManager : IDisposable
 
     private bool CanAttemptGpuAccessLocked()
     {
-        if (!_gpuSleeping) return true;
+        var state = GpuPowerState.Query();
 
-        var now = DateTime.UtcNow;
-        if (now - _lastSleepProbeUtc < SleepProbeInterval) return false;
+        if (state == GpuPowerState.DevicePower.D3)
+        {
+            MarkGpuSleepingLocked();
+            return false;
+        }
 
-        _lastSleepProbeUtc = now;
+        // The device came back up on its own (a game started, a display was attached).
+        // Handles created before the D3 transition can outlive it and return stale results,
+        // so drop them and let the next read rebuild against the powered device.
+        if (_gpuSleeping && state == GpuPowerState.DevicePower.D0)
+            MarkGpuResumedLocked();
+
         return true;
     }
 
     private void MarkGpuSleepingLocked()
     {
         if (!_gpuSleeping)
-            Logger.Info("GPU OC: the dGPU is not responding; clock operations are paused until it wakes.");
+            Logger.Info("GPU OC: the dGPU is asleep (D3); clock and telemetry operations are paused.");
 
         _gpuSleeping = true;
-        _lastSleepProbeUtc = DateTime.UtcNow;
+    }
+
+    private void MarkGpuResumedLocked()
+    {
+        InvalidateGpuLocked();
+        ResetNvmlLocked();
+
+        Logger.Info("GPU OC: the dGPU is awake again; clock operations are resumed.");
+        _gpuSleeping = false;
     }
 
     private void MarkGpuAwakeLocked()
     {
         if (_gpuSleeping)
-            Logger.Info("GPU OC: the dGPU is responding again; clock operations are resumed.");
+            Logger.Info("GPU OC: the dGPU is awake again; clock operations are resumed.");
 
         _gpuSleeping = false;
     }
@@ -289,9 +309,9 @@ public class NvidiaGpuManager : IDisposable
 
             try
             {
-                // A cached NVAPI handle can outlive a sleep. Gate every probe, not just the
-                // first initialization, so a sleeping dGPU is not touched by the watchdog.
-                if (_gpuSleeping && !CanAttemptGpuAccessLocked())
+                // Never initialize NVAPI against a powered-down device: the initialization
+                // itself brings the rail back up. The PnP state costs nothing to read.
+                if (!CanAttemptGpuAccessLocked())
                 {
                     error = GpuSleepingError;
                     return false;
@@ -595,7 +615,7 @@ public class NvidiaGpuManager : IDisposable
     /// per call (Graphics and Memory separately) and the editable bit set, which is the shape
     /// the driver accepts.
     /// </summary>
-    public bool TrySetClocks(int core, int memory, out string? error, string source = "manual", bool forceProbe = false)
+    public bool TrySetClocks(int core, int memory, out string? error, string source = "manual")
     {
         if (!IsClockManagementEnabled())
         {
@@ -603,10 +623,10 @@ public class NvidiaGpuManager : IDisposable
             return false;
         }
 
-        return TrySetClocksCore(core, memory, out error, source, forceProbe);
+        return TrySetClocksCore(core, memory, out error, source);
     }
 
-    private bool TrySetClocksCore(int core, int memory, out string? error, string source, bool forceProbe = false)
+    private bool TrySetClocksCore(int core, int memory, out string? error, string source)
     {
         error = null;
 
@@ -630,10 +650,9 @@ public class NvidiaGpuManager : IDisposable
                 return false;
             }
 
-            // Explicit APPLY may force a probe; automatic writes respect the cooldown even when
-            // a cached NVAPI handle survived the sleep. The cooldown is consumed once per call so
-            // the internal stale-handle retry below can still run.
-            if (_gpuSleeping && !forceProbe && !CanAttemptGpuAccessLocked())
+            // An asleep dGPU is never woken by a write, not even an explicit APPLY. The user is
+            // told to retry once the GPU is actually in use.
+            if (!CanAttemptGpuAccessLocked())
             {
                 error = GpuSleepingError;
                 return false;
@@ -744,8 +763,12 @@ public class NvidiaGpuManager : IDisposable
 
                     if (attempt == 0)
                     {
-                        // A sleeping/reset GPU leaves a stale NVAPI handle. Rebuild it and retry once.
+                        // A sleeping/reset GPU leaves a stale NVAPI handle. Rebuild it and retry
+                        // once, but never re-initialize against a device that is still in D3.
                         MarkGpuSleepingLocked();
+                        if (!CanAttemptGpuAccessLocked())
+                            return false;
+
                         InitializeNvAPI();
                         continue;
                     }
@@ -953,6 +976,12 @@ public class NvidiaGpuManager : IDisposable
         // above on every tick. When it is on, a 0/0 profile is a real instruction to keep the
         // GPU at stock, not a "leave whatever is there" placeholder.
 
+        // Nothing to enforce: the profile is stock and Nitrous does not own an offset from an
+        // earlier AC profile or a manual apply. The only thing a probe could achieve here is to
+        // wake a sleeping dGPU, so skip it entirely.
+        if (core == 0 && memory == 0 && !HasOwnedOffsets())
+            return Task.FromResult(true);
+
         return Task.Run(() =>
         {
             if (!TryGetClocks(out var currentCore, out var currentMemory, out _))
@@ -998,7 +1027,26 @@ public class NvidiaGpuManager : IDisposable
 
         return await Task.Run(() =>
         {
-            return TrySetClocks(coreOffset, memoryOffset, out _, source) ? 1 : 0;
+            var applied = TrySetClocks(coreOffset, memoryOffset, out var error, source);
+
+            if (!applied)
+            {
+                if (IsGpuSleeping)
+                {
+                    // Unplugging while the dGPU is in D3 is common. The reset is not lost: the
+                    // watchdog applies it once the GPU is next awake, but say so instead of
+                    // silently leaving an AC overclock in place on battery.
+                    Logger.Info($"GPU OC: {source}: the dGPU is asleep; " +
+                                $"{coreOffset:+#;-#;0}/{memoryOffset:+#;-#;0} MHz will apply when it wakes.");
+                }
+                else if (error != null)
+                {
+                    Logger.Warn($"GPU OC: {source}: applying " +
+                                $"{coreOffset:+#;-#;0}/{memoryOffset:+#;-#;0} MHz failed: {error}");
+                }
+            }
+
+            return applied ? 1 : 0;
         });
     }
 
@@ -1067,7 +1115,9 @@ public class NvidiaGpuManager : IDisposable
             {
                 if (_disposed) return telemetry;
 
-                if (_gpuSleeping && !CanAttemptGpuAccessLocked())
+                // Reading NVML powers the rail back up. A device in D3 is reported as "no data"
+                // without ever being initialized, so telemetry cannot hold it awake.
+                if (!CanAttemptGpuAccessLocked())
                     return telemetry;
 
                 if (_nvmlDeviceHandle == IntPtr.Zero)
@@ -1175,9 +1225,12 @@ public class NvidiaGpuManager : IDisposable
                     _nvmlConsecutiveFailures++;
                     MarkGpuSleepingLocked();
 
-                    // Rebuild the NVML handle after ~30 seconds of total failure (e.g. after sleep),
-                    // but never more often than once a minute.
-                    if (_nvmlConsecutiveFailures >= 15 && DateTime.UtcNow - _lastNvmlReset > TimeSpan.FromMinutes(1))
+                    // Rebuild the NVML handle after ~30 seconds of total failure (e.g. after a
+                    // driver reset), but never against a device that is in D3: shutting NVML
+                    // down and starting it again would power the rail back up.
+                    if (_nvmlConsecutiveFailures >= 15 &&
+                        DateTime.UtcNow - _lastNvmlReset > TimeSpan.FromMinutes(1) &&
+                        !GpuPowerState.IsAsleep)
                     {
                         ResetNvmlLocked();
                         InitializeNvmlLocked();
