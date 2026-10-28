@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/nitrous-hero.jpg" alt="Nitrous Hero">
+<img src="assets/nitrous-hero.jpg" alt="Nitrous Hero" width="720">
 
 [![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Star%20Nitrous&color=ffb703)](https://github.com/jeremyaliparo/nitrous/stargazers)
