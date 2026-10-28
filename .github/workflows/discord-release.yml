@@ -1,0 +1,152 @@
+name: Post Release to Discord
+
+# The Release workflow creates the GitHub release with GITHUB_TOKEN, and events caused by
+# GITHUB_TOKEN never start another workflow run. A "release: published" trigger would
+# therefore never fire here, so this waits for the Release run to finish instead.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to post (leave blank to post the latest release)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  notify-discord:
+    name: Post to #releases
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send release notes
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+          ROLE_ID: ${{ secrets.DISCORD_ANNOUNCEMENTS_ROLE_ID }}
+          TAG_NAME: ${{ github.event.workflow_run.head_branch || github.event.inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${WEBHOOK_URL:-}" ]; then
+            echo "::error::DISCORD_RELEASES_WEBHOOK is not configured."
+            exit 1
+          fi
+
+          api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
+
+          fetch_release() {
+            if [ -n "${GH_TOKEN:-}" ]; then
+              curl -fsS -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $GH_TOKEN" "$1"
+            else
+              curl -fsS -H "Accept: application/vnd.github+json" "$1"
+            fi
+          }
+
+          # The release is created moments before this run starts. Give the Releases API
+          # a few seconds to catch up, then fall back to the latest release.
+          release_json=""
+          if [ -n "${TAG_NAME:-}" ]; then
+            for attempt in 1 2 3 4 5; do
+              if release_json=$(fetch_release "$api/releases/tags/$TAG_NAME"); then
+                break
+              fi
+              release_json=""
+              echo "Release $TAG_NAME is not visible yet (attempt $attempt/5); retrying in 5s."
+              sleep 5
+            done
+          fi
+
+          if [ -z "$release_json" ]; then
+            release_json=$(fetch_release "$api/releases/latest")
+          fi
+
+          tag=$(jq -r '.tag_name' <<<"$release_json")
+          name=$(jq -r '.name // .tag_name' <<<"$release_json")
+          url=$(jq -r '.html_url' <<<"$release_json")
+          download=$(jq -r '[.assets[]? | select(.name | test("\\.exe$"))][0].browser_download_url // ""' <<<"$release_json")
+
+          # Discord embeds do not render Markdown headings, and the "---" footer that the
+          # release workflow appends repeats the download links the embed already has.
+          summary=$(jq -r '.body // ""' <<<"$release_json" | awk '
+            NR == 1 && /^## / { next }
+            /^---[ \t]*$/ { exit }
+            /^#{2,4}[ \t]/ {
+              heading = $0
+              sub(/^#{2,4}[ \t]+/, "", heading)
+              print "**" toupper(heading) "**"
+              next
+            }
+            { print }
+          ')
+
+          title="$name"
+          case "$title" in
+            Nitrous*) ;;
+            *) title="Nitrous $title" ;;
+          esac
+
+          [ -n "$download" ] || download="$url"
+
+          jq -n \
+            --arg role "${ROLE_ID:-}" \
+            --arg tag "$tag" \
+            --arg title "$title" \
+            --arg body "$summary" \
+            --arg url "$url" \
+            --arg download "$download" \
+            --arg repo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --arg logo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/master/assets/logo.png" \
+            --argjson timestamp "$(date -u +%s)" '
+            def clip:
+              if length > 3800
+              then .[0:3800] + "\n\n[Read the full changelog on GitHub](" + $url + ")"
+              else .
+              end;
+
+            {
+              content: ("🚀 **Nitrous " + $tag + " is out!**"
+                + (if $role == "" then "" else " <@&" + $role + ">" end)),
+              embeds: [
+                {
+                  title: $title,
+                  url: $url,
+                  description: ($body | clip),
+                  color: 11763711,
+                  thumbnail: { url: $logo },
+                  fields: [
+                    { name: "📥 Download", value: ("[Nitrous.exe](" + $download + ")"), inline: true },
+                    { name: "📄 Release notes", value: ("[Full changelog](" + $url + ")"), inline: true },
+                    { name: "⭐ Support", value: ("[Star the repository](" + $repo + ")"), inline: true }
+                  ],
+                  footer: { text: "Nitrous Release Automation" },
+                  timestamp: ($timestamp | todate)
+                }
+              ],
+              allowed_mentions: (if $role == "" then { parse: [] } else { roles: [$role] } end)
+            }' > payload.json
+
+          case "$WEBHOOK_URL" in
+            *\?*) post_url="$WEBHOOK_URL&wait=true" ;;
+            *) post_url="$WEBHOOK_URL?wait=true" ;;
+          esac
+
+          http_code=$(curl -sS -o response.json -w '%{http_code}' \
+            -H "Content-Type: application/json" \
+            -X POST --data-binary @payload.json "$post_url")
+
+          if [ "$http_code" != "200" ] && [ "$http_code" != "204" ]; then
+            echo "::error::Discord rejected the message (HTTP $http_code)."
+            cat response.json
+            exit 1
+          fi
+
+          echo "Posted $tag to #releases (HTTP $http_code)."
