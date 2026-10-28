@@ -29,7 +29,7 @@ jobs:
       - name: Send release notes
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
-          ROLE_ID: ${{ secrets.DISCORD_ANNOUNCEMENTS_ROLE_ID }}
+          ROLE_ID: ${{ secrets.DISCORD_RELEASES_ROLE_ID }}
           TAG_NAME: ${{ github.event.workflow_run.head_branch || github.event.inputs.tag }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -38,6 +38,10 @@ jobs:
           if [ -z "${WEBHOOK_URL:-}" ]; then
             echo "::error::DISCORD_RELEASES_WEBHOOK is not configured."
             exit 1
+          fi
+
+          if [ -z "${ROLE_ID:-}" ]; then
+            echo "::warning::DISCORD_RELEASES_ROLE_ID is not set; posting without a role ping."
           fi
 
           api="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
