@@ -2,7 +2,7 @@
 
 <img src="assets/nitrous-hero.jpg" alt="Nitrous Hero" width="600">
 
-[![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download%20Latest&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Star%20Nitrous&color=ffb703)](https://github.com/jeremyaliparo/nitrous/stargazers)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/PGWzb3mHbG)
 
