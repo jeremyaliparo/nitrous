@@ -1,10 +1,6 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Nitrous Logo" width="80">
-
-# Nitrous
-
-**Pure, zero-bloat hardware control for Acer Nitro laptops.**
+<img src="assets/nitrous-hero.jpg" alt="Nitrous Hero">
 
 [![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Star%20Nitrous&color=ffb703)](https://github.com/jeremyaliparo/nitrous/stargazers)
