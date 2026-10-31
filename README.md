@@ -211,8 +211,9 @@ Nitrous disables a control when the machine does not answer for it, rather than 
 
 * **Keyboard zones** need an RGB keyboard. A single-colour keyboard keeps brightness but not the four zones.
 * **Keyboard auto-off** needs the embedded-controller interface; some models do not expose it.
-* **LCD overdrive** is a panel property, so it depends on the display rather than the model.
 * **USB charging while off** depends on an Acer WMI class that is only partly implemented on some BIOSes.
+
+**LCD overdrive** is different: it is a panel property, so where the panel reports it has none the control is not shown at all rather than greyed out.
 
 If a control you expect to work is disabled, export diagnostics and open an issue.
 

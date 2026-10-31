@@ -85,11 +85,11 @@ Nitrous 1.0.0 is the first stable release.
 - The current rate is shown next to the `DISPLAY` label, so the choice and what the screen is
   actually running are both visible.
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
-  panel rather than the model, so the toggle is only enabled where the firmware reports the panel
-  supports it; it is left disabled rather than pretending to work.
+  panel rather than the model, so the control only appears where the firmware reports the panel
+  supports it; where it does not, the row shows the refresh rate alone.
 - A panel without overdrive can answer the same `0` as a panel that has it switched off, so the
-  change is read back after it is written. A panel that ignores the write is disabled with an
-  explanation instead of looking like it worked.
+  change is read back after it is written. A panel that ignores the write is hidden with a log
+  entry instead of looking like it worked.
 
 ### Diagnostics
 
@@ -102,6 +102,8 @@ Nitrous 1.0.0 is the first stable release.
 - The probe also reports the keyboard backlight: the SMBIOS colour count, whether the EC HID and
   ENEK interfaces are present, and a read-only sweep of `GetGamingKBBacklight`. That is what shows
   whether a model without the EC interface can still set the auto-off over WMI.
+- **Export Diagnostics** now includes the newest EC probe report. It is written to a separate
+  folder, so it used to be missing from the bundle even when someone had just run it.
 
 ## 0.8.5 - 2026-10-27
 

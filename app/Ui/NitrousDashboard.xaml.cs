@@ -686,7 +686,8 @@ public partial class NitrousDashboard : Window
 
     /// <summary>
     /// LCD overdrive is a panel property, not a model one: the firmware answers 0xFF for panels
-    /// that do not have it, so the toggle stays disabled rather than pretending to work.
+    /// that do not have it, so the control is hidden rather than disabled. A control that can
+    /// never do anything is clutter, and a disabled one still invites a click.
     ///
     /// A panel without overdrive can also answer 0, which is exactly what a panel that has it and
     /// has it switched off reports. The two cannot be told apart by reading, so the question is
@@ -707,13 +708,22 @@ public partial class NitrousDashboard : Window
         if (state is { Supported: true, On: var on })
             TogLcdOverdrive.IsChecked = on;
 
+        // Only positive evidence hides it. A read that failed says nothing about the panel, so the
+        // control stays where it is and explains itself.
+        SetLcdOverdriveVisible(state != null && !refused);
+
         ApplyLcdOverdriveAvailability(
             _lcdOverdriveAvailable,
-            refused
-                ? "This panel ignored the overdrive change, so it does not support it."
-                : "This panel does not support LCD overdrive.");
+            state == null ? "The panel did not answer." : "This panel does not support LCD overdrive.");
 
         _lcdOverdriveLoading = false;
+    }
+
+    private void SetLcdOverdriveVisible(bool visible)
+    {
+        var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        LcdOverdriveLabel.Visibility = visibility;
+        TogLcdOverdrive.Visibility = visibility;
     }
 
     private void ApplyLcdOverdriveAvailability(bool available, string? reason)
@@ -842,6 +852,7 @@ public partial class NitrousDashboard : Window
             SettingsManager.Save("LcdOverdriveRefused", 1);
             _lcdOverdriveAvailable = false;
             SetLcdOverdriveToggle(false);
+            SetLcdOverdriveVisible(false);
             ApplyLcdOverdriveAvailability(false, "This panel does not support LCD overdrive.");
         }
         catch (Exception ex)

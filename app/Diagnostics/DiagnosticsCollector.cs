@@ -208,9 +208,10 @@ public static class DiagnosticsCollector
 
             progress?.Report("Copying log files...");
             var logCount = CopyLogFiles(temporaryDirectory, errors);
+            var probeCount = CopyEcProbeFiles(temporaryDirectory, errors);
 
             WriteText(temporaryDirectory, "summary.txt",
-                BuildSummary(report, errors, logCount));
+                BuildSummary(report, errors, logCount, probeCount));
             WriteText(temporaryDirectory, "errors.txt",
                 errors.Count == 0
                     ? "No diagnostic sections failed.\n"
@@ -336,6 +337,45 @@ public static class DiagnosticsCollector
         return count;
     }
 
+    /// <summary>
+    /// The newest EC probe report, if one has been run. It is written outside the diagnostics
+    /// directory, so without this a report someone was asked to run never reaches the bundle.
+    /// </summary>
+    private static int CopyEcProbeFiles(string temporaryDirectory, List<string> errors)
+    {
+        var count = 0;
+
+        try
+        {
+            if (!Directory.Exists(EcProbe.OutputDirectory)) return 0;
+
+            // The JSON and its summary are written together, so the two newest files are one run.
+            foreach (var path in Directory
+                         .EnumerateFiles(EcProbe.OutputDirectory, "ec-probe-*")
+                         .OrderByDescending(File.GetLastWriteTimeUtc)
+                         .Take(2))
+            {
+                try
+                {
+                    WriteText(temporaryDirectory,
+                        Path.Combine("ec-probe", Path.GetFileName(path)),
+                        ReadAllTextShared(path));
+                    count++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"ec-probe/{Path.GetFileName(path)}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"ec-probe: {ex.Message}");
+        }
+
+        return count;
+    }
+
     private static string ReadAllTextShared(string path)
     {
         using var stream = new FileStream(
@@ -413,7 +453,8 @@ public static class DiagnosticsCollector
     private static string BuildSummary(
         Dictionary<string, object?> report,
         List<string> errors,
-        int logCount)
+        int logCount,
+        int probeCount)
     {
         var builder = new StringBuilder();
         builder.AppendLine("Nitrous Diagnostics");
@@ -541,6 +582,9 @@ public static class DiagnosticsCollector
                            $"KbTimeoutRefused={Text(settings, "KbTimeoutRefused")}");
 
         builder.AppendLine($"Log files included: {logCount}");
+        builder.AppendLine(probeCount == 0
+            ? "EC probe reports included: none (run Settings > Diagnostics > EC PROBE first)"
+            : $"EC probe reports included: {probeCount}");
         if (errors.Count == 0)
         {
             builder.AppendLine("Section errors: none");
