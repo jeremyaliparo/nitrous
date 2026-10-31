@@ -50,6 +50,8 @@ public partial class NitrousDashboard : Window
         DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text =
             $"Nitrous {UpdateManager.CurrentVersion}";
 
+        _autoOffRearmTimer.Tick += (_, _) => RearmKeyboardAutoOff();
+
         InitializeKeyboardLighting();
         InitializeUsbCharging();
         InitializeLcdOverdrive();
@@ -378,6 +380,14 @@ public partial class NitrousDashboard : Window
     private bool _keyboardAvailable;
     private bool _keyboardZoned = true;
     private bool _keyboardLoading = true;
+
+    // The lighting write switches the backlight back on, but the auto-off is a separate countdown
+    // on the EC that only a write carrying it arms. Debounced so dragging the brightness slider
+    // costs one EC exchange at the end rather than one per tick.
+    private readonly DispatcherTimer _autoOffRearmTimer = new(DispatcherPriority.Background)
+    {
+        Interval = TimeSpan.FromMilliseconds(600)
+    };
 
     private static readonly (string Name, KeyboardEffect Effect)[] KeyboardEffects =
     {
@@ -948,6 +958,48 @@ public partial class NitrousDashboard : Window
         {
             Logger.Warn("Keyboard: lighting change failed.", ex);
             KeyboardLightingStatus.Text = "Lighting change failed";
+        }
+
+        ScheduleAutoOffRearm();
+    }
+
+    /// <summary>
+    /// The lighting write switches the backlight back on, but the auto-off is a separate countdown
+    /// on the embedded controller, armed only by a write that carries it. Without re-arming,
+    /// opening the dashboard leaves the backlight on until the timeout is picked again.
+    /// </summary>
+    private void ScheduleAutoOffRearm()
+    {
+        if (!_keyboardTimeoutAvailable) return;
+
+        _autoOffRearmTimer.Stop();
+        _autoOffRearmTimer.Start();
+    }
+
+    private void RearmKeyboardAutoOff()
+    {
+        _autoOffRearmTimer.Stop();
+
+        var seconds = SettingsManager.Get("KbBacklightTimeout", 0);
+        if (seconds <= 0) return;
+
+        try
+        {
+            // Brightness comes from the UI rather than a read: the write carries both fields, and
+            // the level Nitrous just applied is the one that should be preserved.
+            if (AcerWmiManager.SetKeyboardBacklightTimeout(seconds, _keyboardBrightness))
+            {
+                Logger.Info($"Keyboard: auto-off re-armed for {seconds}s at {_keyboardBrightness}% " +
+                            "after a lighting change.");
+            }
+            else
+            {
+                Logger.Warn("Keyboard: could not re-arm the auto-off after a lighting change.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: could not re-arm the auto-off.", ex);
         }
     }
 

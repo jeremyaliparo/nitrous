@@ -49,6 +49,10 @@ Nitrous 1.0.0 is the first stable release.
 - The auto-off is now read back after it is written. A controller that answers "done" but has
   nowhere to store the value is disabled with an explanation, instead of accepting the change and
   doing nothing.
+- Opening the dashboard re-applied the lighting, which switched the backlight back on without
+  re-arming the auto-off, so the keyboard stayed lit until the timeout was picked again. Any
+  lighting change now re-arms the saved auto-off, debounced so dragging the brightness slider
+  costs one write rather than one per tick.
 
 ### Battery and USB
 

@@ -159,14 +159,18 @@ public static class AcerWmiManager
 
     /// <summary>
     /// Sets the keyboard backlight auto-off, in seconds (0 = never). The write carries brightness
-    /// too, so the controller's current level is read and preserved.
+    /// too, so the controller's current level is read and preserved unless the caller supplies one.
     /// </summary>
-    public static bool SetKeyboardBacklightTimeout(int timeoutSeconds)
+    public static bool SetKeyboardBacklightTimeout(int timeoutSeconds, int? brightness = null)
     {
         try
         {
             using var hid = AcerEcHid.Open();
-            return hid != null && hid.SetBacklightTimeout(timeoutSeconds);
+            if (hid == null) return false;
+
+            return brightness is { } level
+                ? hid.WriteBacklightTimeout(level, timeoutSeconds)
+                : hid.SetBacklightTimeout(timeoutSeconds);
         }
         catch (Exception ex)
         {
