@@ -388,6 +388,17 @@ public partial class NitrousDashboard : Window
         ("Twinkling", KeyboardEffect.Twinkling)
     };
 
+    /// <summary>Backlight auto-off choices, in seconds (0 = never).</summary>
+    private static readonly (string Name, int Seconds)[] KeyboardTimeouts =
+    {
+        ("Never", 0),
+        ("30 seconds", 30),
+        ("1 minute", 60),
+        ("5 minutes", 300)
+    };
+
+    private bool _keyboardTimeoutAvailable;
+
     /// <summary>
     /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
     /// separate HID device; models without it keep the card visible but disabled.
@@ -411,6 +422,20 @@ public partial class NitrousDashboard : Window
 
         KeyboardBrightness.Value = _keyboardBrightness;
         KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
+
+        foreach (var (name, _) in KeyboardTimeouts)
+            KeyboardTimeoutBox.Items.Add(name);
+
+        var savedTimeout = SettingsManager.Get("KbBacklightTimeout", 0);
+        var timeoutIndex = Array.FindIndex(KeyboardTimeouts, t => t.Seconds == savedTimeout);
+        KeyboardTimeoutBox.SelectedIndex = timeoutIndex >= 0 ? timeoutIndex : 0;
+
+        // The auto-off lives on the embedded controller, not the lighting controller, so it can be
+        // missing even where the zones work.
+        _keyboardTimeoutAvailable = AcerWmiManager.GetKeyboardBacklightTimeout() is not null;
+        KeyboardTimeoutBox.IsEnabled = _keyboardTimeoutAvailable;
+        if (!_keyboardTimeoutAvailable)
+            KeyboardTimeoutBox.ToolTip = "This model does not expose the backlight controller.";
 
         UpdateZoneButtons();
 
@@ -496,6 +521,28 @@ public partial class NitrousDashboard : Window
 
         SettingsManager.Save("KbBrightness", _keyboardBrightness);
         ApplyKeyboardLighting();
+    }
+
+    private void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_keyboardLoading || KeyboardTimeoutBox.SelectedIndex < 0) return;
+
+        var seconds = KeyboardTimeouts[KeyboardTimeoutBox.SelectedIndex].Seconds;
+        SettingsManager.Save("KbBacklightTimeout", seconds);
+
+        if (!_keyboardTimeoutAvailable) return;
+
+        try
+        {
+            KeyboardLightingStatus.Text = AcerWmiManager.SetKeyboardBacklightTimeout(seconds)
+                ? string.Empty
+                : "The controller refused the auto-off change";
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: could not set the backlight auto-off.", ex);
+            KeyboardLightingStatus.Text = "Auto-off change failed";
+        }
     }
 
     private void ApplyKeyboardLighting()

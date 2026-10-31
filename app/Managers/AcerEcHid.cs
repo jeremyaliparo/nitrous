@@ -44,6 +44,10 @@ internal sealed class AcerEcHid : IDisposable
     private const ushort StatusUnsupported = 0xE001;
     private const ushort CommandStatus = 0x0000;
     private const ushort CommandMode = 0x0001;
+
+    /// <summary>Device settings; device 2 is the keyboard backlight (brightness and auto-off).</summary>
+    private const ushort CommandDevice = 0x000A;
+    private const byte KeyboardBacklight = 2;
     private const byte FunctionSet = 1;
     private const byte FunctionGet = 2;
     private const int MinimumReportLength = 65;
@@ -179,6 +183,43 @@ internal sealed class AcerEcHid : IDisposable
         return Exchange(CommandMode, FunctionSet, value.Value) is { } reply
                && reply.Status == StatusDone;
     }
+
+    /// <summary>
+    /// The keyboard backlight's brightness and auto-off, in seconds (0 = never off).
+    /// Null when the controller did not answer.
+    /// </summary>
+    public (int Brightness, int TimeoutSeconds)? ReadBacklightTimeout()
+    {
+        if (Exchange(CommandDevice, FunctionGet, KeyboardBacklight) is not { } reply) return null;
+
+        // The reply repeats the device id at data[5], then 1, brightness and timeout.
+        if (Byte(reply.Data, 5) != KeyboardBacklight) return null;
+        return (Word(reply.Data, 8), Word(reply.Data, 10));
+    }
+
+    /// <summary>Sets both, as one write; the controller takes them together.</summary>
+    public bool WriteBacklightTimeout(int brightness, int timeoutSeconds)
+    {
+        var data = new byte[7];
+        data[0] = KeyboardBacklight;
+        data[1] = 1; // constant, as Acer's software sends it
+        data[2] = 0;
+        data[3] = (byte)(brightness & 0xFF);
+        data[4] = (byte)((brightness >> 8) & 0xFF);
+        data[5] = (byte)(timeoutSeconds & 0xFF);
+        data[6] = (byte)((timeoutSeconds >> 8) & 0xFF);
+
+        return Exchange(CommandDevice, FunctionSet, data) is { } reply
+               && reply.Status == StatusDone;
+    }
+
+    /// <summary>
+    /// Changes only the auto-off, keeping the brightness the controller reports. Reading first
+    /// matters: the write carries both, so guessing a brightness would change the backlight level.
+    /// </summary>
+    public bool SetBacklightTimeout(int timeoutSeconds) =>
+        ReadBacklightTimeout() is { } current &&
+        WriteBacklightTimeout(current.Brightness, timeoutSeconds);
 
     private string? ReadVersion()
     {

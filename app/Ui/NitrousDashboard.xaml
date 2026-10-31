@@ -1152,6 +1152,11 @@
                             </Grid>
                             <Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
 
+                            <Grid Margin="0,10,0,0">
+                                <TextBlock Text="Auto-off" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="KeyboardTimeoutBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
+                            </Grid>
+
                             <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="#6E6E76" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                    </Border>

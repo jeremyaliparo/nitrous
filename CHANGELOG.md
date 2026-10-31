@@ -38,6 +38,9 @@ Nitrous 1.0.0 is the first stable release.
   methods store values the firmware never applies, so they were not usable for this.
 - On models without that controller the card appears disabled, so an absent feature is not
   mistaken for a broken one.
+- **Auto-off** turns the keyboard backlight off after a chosen time (`Never`, 30 seconds, 1 minute,
+  5 minutes). The controller takes brightness and auto-off in one write, so Nitrous reads the
+  current level first and keeps it rather than guessing.
 
 ### Other Nitro models
 

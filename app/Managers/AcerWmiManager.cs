@@ -136,6 +136,43 @@ public static class AcerWmiManager
         }
     }
 
+    /// <summary>
+    /// The keyboard backlight's brightness and auto-off (seconds, 0 = never), or null when this
+    /// model has no EC HID interface.
+    /// </summary>
+    public static (int Brightness, int TimeoutSeconds)? GetKeyboardBacklightTimeout()
+    {
+        try
+        {
+            using var hid = AcerEcHid.Open();
+            return hid?.ReadBacklightTimeout();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("EC HID: could not read the keyboard backlight timeout.", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Sets the keyboard backlight auto-off, in seconds (0 = never). The write carries brightness
+    /// too, so the controller's current level is read and preserved.
+    /// </summary>
+    public static bool SetKeyboardBacklightTimeout(int timeoutSeconds)
+    {
+        try
+        {
+            using var hid = AcerEcHid.Open();
+            return hid != null && hid.SetBacklightTimeout(timeoutSeconds);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("EC HID: could not set the keyboard backlight timeout.", ex);
+            AcerCapabilitiesProvider.Invalidate();
+            return false;
+        }
+    }
+
     private static bool TrySetPowerModeViaEcHid(PowerProfile profile, EcHidInfo info)
     {
         try
