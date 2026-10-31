@@ -7,35 +7,53 @@
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/PGWzb3mHbG)
 
 <p align="center">
-  <img src="assets/dashboard.png" alt="Main Dashboard" width="30%" />
-  <img src="assets/gpu.png" alt="GPU" width="30%" />
-  <img src="assets/settings.png" alt="App Settings" width="30%" />
+  <img src="assets/dashboard.png" alt="Dashboard" width="22%" />
+  <img src="assets/gpu.png" alt="GPU" width="22%" />
+  <img src="assets/keyboard.png" alt="Keyboard lighting" width="22%" />
+  <img src="assets/settings.png" alt="Settings" width="22%" />
 </p>
 
 ---
 
 </div>
 
-Nitrous bypasses heavy, bloated OEM telemetry services by communicating directly with your Acer Nitro's Embedded Controller (EC) via WMI. It gives you an ultra-fast, lightweight dashboard for raw, instant hardware control.
+Nitrous controls your Acer Nitro directly through the embedded controller and firmware, without the OEM service stack. One lightweight dashboard for the controls the OEM tools bury.
 
 ### Key Features
-* **Custom Fan Curves:** Per-profile fan curves with overridable defaults, plus manual control from **1% to 100%**, Auto, and Max modes. The 1% floor is enforced in the UI, the curve editor, curve storage, interpolation, and again at the WMI boundary. Low fan speeds reduce cooling, so use them with care.
-* **Optimized NVML Telemetry:** Direct `nvml.dll` integration instead of `nvidia-smi.exe` for high-performance telemetry with low CPU overhead. Deep telemetry can be disabled for older NVIDIA GPUs, and it is only polled while the GPU page is on screen so an idle dashboard does not keep the dGPU awake.
-* **Dedicated GPU OC/UC Tab:** Fine-tune core and memory offsets with real-time telemetry, clock speeds, usage, and thermal tracking. Offsets are positive-only (`0..300 MHz` core, `0..1000 MHz` memory) and are validated against the driver's advertised range and verified after applying.
-* **Explicit GPU Clock Ownership:** The **Nitrous manages GPU clocks** switch beside `CLOCK OFFSETS` is the only way Nitrous is allowed to write GPU clocks. It is **off by default**, and while it is off every startup, profile, hotkey, AC/DC, resume, watchdog, APPLY, and RESET path is read-only. Turning it on warns about MSI Afterburner and voltage/frequency curve conflicts, then applies the active profile's saved per-profile offsets.
-* **Persistent GPU OC:** While clock management is on, a background watchdog re-reads the applied P0 offsets and repairs drift every 30 seconds, after sleep/resume, and after a driver reset. A failed read (for example, a sleeping dGPU) is never treated as "0 MHz".
-* **Auto-Apply OC Profiles:** Re-applies saved custom GPU offsets for the active power profile, with a longer retry window at boot. Built-in profile defaults are stock `0/0`, so overclocking is opt-in; with clock management on, a `0/0` profile means "stock clocks for this profile".
-* **CPU Power Management:** Per-profile CPU min/max power states with **backup and exact restore**. The original AC and DC values are captured per power scheme before the first write, changes are serialized across the tray and dashboard processes, and the originals are restored when the feature is disabled or the app exits. Correct write ordering prevents `min > max` during dead-band changes.
-* **Processor Boost Mode:** Enumerates the Windows `PERFBOOSTMODE` values actually exposed by your model and lets you choose separate AC and battery modes. The original values are backed up and can be restored from Setup.
-* **Acer Service Control:** Detects Acer/Predator/NitroSense services and can stop and disable them in one action. The original start types, delayed-auto flags, and running state are saved to `%LOCALAPPDATA%\Nitrous\acer-services-backup.json` so they can be restored exactly.
-* **Charging Telemetry:** Shows the measured battery charge or discharge rate beside the AC/BATTERY pill, refreshed every two seconds. This is the rate reported by Windows, not the charger's rated wattage.
-* **Dedicated Keyboard Tab & Hotkeys:** Customizable shortcuts for cycling power profiles and opening the dashboard. Hotkey edits are picked up by the tray engine without a restart.
-* **Smart Automation:** Apply quiet modes and 60 Hz refresh on battery, then restore performance and the high refresh rate on AC power.
-* **Battery Protection:** Hardware-level charge limit to extend battery lifespan; re-asserted after resume.
-* **Dynamic Power Profiles:** Toggle instantly between Quiet, Balanced, Performance, and Turbo TDP modes.
-* **Silent Boot & System Tray:** Starts through Task Scheduler without a UAC prompt on every boot, with restart support in the tray menu.
-* **Verified Auto-Updater:** Downloads GitHub release assets and verifies a SHA-256 digest before installing. If a release does not publish a digest or checksum, the updater refuses the automatic install and offers the release page instead.
-* **Diagnostics:** Hardware, power-plan, update, and startup failures are written to a rotating log, and **Settings → Diagnostics → Export Diagnostics** creates a redacted ZIP with the system, hardware, and log context needed for a bug report.
+
+**Cooling**
+
+* Per-profile fan curves, manual control from **1% to 100%**, Auto and Max.
+* Ramp shaping: fans rise instantly but step down gradually, so a short load burst does not rev them.
+
+**Power**
+
+* Quiet, Balanced, Performance and Turbo, applied through the EC so the enforced GPU power limit follows.
+* Per-profile CPU limits and processor boost mode, with the original values backed up and restored exactly.
+* Charge limit, and USB charging while the laptop is off.
+* Automation: quiet mode and 60 Hz on battery, performance and your chosen rate on AC.
+
+**GPU**
+
+* Core and memory offsets with live clocks, usage and thermals.
+* Clock ownership is opt-in and **off by default**; while it is on, a watchdog repairs drift.
+* Telemetry is only polled while the GPU page is visible, so an idle dashboard never wakes the dGPU.
+
+**Display**
+
+* Any refresh rate the panel actually advertises. Auto uses your AC rate and 60 Hz on battery.
+* LCD overdrive on panels that report support for it.
+
+**Keyboard**
+
+* Four lighting zones, effects, brightness and auto-off.
+
+**App**
+
+* Silent boot, system tray, and hotkeys for power profiles and the dashboard.
+* Auto-updates verified by SHA-256 before anything is replaced.
+* One-click disable of Acer background services, with exact restore.
+* Diagnostics export, plus a read-only EC probe for comparing other Nitro models.
 
 ### Requirements
 
