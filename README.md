@@ -153,7 +153,7 @@ Nitrous is engineered so that every system change is clamped, isolated, or backe
 
 Nitrous disables controls when your firmware does not respond to them rather than failing silently. Hover over any disabled control to see the exact reason:
 - **Keyboard Zones:** Requires a 4-zone RGB keyboard (single-color keyboards only support brightness).
-- **Keyboard Auto-Off:** Requires an embedded-controller interface not exposed on all models.
+- **Keyboard Auto-Off:** Requires the embedded-controller interface. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
 - **USB Charging While Off:** Requires an Acer WMI class that is only partially implemented on certain BIOS versions.
 
 **LCD Overdrive** is the exception: it is a panel property, so where the display reports no support the control is hidden entirely rather than greyed out, and the refresh list fills the row.

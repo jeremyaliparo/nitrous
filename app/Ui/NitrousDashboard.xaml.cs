@@ -460,7 +460,7 @@ public partial class NitrousDashboard : Window
             ? null
             : timeoutRefused
                 ? "This keyboard controller does not store an auto-off."
-                : "This model does not answer on the embedded controller, so the auto-off cannot be set.";
+                : "Nitrous cannot reach this setting on this model; the OEM software may still offer it.";
 
         UpdateZoneButtons();
 
