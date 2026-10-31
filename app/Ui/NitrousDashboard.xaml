@@ -569,7 +569,13 @@
 			<!-- PAGES -->
 			<Grid Grid.Row="1">
 				<!-- 1. DASHBOARD PAGE -->
-				<StackPanel x:Name="DashPage" Visibility="Visible" Margin="20,10,20,0">
+				<ScrollViewer x:Name="DashPage" Visibility="Visible" Margin="20,10,20,0"
+				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
+					<ScrollViewer.Resources>
+						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+					</ScrollViewer.Resources>
+					<StackPanel Margin="0,0,4,16">
 					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
@@ -735,7 +741,8 @@
 							</StackPanel>
 						</Border>
 					</StackPanel>
-				</StackPanel>
+					</StackPanel>
+				</ScrollViewer>
 				<!-- 2. SETTINGS PAGE (Bound to Properties) -->
 				<ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" Margin="20,10,20,0"
 				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"

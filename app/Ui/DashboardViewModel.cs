@@ -1336,6 +1336,17 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var gpuAsleep = _gpuManager.IsGpuSleeping;
                         _telemetryErrorLogged = false;
 
+                        // The EC reports 0 for the dGPU on some models, and while it sits in a low
+                        // power state. Ask the driver instead, but only when the GPU is already
+                        // awake, so this never wakes it just to draw a number.
+                        var driverGpuTemp = 0;
+                        if (telemetry.GpuTemp == 0 && smi == null && _gpuManager.IsGpuAwake)
+                        {
+                            var fallback = await _gpuManager.GetNvmlTelemetryAsync(token);
+                            if (fallback is { HasData: true, CoreTemp: > 0 })
+                                driverGpuTemp = fallback.CoreTemp;
+                        }
+
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {
                             if (gpuAsleep)
@@ -1375,9 +1386,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
                             CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
                             CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
 
-                            GpuTempText = telemetry.GpuTemp > 0 ? $"{telemetry.GpuTemp} C" : "-- C";
+                            var gpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
+                            GpuTempText = gpuTemp > 0 ? $"{gpuTemp} C" : "-- C";
                             GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                            GpuTempColor = telemetry.GpuTemp > 85 ? "#FF453A" : "White";
+                            GpuTempColor = gpuTemp > 85 ? "#FF453A" : "White";
 
                             if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                             {

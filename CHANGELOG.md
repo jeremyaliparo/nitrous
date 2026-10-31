@@ -62,6 +62,12 @@ Nitrous 1.0.0 is the first stable release.
 - The GPU page reports the power limit the laptop is enforcing (`draw / enforced / max W`) and
   never writes it directly.
 
+### Dashboard
+
+- The Dashboard scrolls. The custom fan section was cut off at the bottom on shorter windows.
+- The GPU temperature no longer shows `--` while the GPU is awake: the embedded controller reports
+  0 on some models, so the driver's reading is used instead when it is available.
+
 ### Display
 
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
