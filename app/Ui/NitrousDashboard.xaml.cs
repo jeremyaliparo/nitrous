@@ -415,9 +415,9 @@ public partial class NitrousDashboard : Window
         UpdateZoneButtons();
 
         KeyboardLightingStatus.Text = _keyboardAvailable ? string.Empty : "No lighting interface on this model";
-        Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = _keyboardAvailable;
         KeyboardEffectBox.IsEnabled = _keyboardAvailable;
         KeyboardBrightness.IsEnabled = _keyboardAvailable;
+        UpdateZoneInteractivity();
 
         _keyboardLoading = false;
 
@@ -432,6 +432,16 @@ public partial class NitrousDashboard : Window
             buttons[i].Background = new SolidColorBrush(
                 Color.FromRgb(_zoneColors[i].R, _zoneColors[i].G, _zoneColors[i].B));
         }
+    }
+
+    /// <summary>Zone colours only mean anything in Static; the controller ignores them otherwise.</summary>
+    private void UpdateZoneInteractivity()
+    {
+        var staticMode = _keyboardEffect == KeyboardEffect.Static;
+        var enabled = _keyboardAvailable && staticMode;
+
+        Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
+        ZoneHint.Visibility = staticMode ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void Zone_Click(object sender, RoutedEventArgs e)
@@ -474,6 +484,7 @@ public partial class NitrousDashboard : Window
 
         _keyboardEffect = KeyboardEffects[KeyboardEffectBox.SelectedIndex].Effect;
         SettingsManager.Save("KbEffect", KeyboardEffects[KeyboardEffectBox.SelectedIndex].Name);
+        UpdateZoneInteractivity();
         ApplyKeyboardLighting();
     }
 

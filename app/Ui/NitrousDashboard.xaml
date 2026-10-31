@@ -468,6 +468,32 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="ZoneSwatchStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="#26262A"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Swatch" Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1">
+                            <Border Background="#99000000" CornerRadius="4" Padding="7,2" Margin="6" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+                                <TextBlock Text="{TemplateBinding Content}" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Swatch" Property="BorderBrush" Value="#B388FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Swatch" Property="BorderBrush" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Swatch" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 	</Window.Resources>
 	<!-- Outer Frame with Rounded Corners -->
 	<Border Background="#121214" CornerRadius="16" BorderBrush="#2A2A30" BorderThickness="1">
@@ -1108,11 +1134,12 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button x:Name="Zone1Btn" Grid.Column="0" Height="34" Margin="0,0,6,0" Tag="1" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 1"/>
-                                <Button x:Name="Zone2Btn" Grid.Column="1" Height="34" Margin="0,0,6,0" Tag="2" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 2"/>
-                                <Button x:Name="Zone3Btn" Grid.Column="2" Height="34" Margin="0,0,6,0" Tag="3" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 3"/>
-                                <Button x:Name="Zone4Btn" Grid.Column="3" Height="34" Tag="4" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 4"/>
+                                <Button x:Name="Zone1Btn" Grid.Column="0" Height="42" Margin="0,0,6,0" Tag="1" Click="Zone_Click" Content="ZONE 1" Style="{StaticResource ZoneSwatchStyle}"/>
+                                <Button x:Name="Zone2Btn" Grid.Column="1" Height="42" Margin="0,0,6,0" Tag="2" Click="Zone_Click" Content="ZONE 2" Style="{StaticResource ZoneSwatchStyle}"/>
+                                <Button x:Name="Zone3Btn" Grid.Column="2" Height="42" Margin="0,0,6,0" Tag="3" Click="Zone_Click" Content="ZONE 3" Style="{StaticResource ZoneSwatchStyle}"/>
+                                <Button x:Name="Zone4Btn" Grid.Column="3" Height="42" Tag="4" Click="Zone_Click" Content="ZONE 4" Style="{StaticResource ZoneSwatchStyle}"/>
                             </Grid>
+                            <TextBlock x:Name="ZoneHint" Text="Zone colours apply to Static. Pick Static to use them." Foreground="#6E6E76" FontSize="10" Margin="0,0,0,10" TextWrapping="Wrap" Visibility="Collapsed"/>
 
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="Effect" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
