@@ -728,7 +728,8 @@ public partial class NitrousDashboard : Window
         {
             UsbChargingFloorBox.SelectedIndex =
                 Array.IndexOf(AcerWmiProtocol.UsbChargingFloors, 30);
-            TogUsbCharging.ToolTip = "This model does not expose power-off USB charging.";
+            TogUsbCharging.ToolTip =
+                "Nitrous cannot reach this setting on this model; the OEM software may still offer it.";
         }
 
         _usbChargingLoading = false;
