@@ -506,19 +506,92 @@ public static class EcProbe
         WithGamingInstance(instance =>
         {
             // The input is an address, as with the other Get* methods. Several are tried because
-            // which one holds the backlight is exactly what differs between models.
-            var probes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var input in new uint[] { 0x00, 0x01, 0x02, 0x03, 0x08, 0x10 })
+            // which one holds the backlight is exactly what differs between models, and the error
+            // text is kept so a failure can be told apart from an unsupported method.
+            var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            var failures = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+            var inputs = Enumerable.Range(0, 0x11).Select(index => (uint)index).Append(0xFFu);
+            foreach (var input in inputs)
             {
-                probes[$"0x{input:X2}"] = TryInvoke(
+                var (value, error) = TryInvokeDetailed(
                     instance, "GetGamingKBBacklight", "gmInput", input, "gmOutput");
+
+                values[$"0x{input:X2}"] = value;
+                if (error != null) failures[$"0x{input:X2}"] = error;
             }
 
-            result["getGamingKBBacklight"] = probes;
+            result["getGamingKBBacklight"] = values;
+            result["getGamingKBBacklightErrors"] = failures;
+
+            // A null value cannot say whether the method returned nothing or returned a property
+            // with another name, so the first response is described in full.
+            try
+            {
+                result["getGamingKBBacklightOutput"] = DescribeOutput(
+                    instance, "GetGamingKBBacklight", "gmInput", 0x00);
+            }
+            catch (Exception ex)
+            {
+                result["getGamingKBBacklightOutputError"] = ex.Message;
+            }
+
             return true;
         }, errors, "keyboardBacklight");
 
         return result;
+    }
+
+    /// <summary>
+    /// Every property the method answered, by name. Read-only: the method name must start with Get,
+    /// which <see cref="InvokeGetLocked"/> already enforces for the other probes.
+    /// </summary>
+    private static Dictionary<string, object?> DescribeOutput(
+        ManagementObject instance,
+        string methodName,
+        string inputName,
+        uint input)
+    {
+        var dump = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        if (!methodName.StartsWith(ReadOnlyPrefix, StringComparison.Ordinal))
+            throw new InvalidOperationException($"EC probe is read-only; refusing {methodName}.");
+
+        using var inParams = instance.GetMethodParameters(methodName);
+        inParams[inputName] = input;
+
+        using var outParams = instance.InvokeMethod(methodName, inParams, null);
+        if (outParams == null)
+        {
+            dump["<no output object>"] = true;
+            return dump;
+        }
+
+        foreach (PropertyData property in outParams.Properties)
+            dump[property.Name] = property.Value?.ToString();
+
+        return dump;
+    }
+
+    /// <summary>
+    /// Like <see cref="TryInvoke"/>, but keeps the reason a call failed. A null value alone cannot
+    /// distinguish "the method is not implemented" from "the parameter was rejected".
+    /// </summary>
+    private static (ulong? Value, string? Error) TryInvokeDetailed(
+        ManagementObject instance,
+        string methodName,
+        string inputName,
+        uint input,
+        string outputName)
+    {
+        try
+        {
+            return (InvokeGetLocked(instance, methodName, inputName, input, outputName), null);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message);
+        }
     }
 
     private static void WithInstance(
