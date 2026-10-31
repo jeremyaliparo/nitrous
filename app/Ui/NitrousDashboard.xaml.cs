@@ -477,6 +477,43 @@ public partial class NitrousDashboard : Window
             buttons[i].Background = new SolidColorBrush(
                 Color.FromRgb(_zoneColors[i].R, _zoneColors[i].G, _zoneColors[i].B));
         }
+
+        // The ALL tile shows the four zones side by side, so it reads as "the whole keyboard"
+        // rather than as a fifth zone.
+        ZoneAllBtn.Background = BuildZonePreview();
+    }
+
+    private System.Windows.Media.Brush BuildZonePreview()
+    {
+        var first = _zoneColors[0];
+        var uniform = true;
+        foreach (var color in _zoneColors)
+        {
+            if (color.R != first.R || color.G != first.G || color.B != first.B)
+            {
+                uniform = false;
+                break;
+            }
+        }
+
+        if (uniform)
+            return new SolidColorBrush(Color.FromRgb(first.R, first.G, first.B));
+
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = new System.Windows.Point(1, 0)
+        };
+
+        for (var i = 0; i < _zoneColors.Length; i++)
+        {
+            var color = _zoneColors[i];
+            brush.GradientStops.Add(new GradientStop(
+                Color.FromRgb(color.R, color.G, color.B),
+                i / (double)(_zoneColors.Length - 1)));
+        }
+
+        return brush;
     }
 
     /// <summary>Zone colours only mean anything in Static; the controller ignores them otherwise.</summary>
@@ -486,6 +523,7 @@ public partial class NitrousDashboard : Window
         var enabled = _keyboardAvailable && _keyboardZoned && staticMode;
 
         Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
+        ZoneAllBtn.IsEnabled = enabled;
 
         ZoneHint.Text = !_keyboardZoned
             ? "This keyboard has a single colour, not four zones."
@@ -495,26 +533,44 @@ public partial class NitrousDashboard : Window
 
     private void Zone_Click(object sender, RoutedEventArgs e)
     {
-        if (!_keyboardAvailable ||
+        if (!_keyboardAvailable || !_keyboardZoned ||
             sender is not System.Windows.Controls.Button { Tag: string tag } ||
             !int.TryParse(tag, out var zone))
         {
             return;
         }
 
+        // Tag 0 is the ALL tile: one colour for every zone, which is the common case.
+        var allZones = zone == 0;
         var index = zone - 1;
-        if (index < 0 || index >= _zoneColors.Length) return;
+        if (!allZones && (index < 0 || index >= _zoneColors.Length)) return;
+
+        var current = _zoneColors[allZones ? 0 : index];
 
         using var dialog = new System.Windows.Forms.ColorDialog
         {
             FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(_zoneColors[index].R, _zoneColors[index].G, _zoneColors[index].B)
+            Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B)
         };
 
         if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
 
-        _zoneColors[index] = new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B);
-        SettingsManager.Save($"KbZone{zone}", _zoneColors[index].ToHex());
+        var chosen = new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B);
+
+        if (allZones)
+        {
+            for (var i = 0; i < _zoneColors.Length; i++)
+            {
+                _zoneColors[i] = chosen;
+                SettingsManager.Save($"KbZone{i + 1}", chosen.ToHex());
+            }
+        }
+        else
+        {
+            _zoneColors[index] = chosen;
+            SettingsManager.Save($"KbZone{zone}", chosen.ToHex());
+        }
+
         UpdateZoneButtons();
 
         // Picking a zone colour means Static; the change handler applies it.

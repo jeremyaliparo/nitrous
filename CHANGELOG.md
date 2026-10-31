@@ -34,6 +34,9 @@ Nitrous 1.0.0 is the first stable release.
 
 - The `KB` page can set the keyboard's four lighting zones, an effect, and brightness. Static
   colours are per zone; an effect applies to all four.
+- An `ALL` tile beside the four zones sets every zone to one colour in a single pick, which is
+  what most people want. The tile previews the four zones as a gradient, so a mixed setup is
+  visible without opening each one.
 - This talks to the keyboard's own HID controller (an ENEK interface). The Acer WMI lighting
   methods store values the firmware never applies, so they were not usable for this.
 - On models without that controller the card appears disabled, so an absent feature is not
