@@ -768,15 +768,22 @@ public partial class NitrousDashboard : Window
         if (state is { Supported: true, On: true })
             SettingsManager.Save("LcdOverdriveRefused", 0);
 
+        if (state is { } reported)
+            Logger.Info($"LCD overdrive: firmware reports supported={reported.Supported}, " +
+                        $"on={reported.On}.");
+        else
+            Logger.Warn("LCD overdrive: the firmware did not answer.");
+
         var refused = SettingsManager.Get("LcdOverdriveRefused", 0) == 1;
         _lcdOverdriveAvailable = state is { Supported: true } && !refused;
 
         if (state is { Supported: true, On: var on })
             TogLcdOverdrive.IsChecked = on;
 
-        // Only positive evidence hides it. A read that failed says nothing about the panel, so the
-        // control stays where it is and explains itself.
-        SetLcdOverdriveVisible(state != null && !refused);
+        // A firmware that says the panel has no overdrive is positive evidence, so the control is
+        // removed. A read that failed is not evidence either way, so the control stays where it is
+        // and explains itself.
+        SetLcdOverdriveVisible(state is not { Supported: false } && !refused);
 
         ApplyLcdOverdriveAvailability(
             _lcdOverdriveAvailable,
