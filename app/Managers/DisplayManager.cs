@@ -94,6 +94,22 @@ public static class DisplayManager
         return maxHz;
     }
 
+    /// <summary>The refresh rate Windows is actually running right now.</summary>
+    public static int GetCurrentRefreshRate()
+    {
+        try
+        {
+            var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            return EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode)
+                ? mode.dmDisplayFrequency
+                : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     public static void ApplyRefreshProfile(RefreshProfile profile, bool isAcPower)
     {
         try
@@ -114,21 +130,26 @@ public static class DisplayManager
                 return;
             }
 
-            if (mode.dmDisplayFrequency == targetHz) return;
+            Logger.Info($"Display: profile {profile} -> target {targetHz} Hz " +
+                        $"(current {mode.dmDisplayFrequency} Hz at {mode.dmPelsWidth}x{mode.dmPelsHeight}, max {maxHz} Hz).");
 
-            // Do not ask the driver for a mode it did not advertise. This used to fail silently
-            // on panels that do not expose 60 Hz at the current resolution.
-            if (!IsRefreshSupported(mode.dmPelsWidth, mode.dmPelsHeight, targetHz))
+            if (mode.dmDisplayFrequency == targetHz)
+            {
+                Logger.Info($"Display: already at {targetHz} Hz; nothing to change.");
+                return;
+            }
+
+            // Apply the driver's own entry for this resolution and refresh instead of mutating the
+            // current mode. Asking for a mode the driver advertised cannot be "bad mode", which is
+            // what used to happen on panels that do not expose the target at every colour format.
+            if (!TryFindMode(mode.dmPelsWidth, mode.dmPelsHeight, targetHz, out var target))
             {
                 Logger.Warn($"Display: {targetHz} Hz is not supported at " +
                             $"{mode.dmPelsWidth}x{mode.dmPelsHeight}; leaving the current mode unchanged.");
                 return;
             }
 
-            mode.dmFields = DM_DISPLAYFREQUENCY;
-            mode.dmDisplayFrequency = targetHz;
-
-            var result = ChangeDisplaySettingsExW(null, ref mode, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            var result = ChangeDisplaySettingsExW(null, ref target, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
             if (result != DispChangeSuccessful)
             {
                 Logger.Warn($"Display: ChangeDisplaySettingsExW returned {DescribeResult(result)} " +
@@ -182,6 +203,28 @@ public static class DisplayManager
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The driver's own mode entry for a resolution and refresh, so it can be applied whole.
+    /// </summary>
+    private static bool TryFindMode(int width, int height, int targetHz, out DEVMODEW mode)
+    {
+        mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+        var candidate = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+
+        for (var i = 0; EnumDisplaySettingsW(null, i, ref candidate); i++)
+        {
+            if (candidate.dmPelsWidth == width &&
+                candidate.dmPelsHeight == height &&
+                candidate.dmDisplayFrequency == targetHz)
+            {
+                mode = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsRefreshSupported(int width, int height, int targetHz)

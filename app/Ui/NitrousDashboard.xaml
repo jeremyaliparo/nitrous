@@ -648,7 +648,10 @@
 						</UniformGrid>
 					</Border>
 					<!-- Display: refresh rate and panel overdrive -->
-					<TextBlock Text="DISPLAY" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+					<Grid Margin="0,0,0,8">
+						<TextBlock Text="DISPLAY" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+						<TextBlock x:Name="DisplayCurrentText" Foreground="#6E6E76" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+					</Grid>
 					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
 						<StackPanel>
 							<UniformGrid Rows="1" Height="34">

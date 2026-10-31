@@ -29,6 +29,7 @@ public partial class NitrousDashboard : Window
     private PowerProfile? _lastSyncedPowerMode;
     private FanProfile? _lastSyncedFanMode;
     private RefreshProfile? _lastSyncedRefreshMode;
+    private int _lastSyncedRefreshHz;
 
     public NitrousDashboard()
     {
@@ -108,7 +109,8 @@ public partial class NitrousDashboard : Window
 
         if (activeMode == _lastSyncedPowerMode &&
             activeFan == _lastSyncedFanMode &&
-            activeRefresh == _lastSyncedRefreshMode)
+            activeRefresh == _lastSyncedRefreshMode &&
+            DisplayManager.GetCurrentRefreshRate() == _lastSyncedRefreshHz)
             return;
 
         RefreshDashboardState();
@@ -205,9 +207,26 @@ public partial class NitrousDashboard : Window
         BtnFanMax.IsChecked = activeFan == FanProfile.Max;
         BtnFanCustom.IsChecked = activeFan == FanProfile.Medium;
 
-        BtnRefreshAuto.IsChecked = activeRefresh == RefreshProfile.Auto;
-        BtnRefresh60.IsChecked = activeRefresh == RefreshProfile.Hz60;
-        BtnRefreshMax.IsChecked = activeRefresh == RefreshProfile.MaxHz;
+        // The radio reflects what the display is actually doing, not only what was asked for.
+        // Another app, a resume, or a monitor change can leave the saved profile out of step, and
+        // showing it as selected then claims a state the screen is not in.
+        var actualHz = DisplayManager.GetCurrentRefreshRate();
+        var maxHz = DisplayManager.GetPrimaryMaxRefreshRate();
+        var expectedHz = activeRefresh switch
+        {
+            RefreshProfile.Hz60 => 60,
+            RefreshProfile.MaxHz => maxHz,
+            RefreshProfile.Auto => isOnline ? maxHz : 60,
+            _ => 60
+        };
+        var inSync = actualHz > 0 && actualHz == expectedHz;
+
+        BtnRefreshAuto.IsChecked = inSync && activeRefresh == RefreshProfile.Auto;
+        BtnRefresh60.IsChecked = inSync && activeRefresh == RefreshProfile.Hz60;
+        BtnRefreshMax.IsChecked = inSync && activeRefresh == RefreshProfile.MaxHz;
+
+        DisplayCurrentText.Text = actualHz > 0 ? $"{actualHz} Hz" : string.Empty;
+        _lastSyncedRefreshHz = actualHz;
 
         if (DataContext is DashboardViewModel vm)
         {
