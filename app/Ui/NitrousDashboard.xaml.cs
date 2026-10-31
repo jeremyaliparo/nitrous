@@ -444,16 +444,33 @@ public partial class NitrousDashboard : Window
         foreach (var (name, _) in KeyboardTimeouts)
             KeyboardTimeoutBox.Items.Add(name);
 
-        var savedTimeout = SettingsManager.Get("KbBacklightTimeout", 0);
-        var timeoutIndex = Array.FindIndex(KeyboardTimeouts, t => t.Seconds == savedTimeout);
-        KeyboardTimeoutBox.SelectedIndex = timeoutIndex >= 0 ? timeoutIndex : 0;
-
         // The auto-off lives on the embedded controller, not the lighting controller, so it can be
         // missing even where the zones work. A controller that answers but stores nothing is
         // remembered as not supporting it, so the box does not look usable on every launch.
         var timeoutRefused = SettingsManager.Get("KbTimeoutRefused", 0) == 1;
-        _keyboardTimeoutAvailable =
-            !timeoutRefused && AcerWmiManager.GetKeyboardBacklightTimeout() is not null;
+        var controllerTimeout = timeoutRefused ? null : AcerWmiManager.GetKeyboardBacklightTimeout();
+        _keyboardTimeoutAvailable = controllerTimeout is not null;
+
+        // The controller is the truth. NitroSense, a firmware reset or another tool can change the
+        // auto-off without Nitrous knowing, and showing the saved value would then claim a state the
+        // keyboard is not in. An answer that is not one of the offered values is kept as the saved
+        // preference and logged rather than silently rounded to "Never".
+        var savedTimeout = SettingsManager.Get("KbBacklightTimeout", 0);
+        if (controllerTimeout is { } reported &&
+            Array.Exists(KeyboardTimeouts, t => t.Seconds == reported.TimeoutSeconds))
+        {
+            savedTimeout = reported.TimeoutSeconds;
+            if (savedTimeout != SettingsManager.Get("KbBacklightTimeout", 0))
+                SettingsManager.Save("KbBacklightTimeout", savedTimeout);
+        }
+        else if (controllerTimeout is { } unexpected)
+        {
+            Logger.Info($"Keyboard: controller reports an auto-off of {unexpected.TimeoutSeconds}s, " +
+                        "which is not one of the offered values; keeping the saved preference.");
+        }
+
+        var timeoutIndex = Array.FindIndex(KeyboardTimeouts, t => t.Seconds == savedTimeout);
+        KeyboardTimeoutBox.SelectedIndex = timeoutIndex >= 0 ? timeoutIndex : 0;
 
         KeyboardTimeoutBox.IsEnabled = _keyboardTimeoutAvailable;
         KeyboardTimeoutBox.ToolTip = _keyboardTimeoutAvailable
