@@ -400,6 +400,9 @@ public static class EcProbe
             result["supportedProfilesNames"] = supported.HasValue
                 ? DecodeProfiles((int)((supported.Value >> 8) & 0xFF))
                 : Array.Empty<string>();
+            result["supportedProfilesUnmappedBits"] = supported.HasValue
+                ? UnmappedProfileBits((int)((supported.Value >> 8) & 0xFF))
+                : string.Empty;
 
             var current = TryGetMisc(instance, (uint)AcerWmiProtocol.PowerModeOpcode);
             result["misc0BRaw"] = current;
@@ -420,8 +423,20 @@ public static class EcProbe
     private static string[] DecodeProfiles(int bitmap) =>
         Enumerable.Range(0, 8)
             .Where(bit => (bitmap & (1 << bit)) != 0)
+            .Where(bit => Enum.IsDefined(typeof(PowerProfile), (ulong)bit))
             .Select(DecodeProfile)
             .ToArray();
+
+    /// <summary>
+    /// Bits set in the supported-profile mask that do not name a power profile. Both the AN16S-61
+    /// (0x73) and the ANV15-41 (0x53) set bit 6, so it carries something other than a mode and
+    /// should not be reported as one.
+    /// </summary>
+    private static string UnmappedProfileBits(int bitmap) =>
+        string.Join(",", Enumerable.Range(0, 8)
+            .Where(bit => (bitmap & (1 << bit)) != 0)
+            .Where(bit => !Enum.IsDefined(typeof(PowerProfile), (ulong)bit))
+            .Select(bit => $"0x{bit:X}"));
 
     private static string DecodeProfile(int value)
     {
