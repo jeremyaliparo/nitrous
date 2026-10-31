@@ -899,17 +899,22 @@
 								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
 								<TextBlock Text="Diagnostics" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 							</StackPanel>
-							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. Nothing is uploaded automatically."
+							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. EC PROBE records this model's Acer firmware interface without changing anything. Nothing is uploaded automatically."
 							           Foreground="#888890" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
 								<Button x:Name="ExportDiagnosticsButton" Content="EXPORT DIAGNOSTICS" Click="ExportDiagnostics_Click"
 								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
 								        HorizontalAlignment="Left"/>
-								<Button Grid.Column="1" Content="OPEN LOGS" Click="OpenLogFolder_Click"
+								<Button x:Name="EcProbeButton" Grid.Column="1" Content="EC PROBE" Click="EcProbe_Click"
+								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+								        Margin="8,0,0,0"
+								        ToolTip="Write a read-only report of the Acer WMI methods, sensor addresses, and power-mode registers this model exposes."/>
+								<Button Grid.Column="2" Content="OPEN LOGS" Click="OpenLogFolder_Click"
 								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
 								        Margin="8,0,0,0"/>
 							</Grid>

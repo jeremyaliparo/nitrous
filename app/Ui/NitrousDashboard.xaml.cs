@@ -24,6 +24,7 @@ public partial class NitrousDashboard : Window
 {
     private bool _isDialogOpen;
     private bool _isDiagnosticsExporting;
+    private bool _isEcProbing;
     private readonly DispatcherTimer _profileSyncTimer;
     private PowerProfile? _lastSyncedPowerMode;
     private FanProfile? _lastSyncedFanMode;
@@ -393,6 +394,39 @@ public partial class NitrousDashboard : Window
         {
             _isDiagnosticsExporting = false;
             ExportDiagnosticsButton.IsEnabled = true;
+        }
+    }
+
+    private async void EcProbe_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isEcProbing) return;
+
+        _isEcProbing = true;
+        EcProbeButton.IsEnabled = false;
+        ExportDiagnosticsStatus.Text = "Reading Acer firmware interface...";
+
+        try
+        {
+            var result = await EcProbe.RunAsync();
+
+            ExportDiagnosticsStatus.Text = result.ErrorCount == 0
+                ? "EC probe written."
+                : $"EC probe written with {result.ErrorCount} section error(s); see the report.";
+
+            DiagnosticsCollector.OpenInExplorer(result.SummaryPath);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("EC probe: failed.", ex);
+            ExportDiagnosticsStatus.Text = "EC probe failed. See the log for details.";
+            MessageBox.Show(
+                $"Could not run the EC probe:\n\n{ex.Message}",
+                "Nitrous Diagnostics", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _isEcProbing = false;
+            EcProbeButton.IsEnabled = true;
         }
     }
 
