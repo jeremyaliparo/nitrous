@@ -470,10 +470,15 @@ public static class EcProbe
 
         WithInstance("AcerGenericMethod", instance =>
         {
-            for (uint index = 0; index <= 7; index++)
+            // 0..0x40 rather than 0..7. Acer's own QuickAccess agent reaches power-off USB
+            // charging through this same class, and the ANV15-41 answers 0xE1 for every function
+            // in the low range, so whatever it uses is probably further up.
+            for (uint index = 0; index <= 0x40; index++)
             {
-                result[$"{index}"] = TryInvoke(
+                var (value, error) = TryReadRaw(
                     instance, "GetFunction", "uiInput", index, "uiOutput");
+                result[$"{index}"] = value;
+                if (error != null) result[$"{index}Error"] = error;
             }
 
             return true;
