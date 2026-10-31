@@ -656,15 +656,14 @@
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="Auto"/>
-								<ColumnDefinition Width="Auto"/>
 								<ColumnDefinition Width="*"/>
 								<ColumnDefinition Width="Auto"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<TextBlock Grid.Column="0" Text="Refresh rate" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
-							<ComboBox Grid.Column="1" x:Name="RefreshModeBox" Width="110" Margin="10,0,0,0" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
-							<TextBlock Grid.Column="3" Text="LCD Overdrive" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
-							<CheckBox Grid.Column="4" x:Name="TogLcdOverdrive" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="10,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
+							<TextBlock Grid.Column="0" Text="Refresh" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
+							<ComboBox Grid.Column="1" x:Name="RefreshModeBox" MinWidth="76" MaxWidth="150" Margin="8,0,16,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
+							<TextBlock Grid.Column="2" Text="Overdrive" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
+							<CheckBox Grid.Column="3" x:Name="TogLcdOverdrive" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
 						</Grid>
 					</Border>
 					<!-- Fans -->
