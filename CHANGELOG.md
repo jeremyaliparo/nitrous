@@ -18,6 +18,16 @@ Nitrous 1.0.0 is the first stable release.
   after every change, so a mode the firmware refuses is never shown as active.
 - Models without that interface keep the existing WMI path.
 
+### Fans
+
+- Fan curves rise instantly but no longer fall instantly. When the target drops, the fans hold for
+  3 seconds and then step down at a chosen rate, so a short burst of load no longer makes them rev
+  up and drop again — and the heatsink keeps shedding the heat it just took.
+- **Ramp down** on the Custom fan panel: `Off`, `Gentle` (5 %/s), `Balanced` (10 %/s, default) and
+  `Fast` (20 %/s). `Off` keeps the previous behaviour.
+- The ramp never applies while the chip is at or above 90 °C: the fans go straight to the curve's
+  speed.
+
 ### Other Nitro models
 
 - Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports — its

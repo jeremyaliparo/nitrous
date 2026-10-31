@@ -655,6 +655,15 @@
                                                 IsEnabled="{Binding IsManualSliderEnabled}"/>
                                     </StackPanel>
                                 </Grid>
+								<!-- Ramp down: rises are instant, falls are gradual. -->
+								<Grid Margin="0,0,0,12">
+									<TextBlock Text="RAMP DOWN" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+									<ComboBox Width="120" HorizontalAlignment="Right"
+									          Style="{StaticResource CompactComboBoxStyle}"
+									          ItemsSource="{Binding FanRampOptions}"
+									          SelectedItem="{Binding FanRampDown, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+									          ToolTip="How quickly the fans may slow down after a load burst. Rises are always instant."/>
+								</Grid>
 								<!-- CPU Slider -->
 								<Grid Margin="0,0,0,4">
 									<TextBlock Text="CPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>

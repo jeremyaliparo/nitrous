@@ -414,6 +414,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
         if (_gpuFanSpeed != savedGpu) SettingsManager.Save("CustomFanSpeedGpu", _gpuFanSpeed);
 
         _isUnifiedFans = SettingsManager.Get("UnifiedFans", 1) == 1;
+        _fanRampDown = SettingsManager.Get("FanRampDown", FanRamp.Balanced);
+        if (Array.IndexOf(FanRamp.Options, _fanRampDown) < 0) _fanRampDown = FanRamp.Balanced;
         _isCurveModeEnabled = SettingsManager.Get("IsCurveModeEnabled", 0) == 1;
         _manageCpuPower = SettingsManager.Get("ManageCpuPower", 0) == 1;
 
@@ -668,6 +670,21 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 SettingsManager.Save("UnifiedFans", value ? 1 : 0);
                 if (value) GpuFanSpeed = CpuFanSpeed;
             }
+        }
+    }
+
+    /// <summary>How fast the curve engine may lower the fans; see <see cref="FanRamp"/>.</summary>
+    public string[] FanRampOptions => FanRamp.Options;
+
+    private string _fanRampDown = FanRamp.Balanced;
+    public string FanRampDown
+    {
+        get => _fanRampDown;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            if (SetProperty(ref _fanRampDown, value))
+                SettingsManager.Save("FanRampDown", value);
         }
     }
 

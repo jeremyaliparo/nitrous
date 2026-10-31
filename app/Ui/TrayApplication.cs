@@ -25,6 +25,19 @@ public class TrayApplication : ApplicationContext
     private readonly CancellationTokenSource _engineCts = new();
     private int _lastAppliedCpuSpeed = -1;
     private int _lastAppliedGpuSpeed = -1;
+    private readonly FanRampState _cpuRamp = new();
+    private readonly FanRampState _gpuRamp = new();
+
+    /// <summary>The fan engine's period; also the step the ramp-down rate is measured against.</summary>
+    private static readonly TimeSpan FanEngineTick = TimeSpan.FromSeconds(2);
+
+    /// <summary>Forgets the ramp and the applied speeds, so the next tick starts from the curve.</summary>
+    private void ResetFanRamp()
+    {
+        _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
+        _cpuRamp.Reset();
+        _gpuRamp.Reset();
+    }
     private DateTime _lastOcWatchdogLog = DateTime.MinValue;
 
     private readonly GlobalHotkeyManager _hotkeys = new();
@@ -297,7 +310,7 @@ public class TrayApplication : ApplicationContext
             await Task.Delay(6000);
             if (_shuttingDown) return;
 
-            _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
+            ResetFanRamp();
             await ApplyPowerSettingsAsync(isStartup: false, force: true);
             if (_shuttingDown) return;
 
@@ -404,7 +417,7 @@ public class TrayApplication : ApplicationContext
                 profile,
                 allowStockReset: true,
                 source: isStartup ? "startup-apply" : "acdc");
-            _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
+            ResetFanRamp();
         }
         catch (Exception ex)
         {
@@ -493,7 +506,7 @@ public class TrayApplication : ApplicationContext
                     await CpuPowerManager.ApplyProfileLimitsAsync(nextProfile, isOnline).ConfigureAwait(false);
 
                 await _gpuManager.ApplyPowerProfileOcAsync(nextProfile, allowStockReset: true, source: "hotkey").ConfigureAwait(false);
-                _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
+                ResetFanRamp();
             }
             catch (Exception ex)
             {
@@ -595,7 +608,7 @@ public class TrayApplication : ApplicationContext
         // Fan curve engine.
         Task.Run(async () =>
         {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            using var timer = new PeriodicTimer(FanEngineTick);
             try
             {
                 while (!_engineCts.Token.IsCancellationRequested)
@@ -646,12 +659,26 @@ public class TrayApplication : ApplicationContext
                                 ? targetCpuSpeed
                                 : FanSafety.Clamp(FanCurveHelper.InterpolateSpeed(gpuCurve, effectiveGpuTemp));
 
-                            if (targetCpuSpeed != _lastAppliedCpuSpeed || targetGpuSpeed != _lastAppliedGpuSpeed)
+                            // Rise at once, fall gradually. A burst of load that lifts the
+                            // temperature for a second should not make the fans drop again the
+                            // moment it ends.
+                            var rampPerSecond = FanRamp.PerSecondFor(
+                                SettingsManager.Get("FanRampDown", FanRamp.Balanced));
+                            var now = DateTime.UtcNow;
+                            var cpuSpeed = _cpuRamp.Next(
+                                targetCpuSpeed, telemetry.CpuTemp,
+                                rampPerSecond, FanEngineTick, FanRamp.Hold, now);
+                            var gpuSpeed = _gpuRamp.Next(
+                                targetGpuSpeed,
+                                effectiveGpuTemp == 0 ? telemetry.CpuTemp : effectiveGpuTemp,
+                                rampPerSecond, FanEngineTick, FanRamp.Hold, now);
+
+                            if (cpuSpeed != _lastAppliedCpuSpeed || gpuSpeed != _lastAppliedGpuSpeed)
                             {
-                                if (await AcerWmiManager.SetCustomFansAsync(targetCpuSpeed, targetGpuSpeed))
+                                if (await AcerWmiManager.SetCustomFansAsync(cpuSpeed, gpuSpeed))
                                 {
-                                    _lastAppliedCpuSpeed = targetCpuSpeed;
-                                    _lastAppliedGpuSpeed = targetGpuSpeed;
+                                    _lastAppliedCpuSpeed = cpuSpeed;
+                                    _lastAppliedGpuSpeed = gpuSpeed;
                                 }
                                 else
                                 {
@@ -664,7 +691,7 @@ public class TrayApplication : ApplicationContext
                         else
                         {
                             // Re-arm the next time the user enters curve mode.
-                            _lastAppliedCpuSpeed = _lastAppliedGpuSpeed = -1;
+                            ResetFanRamp();
                         }
                     }
                     catch (OperationCanceledException)
