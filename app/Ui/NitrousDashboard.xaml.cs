@@ -724,6 +724,16 @@ public partial class NitrousDashboard : Window
         var visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         LcdOverdriveLabel.Visibility = visibility;
         TogLcdOverdrive.Visibility = visibility;
+
+        // With the overdrive control gone the row holds a single control, so let it fill the
+        // width rather than leaving an empty gap on the right.
+        RefreshModeBox.Width = visible ? 118 : double.NaN;
+        RefreshModeBox.HorizontalAlignment = visible
+            ? System.Windows.HorizontalAlignment.Left
+            : System.Windows.HorizontalAlignment.Stretch;
+        RefreshModeBox.Margin = visible
+            ? new Thickness(8, 0, 16, 0)
+            : new Thickness(8, 0, 0, 0);
     }
 
     private void ApplyLcdOverdriveAvailability(bool available, string? reason)

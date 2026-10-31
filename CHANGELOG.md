@@ -86,7 +86,7 @@ Nitrous 1.0.0 is the first stable release.
   actually running are both visible.
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
   panel rather than the model, so the control only appears where the firmware reports the panel
-  supports it; where it does not, the row shows the refresh rate alone.
+  supports it; where it does not, the refresh list takes the whole row instead of leaving a gap.
 - A panel without overdrive can answer the same `0` as a panel that has it switched off, so the
   change is read back after it is written. A panel that ignores the write is hidden with a log
   entry instead of looking like it worked.
