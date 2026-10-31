@@ -38,6 +38,8 @@ Nitrous 1.0.0 is the first stable release.
   methods store values the firmware never applies, so they were not usable for this.
 - On models without that controller the card appears disabled, so an absent feature is not
   mistaken for a broken one.
+- The four zones are also withheld when SMBIOS reports a single-colour keyboard, so a model that
+  can only light one colour is not offered four swatches that cannot do anything.
 - **Auto-off** turns the keyboard backlight off after a chosen time (`Never`, 30 seconds, 1 minute,
   5 minutes). The controller takes brightness and auto-off in one write, so Nitrous reads the
   current level first and keeps it rather than guessing.
@@ -97,6 +99,9 @@ Nitrous 1.0.0 is the first stable release.
   registers. It never calls a `Set*` method. Reports are saved to
   `%LOCALAPPDATA%\Nitrous\ec-probe`, so a report from another Nitro model can be compared against
   one that is known to work.
+- The probe also reports the keyboard backlight: the SMBIOS colour count, whether the EC HID and
+  ENEK interfaces are present, and a read-only sweep of `GetGamingKBBacklight`. That is what shows
+  whether a model without the EC interface can still set the auto-off over WMI.
 
 ## 0.8.5 - 2026-10-27
 

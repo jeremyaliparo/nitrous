@@ -376,6 +376,7 @@ public partial class NitrousDashboard : Window
     private int _keyboardBrightness = 100;
     private KeyboardEffect _keyboardEffect = KeyboardEffect.Static;
     private bool _keyboardAvailable;
+    private bool _keyboardZoned = true;
     private bool _keyboardLoading = true;
 
     private static readonly (string Name, KeyboardEffect Effect)[] KeyboardEffects =
@@ -408,6 +409,11 @@ public partial class NitrousDashboard : Window
     private void InitializeKeyboardLighting()
     {
         _keyboardAvailable = AcerKeyboard.IsAvailable();
+
+        // SMBIOS says whether the keyboard has one colour or RGB. A single-colour keyboard can
+        // still have a backlight, so only the zones are withheld: offering four swatches on a
+        // keyboard that cannot light them is what made this look broken on an unlisted model.
+        _keyboardZoned = AcerCapabilitiesProvider.Current.Smbios.KeyboardColor is not 1;
 
         for (var i = 0; i < AcerKeyboard.ZoneCount; i++)
             _zoneColors[i] = KeyboardColor.FromHex(SettingsManager.Get($"KbZone{i + 1}", _zoneColors[i].ToHex()));
@@ -444,11 +450,16 @@ public partial class NitrousDashboard : Window
             ? null
             : timeoutRefused
                 ? "This keyboard controller does not store an auto-off."
-                : "This model does not expose the backlight controller.";
+                : "This model does not answer on the embedded controller, so the auto-off cannot be set.";
 
         UpdateZoneButtons();
 
-        KeyboardLightingStatus.Text = _keyboardAvailable ? string.Empty : "No lighting interface on this model";
+        KeyboardLightingStatus.Text = !_keyboardAvailable
+            ? "No lighting interface on this model"
+            : !_keyboardZoned
+                ? "Single-colour keyboard"
+                : string.Empty;
+
         KeyboardEffectBox.IsEnabled = _keyboardAvailable;
         KeyboardBrightness.IsEnabled = _keyboardAvailable;
         UpdateZoneInteractivity();
@@ -472,10 +483,14 @@ public partial class NitrousDashboard : Window
     private void UpdateZoneInteractivity()
     {
         var staticMode = _keyboardEffect == KeyboardEffect.Static;
-        var enabled = _keyboardAvailable && staticMode;
+        var enabled = _keyboardAvailable && _keyboardZoned && staticMode;
 
         Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
-        ZoneHint.Visibility = staticMode ? Visibility.Collapsed : Visibility.Visible;
+
+        ZoneHint.Text = !_keyboardZoned
+            ? "This keyboard has a single colour, not four zones."
+            : "Zone colours apply to Static. Pick Static to use them.";
+        ZoneHint.Visibility = !_keyboardZoned || !staticMode ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void Zone_Click(object sender, RoutedEventArgs e)

@@ -98,6 +98,7 @@ public static class EcProbe
         cancellationToken.ThrowIfCancellationRequested();
 
         report["genericFunction"] = CollectGenericFunction(errors);
+        report["keyboardBacklight"] = CollectKeyboardBacklight(errors);
         report["errors"] = errors;
 
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -457,6 +458,53 @@ public static class EcProbe
         List<string> errors,
         string section) =>
         WithInstance(AcerWmiProtocol.GamingClass, action, errors, section);
+
+    /// <summary>
+    /// What this machine offers for the keyboard backlight. The auto-off lives on the EC HID
+    /// interface on some models and inside the Acer WMI class on others, so both are reported
+    /// alongside the SMBIOS colour count. Every call here is a Get.
+    /// </summary>
+    private static Dictionary<string, object?> CollectKeyboardBacklight(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var capabilities = AcerCapabilitiesProvider.Current;
+            result["smbiosKeyboardColour"] = capabilities.Smbios.KeyboardColor;
+            result["ecHidPresent"] = capabilities.EcHid != null;
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"keyboardBacklight/capabilities: {ex.Message}");
+        }
+
+        try
+        {
+            result["eNekHidPresent"] = AcerKeyboard.IsAvailable();
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"keyboardBacklight/eNek: {ex.Message}");
+        }
+
+        WithGamingInstance(instance =>
+        {
+            // The input is an address, as with the other Get* methods. Several are tried because
+            // which one holds the backlight is exactly what differs between models.
+            var probes = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var input in new uint[] { 0x00, 0x01, 0x02, 0x03, 0x08, 0x10 })
+            {
+                probes[$"0x{input:X2}"] = TryInvoke(
+                    instance, "GetGamingKBBacklight", "gmInput", input, "gmOutput");
+            }
+
+            result["getGamingKBBacklight"] = probes;
+            return true;
+        }, errors, "keyboardBacklight");
+
+        return result;
+    }
 
     private static void WithInstance(
         string className,
