@@ -99,6 +99,7 @@ public static class EcProbe
 
         report["genericFunction"] = CollectGenericFunction(errors);
         report["keyboardBacklight"] = CollectKeyboardBacklight(errors);
+        report["ledState"] = CollectLedState(errors);
         report["errors"] = errors;
 
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -538,6 +539,44 @@ public static class EcProbe
 
             return true;
         }, errors, "keyboardBacklight");
+
+        return result;
+    }
+
+    /// <summary>
+    /// The other read-only LED methods, swept over their low inputs. The keyboard backlight timeout
+    /// is not in the GetGamingKBBacklight answer on an ANV15-41, so it is either behind another
+    /// input or carried by one of these. Nothing here writes.
+    /// </summary>
+    private static Dictionary<string, object?> CollectLedState(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        WithGamingInstance(instance =>
+        {
+            var sweeps = new (string Method, uint[] Inputs)[]
+            {
+                ("GetGamingLEDBehavior", new uint[] { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 }),
+                ("GetGamingLED", new uint[] { 0x00, 0x01, 0x02, 0x03, 0x08, 0x10 }),
+                ("GetGamingRgbKb", new uint[] { 0x01, 0x02, 0x04, 0x08, 0x0F })
+            };
+
+            foreach (var (method, inputs) in sweeps)
+            {
+                var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var input in inputs)
+                {
+                    var (value, error) = TryReadRaw(instance, method, "gmInput", input, "gmOutput");
+                    values[$"0x{input:X2}"] = value;
+                    if (error != null) values[$"0x{input:X2}Error"] = error;
+                }
+
+                result[method] = values;
+            }
+
+            return true;
+        }, errors, "ledState");
 
         return result;
     }
