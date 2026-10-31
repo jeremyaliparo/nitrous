@@ -70,7 +70,9 @@ public static class EcProbe
         var errors = new List<string>();
         var report = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
-            ["probeVersion"] = 1,
+            // Bumped whenever a section or field is added: reports are compared across models, and
+            // a reader has to know which shape it is looking at.
+            ["probeVersion"] = 2,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
