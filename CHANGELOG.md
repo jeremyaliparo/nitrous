@@ -30,6 +30,15 @@ Nitrous 1.0.0 is the first stable release.
 - The ramp never applies at or above 90 °C: the fans go straight to the curve's speed.
 - The curve editor now uses the dashboard's colours instead of the old blue theme.
 
+### Keyboard lighting
+
+- The `KB` page can set the keyboard's four lighting zones, an effect, and brightness. Static
+  colours are per zone; an effect applies to all four.
+- This talks to the keyboard's own HID controller (an ENEK interface). The Acer WMI lighting
+  methods store values the firmware never applies, so they were not usable for this.
+- On models without that controller the card appears disabled, so an absent feature is not
+  mistaken for a broken one.
+
 ### Other Nitro models
 
 - Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports — its

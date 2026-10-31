@@ -1092,6 +1092,42 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+ 
+                   <!-- Keyboard Lighting -->
+                   <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,10">
+                                <TextBlock Text="KEYBOARD LIGHTING" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="KeyboardLightingStatus" Foreground="#6E6E76" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="Zone1Btn" Grid.Column="0" Height="34" Margin="0,0,6,0" Tag="1" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 1"/>
+                                <Button x:Name="Zone2Btn" Grid.Column="1" Height="34" Margin="0,0,6,0" Tag="2" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 2"/>
+                                <Button x:Name="Zone3Btn" Grid.Column="2" Height="34" Margin="0,0,6,0" Tag="3" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 3"/>
+                                <Button x:Name="Zone4Btn" Grid.Column="3" Height="34" Tag="4" Click="Zone_Click" Foreground="White" BorderThickness="0" FontSize="10" FontWeight="Bold" Content="ZONE 4"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,8">
+                                <TextBlock Text="Effect" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="KeyboardEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardEffect_Changed"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,2">
+                                <TextBlock Text="Brightness" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                            </Grid>
+                            <Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
+
+                            <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="#6E6E76" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+                   </Border>
                 </StackPanel>
 			</Grid>
 			<!-- Bottom Navigation -->

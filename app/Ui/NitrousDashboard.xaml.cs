@@ -49,6 +49,8 @@ public partial class NitrousDashboard : Window
         DashVersionText.Text = GpuVersionText.Text = KeyboardVersionText.Text = SettingsVersionText.Text =
             $"Nitrous {UpdateManager.CurrentVersion}";
 
+        InitializeKeyboardLighting();
+
         System.Threading.Tasks.Task.Run(() =>
         {
             var modelName = SystemInfoManager.GetSystemModel();
@@ -359,6 +361,149 @@ public partial class NitrousDashboard : Window
 
         _isDialogOpen = true;
         _activeCurveWindow.Show();
+    }
+
+    private readonly KeyboardColor[] _zoneColors =
+    {
+        KeyboardColor.FromHex("#B388FF"),
+        KeyboardColor.FromHex("#B388FF"),
+        KeyboardColor.FromHex("#B388FF"),
+        KeyboardColor.FromHex("#B388FF")
+    };
+
+    private int _keyboardBrightness = 100;
+    private KeyboardEffect _keyboardEffect = KeyboardEffect.Static;
+    private bool _keyboardAvailable;
+    private bool _keyboardLoading = true;
+
+    private static readonly (string Name, KeyboardEffect Effect)[] KeyboardEffects =
+    {
+        ("Static", KeyboardEffect.Static),
+        ("Breathing", KeyboardEffect.Breathing),
+        ("Neon", KeyboardEffect.Neon),
+        ("Wave", KeyboardEffect.Wave),
+        ("Shifting", KeyboardEffect.Shifting),
+        ("Zoom", KeyboardEffect.Zoom),
+        ("Meteor", KeyboardEffect.Meteor),
+        ("Twinkling", KeyboardEffect.Twinkling)
+    };
+
+    /// <summary>
+    /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
+    /// separate HID device; models without it keep the card visible but disabled.
+    /// </summary>
+    private void InitializeKeyboardLighting()
+    {
+        _keyboardAvailable = AcerKeyboard.IsAvailable();
+
+        for (var i = 0; i < AcerKeyboard.ZoneCount; i++)
+            _zoneColors[i] = KeyboardColor.FromHex(SettingsManager.Get($"KbZone{i + 1}", _zoneColors[i].ToHex()));
+
+        _keyboardBrightness = Math.Clamp(SettingsManager.Get("KbBrightness", 100), 0, 100);
+
+        foreach (var (name, _) in KeyboardEffects)
+            KeyboardEffectBox.Items.Add(name);
+
+        var saved = SettingsManager.Get("KbEffect", "Static");
+        var selected = Array.FindIndex(KeyboardEffects, e => e.Name == saved);
+        KeyboardEffectBox.SelectedIndex = selected >= 0 ? selected : 0;
+        _keyboardEffect = KeyboardEffects[KeyboardEffectBox.SelectedIndex].Effect;
+
+        KeyboardBrightness.Value = _keyboardBrightness;
+        KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
+
+        UpdateZoneButtons();
+
+        KeyboardLightingStatus.Text = _keyboardAvailable ? string.Empty : "No lighting interface on this model";
+        Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = _keyboardAvailable;
+        KeyboardEffectBox.IsEnabled = _keyboardAvailable;
+        KeyboardBrightness.IsEnabled = _keyboardAvailable;
+
+        _keyboardLoading = false;
+
+        if (_keyboardAvailable) ApplyKeyboardLighting();
+    }
+
+    private void UpdateZoneButtons()
+    {
+        var buttons = new[] { Zone1Btn, Zone2Btn, Zone3Btn, Zone4Btn };
+        for (var i = 0; i < buttons.Length; i++)
+        {
+            buttons[i].Background = new SolidColorBrush(
+                Color.FromRgb(_zoneColors[i].R, _zoneColors[i].G, _zoneColors[i].B));
+        }
+    }
+
+    private void Zone_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_keyboardAvailable ||
+            sender is not System.Windows.Controls.Button { Tag: string tag } ||
+            !int.TryParse(tag, out var zone))
+        {
+            return;
+        }
+
+        var index = zone - 1;
+        if (index < 0 || index >= _zoneColors.Length) return;
+
+        using var dialog = new System.Windows.Forms.ColorDialog
+        {
+            FullOpen = true,
+            Color = System.Drawing.Color.FromArgb(_zoneColors[index].R, _zoneColors[index].G, _zoneColors[index].B)
+        };
+
+        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+        _zoneColors[index] = new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B);
+        SettingsManager.Save($"KbZone{zone}", _zoneColors[index].ToHex());
+        UpdateZoneButtons();
+
+        // Picking a zone colour means Static; the change handler applies it.
+        if (_keyboardEffect != KeyboardEffect.Static)
+        {
+            KeyboardEffectBox.SelectedIndex = 0;
+            return;
+        }
+
+        ApplyKeyboardLighting();
+    }
+
+    private void KeyboardEffect_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_keyboardLoading || KeyboardEffectBox.SelectedIndex < 0) return;
+
+        _keyboardEffect = KeyboardEffects[KeyboardEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbEffect", KeyboardEffects[KeyboardEffectBox.SelectedIndex].Name);
+        ApplyKeyboardLighting();
+    }
+
+    private void KeyboardBrightness_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _keyboardBrightness = (int)Math.Round(e.NewValue);
+        if (KeyboardBrightnessText != null) KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
+        if (_keyboardLoading || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbBrightness", _keyboardBrightness);
+        ApplyKeyboardLighting();
+    }
+
+    private void ApplyKeyboardLighting()
+    {
+        if (!_keyboardAvailable) return;
+
+        try
+        {
+            var applied = _keyboardEffect == KeyboardEffect.Static
+                ? AcerKeyboard.SetZoneColors(_zoneColors, _keyboardBrightness)
+                : AcerKeyboard.SetEffect(_keyboardEffect, _keyboardBrightness, 4, leftwards: false, _zoneColors[0]);
+
+            KeyboardLightingStatus.Text = applied ? string.Empty : "The keyboard refused the change";
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: lighting change failed.", ex);
+            KeyboardLightingStatus.Text = "Lighting change failed";
+        }
     }
 
     private async void ExportDiagnostics_Click(object sender, RoutedEventArgs e)
