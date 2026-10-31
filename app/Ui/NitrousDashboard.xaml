@@ -103,6 +103,12 @@
 								<Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0"/>
 								<Setter TargetName="Thumb" Property="Fill" Value="#121214"/>
 							</Trigger>
+							<!-- A disabled toggle used to look exactly like an enabled one, so a control the
+							     model does not support invited a click that could never do anything. -->
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.35"/>
+								<Setter Property="Cursor" Value="Arrow"/>
+							</Trigger>
 						</ControlTemplate.Triggers>
 					</ControlTemplate>
 				</Setter.Value>
@@ -663,7 +669,7 @@
 							<TextBlock Grid.Column="0" Text="Refresh" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
 							<ComboBox Grid.Column="1" x:Name="RefreshModeBox" MinWidth="76" MaxWidth="150" Margin="8,0,16,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
 							<TextBlock Grid.Column="2" Text="Overdrive" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
-							<CheckBox Grid.Column="3" x:Name="TogLcdOverdrive" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
+							<CheckBox Grid.Column="3" x:Name="TogLcdOverdrive" ToolTipService.ShowOnDisabled="True" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
 						</Grid>
 					</Border>
 					<!-- Fans -->
@@ -1183,7 +1189,7 @@
 
                             <Grid Margin="0,10,0,0">
                                 <TextBlock Text="Auto-off" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="KeyboardTimeoutBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
+                                <ComboBox x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
                             </Grid>
 
                             <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="#6E6E76" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>

@@ -536,7 +536,9 @@ public static class DiagnosticsCollector
         builder.AppendLine($"Settings: ManageCpuPower={Text(settings, "ManageCpuPower")}, " +
                            $"LastPowerMode={Text(settings, "LastPowerMode")}, " +
                            $"LastFanMode={Text(settings, "LastFanMode")}, " +
-                           $"RefreshMode={Text(settings, "RefreshMode")}");
+                           $"RefreshMode={Text(settings, "RefreshMode")}, " +
+                           $"LcdOverdriveRefused={Text(settings, "LcdOverdriveRefused")}, " +
+                           $"KbTimeoutRefused={Text(settings, "KbTimeoutRefused")}");
 
         builder.AppendLine($"Log files included: {logCount}");
         if (errors.Count == 0)

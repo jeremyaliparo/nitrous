@@ -41,6 +41,9 @@ Nitrous 1.0.0 is the first stable release.
 - **Auto-off** turns the keyboard backlight off after a chosen time (`Never`, 30 seconds, 1 minute,
   5 minutes). The controller takes brightness and auto-off in one write, so Nitrous reads the
   current level first and keeps it rather than guessing.
+- The auto-off is now read back after it is written. A controller that answers "done" but has
+  nowhere to store the value is disabled with an explanation, instead of accepting the change and
+  doing nothing.
 
 ### Battery and USB
 
@@ -64,6 +67,11 @@ Nitrous 1.0.0 is the first stable release.
 
 ### Dashboard
 
+- Disabled toggles now look disabled. The toggle style had no disabled state, so a control the
+  model does not support looked exactly like one that worked. The same style is used by CPU Power,
+  Battery Limit, USB Charging and GPU clock ownership.
+- A disabled control's tooltip now appears. WPF hides tooltips on disabled elements by default, so
+  the explanation of why a control was unavailable could never be read.
 - The Dashboard scrolls. The custom fan section was cut off at the bottom on shorter windows.
 - The GPU temperature no longer shows `--` while the GPU is awake: the embedded controller reports
   0 on some models, so the driver's reading is used instead when it is available.
@@ -77,6 +85,9 @@ Nitrous 1.0.0 is the first stable release.
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
   panel rather than the model, so the toggle is only enabled where the firmware reports the panel
   supports it; it is left disabled rather than pretending to work.
+- A panel without overdrive can answer the same `0` as a panel that has it switched off, so the
+  change is read back after it is written. A panel that ignores the write is disabled with an
+  explanation instead of looking like it worked.
 
 ### Diagnostics
 

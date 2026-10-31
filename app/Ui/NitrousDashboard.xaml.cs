@@ -433,11 +433,18 @@ public partial class NitrousDashboard : Window
         KeyboardTimeoutBox.SelectedIndex = timeoutIndex >= 0 ? timeoutIndex : 0;
 
         // The auto-off lives on the embedded controller, not the lighting controller, so it can be
-        // missing even where the zones work.
-        _keyboardTimeoutAvailable = AcerWmiManager.GetKeyboardBacklightTimeout() is not null;
+        // missing even where the zones work. A controller that answers but stores nothing is
+        // remembered as not supporting it, so the box does not look usable on every launch.
+        var timeoutRefused = SettingsManager.Get("KbTimeoutRefused", 0) == 1;
+        _keyboardTimeoutAvailable =
+            !timeoutRefused && AcerWmiManager.GetKeyboardBacklightTimeout() is not null;
+
         KeyboardTimeoutBox.IsEnabled = _keyboardTimeoutAvailable;
-        if (!_keyboardTimeoutAvailable)
-            KeyboardTimeoutBox.ToolTip = "This model does not expose the backlight controller.";
+        KeyboardTimeoutBox.ToolTip = _keyboardTimeoutAvailable
+            ? null
+            : timeoutRefused
+                ? "This keyboard controller does not store an auto-off."
+                : "This model does not expose the backlight controller.";
 
         UpdateZoneButtons();
 
@@ -525,7 +532,7 @@ public partial class NitrousDashboard : Window
         ApplyKeyboardLighting();
     }
 
-    private void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)
+    private async void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_keyboardLoading || KeyboardTimeoutBox.SelectedIndex < 0) return;
 
@@ -536,15 +543,61 @@ public partial class NitrousDashboard : Window
 
         try
         {
-            KeyboardLightingStatus.Text = AcerWmiManager.SetKeyboardBacklightTimeout(seconds)
-                ? string.Empty
-                : "The controller refused the auto-off change";
+            if (!AcerWmiManager.SetKeyboardBacklightTimeout(seconds))
+            {
+                KeyboardLightingStatus.Text = "Auto-off refused";
+                return;
+            }
+
+            // The controller answers "done" even where it has nowhere to store an auto-off, so
+            // the value it reports afterwards is the only proof the change was applied.
+            var applied = await ReadKeyboardTimeoutAfterWriteAsync(seconds);
+
+            if (applied is { } state && state.TimeoutSeconds == seconds)
+            {
+                KeyboardLightingStatus.Text = string.Empty;
+                return;
+            }
+
+            if (applied == null)
+            {
+                Logger.Warn("Keyboard: could not read the auto-off back.");
+                return;
+            }
+
+            Logger.Warn($"Keyboard: wrote {seconds}s, controller reports " +
+                        $"{applied.Value.TimeoutSeconds}s.");
+
+            SettingsManager.Save("KbTimeoutRefused", 1);
+            _keyboardTimeoutAvailable = false;
+            KeyboardTimeoutBox.IsEnabled = false;
+            KeyboardTimeoutBox.ToolTip = "This keyboard controller does not store an auto-off.";
+            KeyboardLightingStatus.Text = "Auto-off not supported";
         }
         catch (Exception ex)
         {
             Logger.Warn("Keyboard: could not set the backlight auto-off.", ex);
             KeyboardLightingStatus.Text = "Auto-off change failed";
         }
+    }
+
+    /// <summary>
+    /// Reads the auto-off back until it agrees with what was written, or the attempts run out.
+    /// </summary>
+    private static async Task<(int Brightness, int TimeoutSeconds)?> ReadKeyboardTimeoutAfterWriteAsync(
+        int wantedSeconds)
+    {
+        (int Brightness, int TimeoutSeconds)? last = null;
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var state = AcerWmiManager.GetKeyboardBacklightTimeout();
+            if (state is { } value && value.TimeoutSeconds == wantedSeconds) return state;
+            if (state != null) last = state;
+            if (attempt < 2) await Task.Delay(80);
+        }
+
+        return last;
     }
 
     private bool _usbChargingLoading = true;
@@ -613,25 +666,71 @@ public partial class NitrousDashboard : Window
     }
 
     private bool _lcdOverdriveLoading = true;
+    private bool _lcdOverdriveBusy;
     private bool _lcdOverdriveAvailable;
 
     /// <summary>
     /// LCD overdrive is a panel property, not a model one: the firmware answers 0xFF for panels
     /// that do not have it, so the toggle stays disabled rather than pretending to work.
+    ///
+    /// A panel without overdrive can also answer 0, which is exactly what a panel that has it and
+    /// has it switched off reports. The two cannot be told apart by reading, so the question is
+    /// settled the first time a change is asked for: the firmware is written, then read back, and
+    /// a panel that ignores the write is remembered as not supporting it.
     /// </summary>
     private void InitializeLcdOverdrive()
     {
         var state = AcerWmiManager.GetLcdOverdrive();
-        _lcdOverdriveAvailable = state is { Supported: true };
 
-        TogLcdOverdrive.IsEnabled = _lcdOverdriveAvailable;
+        // Reporting overdrive on is proof the panel has it, so a stale refusal is cleared.
+        if (state is { Supported: true, On: true })
+            SettingsManager.Save("LcdOverdriveRefused", 0);
+
+        var refused = SettingsManager.Get("LcdOverdriveRefused", 0) == 1;
+        _lcdOverdriveAvailable = state is { Supported: true } && !refused;
 
         if (state is { Supported: true, On: var on })
             TogLcdOverdrive.IsChecked = on;
-        else
-            TogLcdOverdrive.ToolTip = "This panel does not support LCD overdrive.";
+
+        ApplyLcdOverdriveAvailability(
+            _lcdOverdriveAvailable,
+            refused
+                ? "This panel ignored the overdrive change, so it does not support it."
+                : "This panel does not support LCD overdrive.");
 
         _lcdOverdriveLoading = false;
+    }
+
+    private void ApplyLcdOverdriveAvailability(bool available, string? reason)
+    {
+        TogLcdOverdrive.IsEnabled = available;
+        TogLcdOverdrive.ToolTip = available ? null : reason;
+    }
+
+    private void SetLcdOverdriveToggle(bool on)
+    {
+        _lcdOverdriveLoading = true;
+        TogLcdOverdrive.IsChecked = on;
+        _lcdOverdriveLoading = false;
+    }
+
+    /// <summary>
+    /// Reads the setting back until it agrees with what was written, or the attempts run out. The
+    /// firmware can lag a write, and one early read would look like a refusal.
+    /// </summary>
+    private static async Task<(bool Supported, bool On)?> ReadLcdOverdriveAfterWriteAsync(bool wanted)
+    {
+        (bool Supported, bool On)? last = null;
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var state = AcerWmiManager.GetLcdOverdrive();
+            if (state is { Supported: true, On: var on } && on == wanted) return state;
+            if (state != null) last = state;
+            if (attempt < 2) await Task.Delay(80);
+        }
+
+        return last;
     }
 
     private sealed record RefreshChoice(string Label, int? Hz);
@@ -692,18 +791,52 @@ public partial class NitrousDashboard : Window
         DisplayCurrentText.Text = actual > 0 ? $"{actual} Hz" : string.Empty;
     }
 
-    private void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)
+    private async void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)
     {
-        if (_lcdOverdriveLoading || !_lcdOverdriveAvailable) return;
+        if (_lcdOverdriveLoading || _lcdOverdriveBusy || !_lcdOverdriveAvailable) return;
+
+        var wanted = TogLcdOverdrive.IsChecked == true;
+        _lcdOverdriveBusy = true;
 
         try
         {
-            if (!AcerWmiManager.SetLcdOverdrive(TogLcdOverdrive.IsChecked == true))
+            if (!AcerWmiManager.SetLcdOverdrive(wanted))
+            {
                 Logger.Warn("LCD overdrive: the firmware refused the change.");
+                SetLcdOverdriveToggle(!wanted);
+                return;
+            }
+
+            var applied = await ReadLcdOverdriveAfterWriteAsync(wanted);
+
+            if (applied is { Supported: true, On: var on } && on == wanted)
+                return;
+
+            if (applied == null)
+            {
+                // The read failed, which says nothing about the panel. Leave the toggle usable.
+                Logger.Warn("LCD overdrive: could not read the setting back.");
+                return;
+            }
+
+            // Either the firmware now calls the panel unsupported, or it accepted the write and
+            // did not apply it. Both mean this panel cannot do overdrive.
+            Logger.Warn($"LCD overdrive: wrote {wanted}, firmware reports " +
+                        $"supported={applied.Value.Supported}, on={applied.Value.On}.");
+
+            SettingsManager.Save("LcdOverdriveRefused", 1);
+            _lcdOverdriveAvailable = false;
+            SetLcdOverdriveToggle(false);
+            ApplyLcdOverdriveAvailability(false, "This panel does not support LCD overdrive.");
         }
         catch (Exception ex)
         {
             Logger.Warn("LCD overdrive: could not apply the change.", ex);
+            SetLcdOverdriveToggle(!wanted);
+        }
+        finally
+        {
+            _lcdOverdriveBusy = false;
         }
     }
 
