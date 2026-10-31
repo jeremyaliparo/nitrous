@@ -405,6 +405,19 @@ public static class EcProbe
                 ? UnmappedProfileBits((int)((supported.Value >> 8) & 0xFF))
                 : string.Empty;
 
+            // A separate register set from GetGamingProfile. Nothing here has been swept before, and
+            // a per-profile setting is a plausible home for the keyboard backlight switch.
+            var profileSettings = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            for (uint index = 0; index <= 0x0F; index++)
+            {
+                var (value, error) = TryReadRaw(
+                    instance, "GetGamingProfileSetting", "gmInput", index, "gmOutput");
+                profileSettings[$"0x{index:X2}"] = value;
+                if (error != null) profileSettings[$"0x{index:X2}Error"] = error;
+            }
+
+            result["getGamingProfileSetting"] = profileSettings;
+
             var current = TryGetMisc(instance, (uint)AcerWmiProtocol.PowerModeOpcode);
             result["misc0BRaw"] = current;
             result["misc0BValue"] = current.HasValue
