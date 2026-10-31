@@ -402,8 +402,7 @@ public class TrayApplication : ApplicationContext
             else
                 await CpuPowerManager.RestoreOriginalAsync();
 
-            var refreshMode = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
-            DisplayManager.ApplyRefreshProfile(refreshMode, isOnline);
+            DisplayManager.Apply(isOnline);
 
             // Charge limit is a hardware latch; re-assert it on startup/resume so it survives
             // an EC reset. It is cheap and harmless on AC/DC transitions, but we avoid churn.

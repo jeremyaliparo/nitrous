@@ -28,7 +28,7 @@ public partial class NitrousDashboard : Window
     private readonly DispatcherTimer _profileSyncTimer;
     private PowerProfile? _lastSyncedPowerMode;
     private FanProfile? _lastSyncedFanMode;
-    private RefreshProfile? _lastSyncedRefreshMode;
+    private RefreshMode? _lastSyncedRefreshMode;
     private int _lastSyncedRefreshHz;
 
     public NitrousDashboard()
@@ -105,7 +105,7 @@ public partial class NitrousDashboard : Window
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile fan)
             ? fan
             : FanProfile.Auto;
-        var activeRefresh = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
+        var activeRefresh = DisplayManager.GetMode();
 
         if (activeMode == _lastSyncedPowerMode &&
             activeFan == _lastSyncedFanMode &&
@@ -196,7 +196,7 @@ public partial class NitrousDashboard : Window
 
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f) ? f : FanProfile.Auto;
-        var activeRefresh = (RefreshProfile)SettingsManager.Get("RefreshMode", (int)RefreshProfile.Auto);
+        var activeRefresh = DisplayManager.GetMode();
 
         BtnPowerQuiet.IsChecked = activeMode == PowerProfile.Quiet;
         BtnPowerBal.IsChecked = activeMode == PowerProfile.Balanced;
@@ -207,26 +207,7 @@ public partial class NitrousDashboard : Window
         BtnFanMax.IsChecked = activeFan == FanProfile.Max;
         BtnFanCustom.IsChecked = activeFan == FanProfile.Medium;
 
-        // The radio reflects what the display is actually doing, not only what was asked for.
-        // Another app, a resume, or a monitor change can leave the saved profile out of step, and
-        // showing it as selected then claims a state the screen is not in.
-        var actualHz = DisplayManager.GetCurrentRefreshRate();
-        var maxHz = DisplayManager.GetPrimaryMaxRefreshRate();
-        var expectedHz = activeRefresh switch
-        {
-            RefreshProfile.Hz60 => 60,
-            RefreshProfile.MaxHz => maxHz,
-            RefreshProfile.Auto => isOnline ? maxHz : 60,
-            _ => 60
-        };
-        var inSync = actualHz > 0 && actualHz == expectedHz;
-
-        BtnRefreshAuto.IsChecked = inSync && activeRefresh == RefreshProfile.Auto;
-        BtnRefresh60.IsChecked = inSync && activeRefresh == RefreshProfile.Hz60;
-        BtnRefreshMax.IsChecked = inSync && activeRefresh == RefreshProfile.MaxHz;
-
-        DisplayCurrentText.Text = actualHz > 0 ? $"{actualHz} Hz" : string.Empty;
-        _lastSyncedRefreshHz = actualHz;
+        SyncRefreshControls();
 
         if (DataContext is DashboardViewModel vm)
         {
@@ -651,6 +632,64 @@ public partial class NitrousDashboard : Window
             TogLcdOverdrive.ToolTip = "This panel does not support LCD overdrive.";
 
         _lcdOverdriveLoading = false;
+    }
+
+    private sealed record RefreshChoice(string Label, int? Hz);
+
+    private bool _refreshControlsLoading;
+
+    /// <summary>
+    /// Fills the dropdown with Auto and the rates the display advertises, and marks the saved
+    /// choice. The current rate is shown separately, so the dropdown says what was chosen and the
+    /// label says what is actually running.
+    /// </summary>
+    private void SyncRefreshControls()
+    {
+        _refreshControlsLoading = true;
+
+        var choices = new List<RefreshChoice> { new("Auto", null) };
+        foreach (var hz in DisplayManager.GetSupportedRefreshRates())
+            choices.Add(new RefreshChoice($"{hz} Hz", hz));
+
+        RefreshModeBox.ItemsSource = choices;
+        RefreshModeBox.DisplayMemberPath = nameof(RefreshChoice.Label);
+
+        var mode = DisplayManager.GetMode();
+        var chosen = DisplayManager.GetChosenRefreshRate();
+
+        var selected = choices[0];
+        if (mode != RefreshMode.Auto)
+        {
+            foreach (var choice in choices)
+            {
+                if (choice.Hz == chosen)
+                {
+                    selected = choice;
+                    break;
+                }
+            }
+        }
+
+        RefreshModeBox.SelectedItem = selected;
+
+        var actual = DisplayManager.GetCurrentRefreshRate();
+        DisplayCurrentText.Text = actual > 0 ? $"{actual} Hz" : string.Empty;
+        _lastSyncedRefreshHz = actual;
+
+        _refreshControlsLoading = false;
+    }
+
+    private void RefreshMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshControlsLoading || RefreshModeBox.SelectedItem is not RefreshChoice choice) return;
+
+        if (choice.Hz is { } hz)
+            DisplayManager.SetFixedRate(hz);
+        else
+            DisplayManager.SetAuto();
+
+        var actual = DisplayManager.GetCurrentRefreshRate();
+        DisplayCurrentText.Text = actual > 0 ? $"{actual} Hz" : string.Empty;
     }
 
     private void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)

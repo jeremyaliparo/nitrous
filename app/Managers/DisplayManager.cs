@@ -110,42 +110,129 @@ public static class DisplayManager
         }
     }
 
-    public static void ApplyRefreshProfile(RefreshProfile profile, bool isAcPower)
+    /// <summary>Distinct refresh rates the display advertises at its current resolution.</summary>
+    public static IReadOnlyList<int> GetSupportedRefreshRates()
+    {
+        var rates = new SortedSet<int>();
+        try
+        {
+            var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref current))
+                return Array.Empty<int>();
+
+            var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            for (var i = 0; EnumDisplaySettingsW(null, i, ref mode); i++)
+            {
+                if (mode.dmPelsWidth == current.dmPelsWidth &&
+                    mode.dmPelsHeight == current.dmPelsHeight &&
+                    mode.dmDisplayFrequency > 0)
+                {
+                    rates.Add(mode.dmDisplayFrequency);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not enumerate refresh rates.", ex);
+        }
+
+        return rates.ToArray();
+    }
+
+    /// <summary>The rate the user picked; 0 when nothing has been picked yet.</summary>
+    public static int GetChosenRefreshRate()
+    {
+        Migrate();
+        return SettingsManager.Get("RefreshAcHz", 0);
+    }
+
+    public static RefreshMode GetMode()
+    {
+        Migrate();
+        return (RefreshMode)SettingsManager.Get("RefreshMode", (int)RefreshMode.Auto);
+    }
+
+    /// <summary>Picks a fixed rate: applied on AC and on battery, and remembered for Auto.</summary>
+    public static void SetFixedRate(int hz)
+    {
+        SettingsManager.Save("RefreshAcHz", hz);
+        SettingsManager.Save("RefreshMode", (int)RefreshMode.Fixed);
+        Apply(isAcPower: IsOnAc());
+    }
+
+    /// <summary>Auto: the chosen rate on AC, 60 Hz on battery.</summary>
+    public static void SetAuto()
+    {
+        SettingsManager.Save("RefreshMode", (int)RefreshMode.Auto);
+        Apply(isAcPower: IsOnAc());
+    }
+
+    /// <summary>
+    /// Applies the saved profile. Auto uses the chosen rate on AC and 60 Hz on battery; Fixed uses
+    /// the chosen rate on both.
+    /// </summary>
+    public static void Apply(bool isAcPower)
+    {
+        Migrate();
+
+        var mode = GetMode();
+        var chosen = GetChosenRefreshRate();
+        var targetHz = mode == RefreshMode.Auto && !isAcPower
+            ? 60
+            : chosen > 0 ? chosen : GetPrimaryMaxRefreshRate();
+
+        ApplyRefreshRate(targetHz, mode);
+    }
+
+    /// <summary>
+    /// The old setting was Auto/60/Max. Convert it once, so an existing install keeps its choice.
+    /// </summary>
+    private static void Migrate()
+    {
+        if (SettingsManager.Get("RefreshAcHz", -1) >= 0) return;
+
+        var legacy = SettingsManager.Get("RefreshMode", (int)RefreshMode.Auto);
+        var rate = legacy switch
+        {
+            1 => 60,
+            2 => GetPrimaryMaxRefreshRate(),
+            _ => GetPrimaryMaxRefreshRate()
+        };
+
+        SettingsManager.Save("RefreshAcHz", rate);
+        SettingsManager.Save("RefreshMode", legacy == 0 ? (int)RefreshMode.Auto : (int)RefreshMode.Fixed);
+    }
+
+    private static bool IsOnAc() =>
+        System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
+        System.Windows.Forms.PowerLineStatus.Online;
+
+    private static void ApplyRefreshRate(int targetHz, RefreshMode mode)
     {
         try
         {
-            var maxHz = GetPrimaryMaxRefreshRate();
-            var targetHz = profile switch
-            {
-                RefreshProfile.Hz60 => 60,
-                RefreshProfile.MaxHz => maxHz,
-                RefreshProfile.Auto => isAcPower ? maxHz : 60,
-                _ => 60
-            };
-
-            var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode))
+            var modeStruct = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref modeStruct))
             {
                 Logger.Warn("Display: could not read the current display mode.");
                 return;
             }
 
-            Logger.Info($"Display: profile {profile} -> target {targetHz} Hz " +
-                        $"(current {mode.dmDisplayFrequency} Hz at {mode.dmPelsWidth}x{mode.dmPelsHeight}, max {maxHz} Hz).");
+            Logger.Info($"Display: {mode} -> target {targetHz} Hz " +
+                        $"(current {modeStruct.dmDisplayFrequency} Hz at {modeStruct.dmPelsWidth}x{modeStruct.dmPelsHeight}).");
 
-            if (mode.dmDisplayFrequency == targetHz)
+            if (modeStruct.dmDisplayFrequency == targetHz)
             {
                 Logger.Info($"Display: already at {targetHz} Hz; nothing to change.");
                 return;
             }
 
             // Apply the driver's own entry for this resolution and refresh instead of mutating the
-            // current mode. Asking for a mode the driver advertised cannot be "bad mode", which is
-            // what used to happen on panels that do not expose the target at every colour format.
-            if (!TryFindMode(mode.dmPelsWidth, mode.dmPelsHeight, targetHz, out var target))
+            // current mode. Asking for a mode the driver advertised cannot be "bad mode".
+            if (!TryFindMode(modeStruct.dmPelsWidth, modeStruct.dmPelsHeight, targetHz, out var target))
             {
                 Logger.Warn($"Display: {targetHz} Hz is not supported at " +
-                            $"{mode.dmPelsWidth}x{mode.dmPelsHeight}; leaving the current mode unchanged.");
+                            $"{modeStruct.dmPelsWidth}x{modeStruct.dmPelsHeight}; leaving the current mode unchanged.");
                 return;
             }
 

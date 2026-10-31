@@ -70,6 +70,10 @@ Nitrous 1.0.0 is the first stable release.
 
 ### Display
 
+- The refresh rate is a list of the rates the display actually advertises, instead of Auto / 60 /
+  Max. `Auto` uses the rate you chose on AC and 60 Hz on battery.
+- The current rate is shown next to the `DISPLAY` label, so the choice and what the screen is
+  actually running are both visible.
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
   panel rather than the model, so the toggle is only enabled where the firmware reports the panel
   supports it; it is left disabled rather than pretending to work.

@@ -435,9 +435,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
             : FanProfile.Auto;
         IsCustomFanEnabled = activeFan == FanProfile.Medium;
 
-        // Initialize refresh-rate label.
-        MaxRefreshText = $"{DisplayManager.GetPrimaryMaxRefreshRate()}Hz";
-
         // Initialize settings state.
         _chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
         _autoSwitch = SettingsManager.Get("AutoSwitch", 0) == 1;
@@ -531,23 +528,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
             }
         });
 
-        SetRefreshCommand = new RelayCommand(param =>
-        {
-            try
-            {
-                if (!Enum.TryParse(param?.ToString(), out RefreshProfile profile)) return;
-
-                SettingsManager.Save("RefreshMode", (int)profile);
-                var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
-                               System.Windows.Forms.PowerLineStatus.Online;
-                DisplayManager.ApplyRefreshProfile(profile, isOnline);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("Display: failed to switch refresh profile.", ex);
-            }
-        });
-
         ApplyGpuClocksCommand = new RelayCommand(async _ =>
         {
             if (_isApplyingClocks) return;
@@ -627,8 +607,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
         StartTelemetryPolling();
     }
-
-    public string MaxRefreshText { get; }
 
     // --- FAN PROPERTIES & LOGIC ---
     private int _cpuFanSpeed;
@@ -804,7 +782,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
     // --- COMMANDS ---
     public ICommand SetPowerCommand { get; }
     public ICommand SetFanCommand { get; }
-    public ICommand SetRefreshCommand { get; }
     public ICommand ApplyGpuClocksCommand { get; }
     public ICommand ResetGpuClocksCommand { get; }
     public ICommand RestoreBoostCommand { get; }

@@ -654,11 +654,7 @@
 					</Grid>
 					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
 						<StackPanel>
-							<UniformGrid Rows="1" Height="34">
-								<RadioButton x:Name="BtnRefreshAuto" TabIndex="0" GroupName="Refresh" Uid="Auto" Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="Auto"/>
-								<RadioButton x:Name="BtnRefresh60" TabIndex="1" GroupName="Refresh" Uid="Hz60" Tag="M2,12C4.5,6.5 7.5,6.5 10.5,12C13.5,17.5 16.5,17.5 19,12H22C18.5,19.5 14.5,19.5 10.5,14C7.5,8.5 5,8.5 2,12Z" Content="60Hz" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="Hz60"/>
-								<RadioButton x:Name="BtnRefreshMax" TabIndex="1" GroupName="Refresh" Uid="MaxHz" Tag="M13,2L4,14H11L9,22L20,10H13L15,2Z" Content="{Binding MaxRefreshText}" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="MaxHz"/>
-							</UniformGrid>
+							<ComboBox x:Name="RefreshModeBox" Margin="6,6,6,0" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
 						<Border Height="1" Background="#2A2A30" Margin="6,3,6,0"/>
 						<Grid Margin="9,4,9,6">
 							<Grid.ColumnDefinitions>
