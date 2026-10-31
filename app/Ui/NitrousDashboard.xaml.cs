@@ -780,14 +780,10 @@ public partial class NitrousDashboard : Window
         if (state is { Supported: true, On: var on })
             TogLcdOverdrive.IsChecked = on;
 
-        // A firmware that says the panel has no overdrive is positive evidence, so the control is
-        // removed. A read that failed is not evidence either way, so the control stays where it is
-        // and explains itself.
-        SetLcdOverdriveVisible(state is not { Supported: false } && !refused);
-
-        ApplyLcdOverdriveAvailability(
-            _lcdOverdriveAvailable,
-            state == null ? "The panel did not answer." : "This panel does not support LCD overdrive.");
+        // The control exists only when it can actually work. A panel with no overdrive, a firmware
+        // that does not answer, and a write the panel ignored all leave the row showing the
+        // refresh list alone, rather than a control that cannot do anything.
+        SetLcdOverdriveVisible(_lcdOverdriveAvailable);
 
         _lcdOverdriveLoading = false;
     }
@@ -807,12 +803,6 @@ public partial class NitrousDashboard : Window
         RefreshModeBox.Margin = visible
             ? new Thickness(8, 0, 16, 0)
             : new Thickness(8, 0, 0, 0);
-    }
-
-    private void ApplyLcdOverdriveAvailability(bool available, string? reason)
-    {
-        TogLcdOverdrive.IsEnabled = available;
-        TogLcdOverdrive.ToolTip = available ? null : reason;
     }
 
     private void SetLcdOverdriveToggle(bool on)
@@ -936,7 +926,6 @@ public partial class NitrousDashboard : Window
             _lcdOverdriveAvailable = false;
             SetLcdOverdriveToggle(false);
             SetLcdOverdriveVisible(false);
-            ApplyLcdOverdriveAvailability(false, "This panel does not support LCD overdrive.");
         }
         catch (Exception ex)
         {
