@@ -9,6 +9,9 @@ using Nitrous.Helpers;
 
 namespace Nitrous.Managers;
 
+/// <summary>Power-off USB charging: on or off, and the battery level it stops at (null: none).</summary>
+public readonly record struct UsbChargingState(bool On, int? Floor);
+
 public static class AcerWmiManager
 {
     private static readonly object Gate = new();
@@ -171,6 +174,75 @@ public static class AcerWmiManager
             AcerCapabilitiesProvider.Invalidate();
             return false;
         }
+    }
+
+    /// <summary>
+    /// Power-off USB charging as the firmware has it; null when this model does not answer
+    /// (the APGeAction class is only partly implemented on some BIOSes).
+    /// </summary>
+    public static UsbChargingState? GetUsbCharging()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                AcerWmiProtocol.WmiNamespace, $"SELECT * FROM {AcerWmiProtocol.ActionClass}");
+
+            foreach (ManagementObject instance in searcher.Get())
+            {
+                using (instance)
+                {
+                    using var inParams = instance.GetMethodParameters("GetFunction");
+                    inParams["uiInput"] = AcerWmiProtocol.UsbChargingQuery;
+                    using var outParams = instance.InvokeMethod("GetFunction", inParams, null);
+
+                    var raw = outParams?.Properties["uiOutput"]?.Value;
+                    if (raw == null) return null;
+
+                    var value = Convert.ToUInt64(raw);
+                    var state = (int)((value >> 8) & 0xFF);
+                    var floor = (int)((value >> 16) & 0xFF);
+
+                    return new UsbChargingState(
+                        state == AcerWmiProtocol.UsbChargingOn,
+                        AcerWmiProtocol.UsbChargingFloors.Contains(floor) ? floor : null);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("WMI: could not read USB charging.", ex);
+        }
+
+        return null;
+    }
+
+    /// <summary>Enables or disables power-off USB charging, stopping at the given battery level.</summary>
+    public static bool SetUsbCharging(bool on, int floor)
+    {
+        if (!AcerWmiProtocol.UsbChargingFloors.Contains(floor)) return false;
+
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                AcerWmiProtocol.WmiNamespace, $"SELECT * FROM {AcerWmiProtocol.ActionClass}");
+
+            foreach (ManagementObject instance in searcher.Get())
+            {
+                using (instance)
+                {
+                    using var inParams = instance.GetMethodParameters("SetFunction");
+                    inParams["uiInput"] = AcerWmiProtocol.UsbChargingPayload(on, floor);
+                    using var outParams = instance.InvokeMethod("SetFunction", inParams, null);
+                    return outParams != null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("WMI: could not set USB charging.", ex);
+        }
+
+        return false;
     }
 
     private static bool TrySetPowerModeViaEcHid(PowerProfile profile, EcHidInfo info)

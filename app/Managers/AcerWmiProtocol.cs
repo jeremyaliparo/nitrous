@@ -50,6 +50,20 @@ internal static class AcerWmiProtocol
     public const byte BatteryNumber = 1;
     public const byte BatteryFunctionMask = 1;
 
+    // APGeAction: power-off USB charging (function 4).
+    public const string ActionClass = "APGeAction";
+    public const uint UsbChargingQuery = 0x04;
+    public const byte UsbChargingOn = 0x0F;
+    public const byte UsbChargingOff = 0x1F;
+
+    /// <summary>The battery levels the firmware offers for stopping USB charging.</summary>
+    public static readonly int[] UsbChargingFloors = { 10, 20, 30 };
+
+    public static ulong UsbChargingPayload(bool on, int floor) =>
+        UsbChargingQuery |
+        ((ulong)(on ? UsbChargingOn : UsbChargingOff) << 8) |
+        ((ulong)floor << 16);
+
     public static ulong PowerModePayload(PowerProfile profile) => ((ulong)profile << 8) | PowerModeOpcode;
 
     public static ulong FanSpeedPayload(ulong deviceMask, int percent) => deviceMask | ((ulong)percent << 8);

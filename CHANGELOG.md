@@ -42,6 +42,12 @@ Nitrous 1.0.0 is the first stable release.
   5 minutes). The controller takes brightness and auto-off in one write, so Nitrous reads the
   current level first and keeps it rather than guessing.
 
+### Battery and USB
+
+- **USB Charging While Off** on the Setup page: keeps charging USB devices while the laptop is
+  off, stopping at 10 %, 20 % or 30 % battery. Nitrous reads the firmware's current state when the
+  page opens, and the controls stay disabled on models that do not implement it.
+
 ### Other Nitro models
 
 - Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports — its

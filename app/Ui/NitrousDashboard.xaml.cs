@@ -50,6 +50,7 @@ public partial class NitrousDashboard : Window
             $"Nitrous {UpdateManager.CurrentVersion}";
 
         InitializeKeyboardLighting();
+        InitializeUsbCharging();
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -542,6 +543,71 @@ public partial class NitrousDashboard : Window
         {
             Logger.Warn("Keyboard: could not set the backlight auto-off.", ex);
             KeyboardLightingStatus.Text = "Auto-off change failed";
+        }
+    }
+
+    private bool _usbChargingLoading = true;
+    private bool _usbChargingAvailable;
+    private int _usbChargingFloor = 30;
+
+    /// <summary>
+    /// Power-off USB charging is an APGeAction setting, not a misc register, and some BIOSes only
+    /// implement part of that class. When it does not answer the controls stay disabled.
+    /// </summary>
+    private void InitializeUsbCharging()
+    {
+        foreach (var floor in AcerWmiProtocol.UsbChargingFloors)
+            UsbChargingFloorBox.Items.Add($"{floor}%");
+
+        var state = AcerWmiManager.GetUsbCharging();
+        _usbChargingAvailable = state.HasValue;
+
+        TogUsbCharging.IsEnabled = _usbChargingAvailable;
+        UsbChargingFloorBox.IsEnabled = _usbChargingAvailable;
+
+        if (state is { } current)
+        {
+            _usbChargingFloor = current.Floor ?? 30;
+            TogUsbCharging.IsChecked = current.On;
+            UsbChargingFloorBox.SelectedIndex =
+                Array.IndexOf(AcerWmiProtocol.UsbChargingFloors, _usbChargingFloor);
+        }
+        else
+        {
+            UsbChargingFloorBox.SelectedIndex =
+                Array.IndexOf(AcerWmiProtocol.UsbChargingFloors, 30);
+            TogUsbCharging.ToolTip = "This model does not expose power-off USB charging.";
+        }
+
+        _usbChargingLoading = false;
+    }
+
+    private void UsbCharging_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_usbChargingLoading || !_usbChargingAvailable) return;
+        ApplyUsbCharging();
+    }
+
+    private void UsbChargingFloor_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (UsbChargingFloorBox.SelectedIndex >= 0)
+            _usbChargingFloor = AcerWmiProtocol.UsbChargingFloors[UsbChargingFloorBox.SelectedIndex];
+
+        if (_usbChargingLoading || !_usbChargingAvailable) return;
+        ApplyUsbCharging();
+    }
+
+    private void ApplyUsbCharging()
+    {
+        try
+        {
+            var on = TogUsbCharging.IsChecked == true;
+            if (!AcerWmiManager.SetUsbCharging(on, _usbChargingFloor))
+                Logger.Warn($"USB charging: the firmware refused on={on} floor={_usbChargingFloor}.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("USB charging: could not apply the setting.", ex);
         }
     }
 
