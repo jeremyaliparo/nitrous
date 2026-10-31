@@ -840,7 +840,7 @@
 									<ComboBox x:Name="UsbChargingFloorBox" Width="90" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="UsbChargingFloor_Changed"/>
 								</StackPanel>
 							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogUsbCharging" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0" Checked="UsbCharging_Toggled" Unchecked="UsbCharging_Toggled"/>
+							<CheckBox Grid.Column="1" x:Name="TogUsbCharging" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0" Checked="UsbCharging_Toggled" Unchecked="UsbCharging_Toggled"/>
 						</Grid>
 					</Border>
 
