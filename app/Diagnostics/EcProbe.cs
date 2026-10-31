@@ -514,7 +514,7 @@ public static class EcProbe
             var inputs = Enumerable.Range(0, 0x11).Select(index => (uint)index).Append(0xFFu);
             foreach (var input in inputs)
             {
-                var (value, error) = TryInvokeDetailed(
+                var (value, error) = TryReadRaw(
                     instance, "GetGamingKBBacklight", "gmInput", input, "gmOutput");
 
                 values[$"0x{input:X2}"] = value;
@@ -568,16 +568,16 @@ public static class EcProbe
         }
 
         foreach (PropertyData property in outParams.Properties)
-            dump[property.Name] = property.Value?.ToString();
+            dump[property.Name] = DescribeValue(property.Value);
 
         return dump;
     }
 
     /// <summary>
-    /// Like <see cref="TryInvoke"/>, but keeps the reason a call failed. A null value alone cannot
-    /// distinguish "the method is not implemented" from "the parameter was rejected".
+    /// Reads one output property without assuming its type. Some Acer methods answer a scalar and
+    /// others answer a byte array, and converting the array throws before it can be reported.
     /// </summary>
-    private static (ulong? Value, string? Error) TryInvokeDetailed(
+    private static (string? Value, string? Error) TryReadRaw(
         ManagementObject instance,
         string methodName,
         string inputName,
@@ -586,13 +586,36 @@ public static class EcProbe
     {
         try
         {
-            return (InvokeGetLocked(instance, methodName, inputName, input, outputName), null);
+            if (!methodName.StartsWith(ReadOnlyPrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException($"EC probe is read-only; refusing {methodName}.");
+
+            using var inParams = instance.GetMethodParameters(methodName);
+            inParams[inputName] = input;
+
+            using var outParams = instance.InvokeMethod(methodName, inParams, null);
+            if (outParams == null) return (null, "no output object");
+
+            foreach (PropertyData property in outParams.Properties)
+            {
+                if (string.Equals(property.Name, outputName, StringComparison.OrdinalIgnoreCase))
+                    return (DescribeValue(property.Value), null);
+            }
+
+            return (null, $"no {outputName} property");
         }
         catch (Exception ex)
         {
             return (null, ex.Message);
         }
     }
+
+    /// <summary>A scalar as text, and a byte array as hex, so the layout survives the report.</summary>
+    private static string? DescribeValue(object? value) => value switch
+    {
+        null => null,
+        byte[] bytes => Convert.ToHexString(bytes),
+        _ => Convert.ToString(value, CultureInfo.InvariantCulture)
+    };
 
     private static void WithInstance(
         string className,
