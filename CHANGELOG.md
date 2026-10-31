@@ -3,6 +3,43 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 1.0.0 - 2026-10-31
+
+Nitrous 1.0.0 is the first stable release.
+
+### Power modes
+
+- `QUIET / BALANCED / PERFORMANCE / TURBO` now actually change the laptop's operating mode, and
+  the enforced GPU power limit follows it (80 W on Quiet, 115 W on Turbo on the AN16S-61).
+- Nitrous used to write the Acer WMI misc register for this. The firmware stores that value and
+  echoes it back, but does not apply it, so the buttons looked like they worked and changed
+  nothing. On models with an embedded-controller HID interface the mode is now set there.
+- Nitrous asks the controller which modes it supports before sending one, and reads the mode back
+  after every change, so a mode the firmware refuses is never shown as active.
+- Models without that interface keep the existing WMI path.
+
+### Other Nitro models
+
+- Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports — its
+  Acer SMBIOS tables, which Acer WMI methods exist, whether the embedded controller has a HID
+  interface and which modes it lists — and picks the mode channel from that. An unlisted Nitro
+  that follows the same protocol works without a new build.
+- The only per-model data is a short list of firmware quirks that cannot be probed, and a model
+  that is not on it simply gets the plain protocol.
+
+### GPU page
+
+- The GPU page reports the power limit the laptop is enforcing (`draw / enforced / max W`) and
+  never writes it directly.
+
+### Diagnostics
+
+- New **EC PROBE** button writes a read-only report of this machine's Acer firmware interface:
+  the WMI classes and method IDs it exposes, the sensor addresses Nitrous uses, and the
+  power-mode and supported-profile registers. It never calls a `Set*` method. Reports are saved
+  to `%LOCALAPPDATA%\Nitrous\ec-probe`, so a report from another Nitro model can be compared
+  against one that is known to work.
+
 ## 0.8.5 - 2026-10-27
 
 ### GPU page

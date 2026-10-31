@@ -15,7 +15,7 @@
 		     that property is ignored when a custom manifest is supplied. -->
 		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.8.5</Version>
+		<Version>1.0.0</Version>
 		<Product>Nitrous</Product>
 		<Company>Nitrous</Company>
 		<RepositoryUrl>https://github.com/jeremyaliparo/nitrous</RepositoryUrl>
