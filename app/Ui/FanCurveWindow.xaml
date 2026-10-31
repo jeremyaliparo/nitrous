@@ -9,20 +9,20 @@
     <Window.Resources>
         <!-- Line Gradient -->
         <LinearGradientBrush x:Key="CurveStrokeGrad" StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="#38bdf8" Offset="0.0"/>
-            <GradientStop Color="#a855f7" Offset="0.35"/>
-            <GradientStop Color="#c084fc" Offset="0.70"/>
-            <GradientStop Color="#f43f5e" Offset="1.0"/>
+            <GradientStop Color="#B388FF" Offset="0.0"/>
+            <GradientStop Color="#C9A7FF" Offset="0.35"/>
+            <GradientStop Color="#E0C7FF" Offset="0.70"/>
+            <GradientStop Color="#FF5C7A" Offset="1.0"/>
         </LinearGradientBrush>
 
         <!-- Tooltip Drop Shadow -->
-        <DropShadowEffect x:Key="PurpleGlowLine" Color="#a855f7" BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
-        <DropShadowEffect x:Key="PurpleGlowTooltip" Color="#a855f7" BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
+        <DropShadowEffect x:Key="PurpleGlowLine" Color="#B388FF" BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
+        <DropShadowEffect x:Key="PurpleGlowTooltip" Color="#B388FF" BlurRadius="12" ShadowDepth="2" Opacity="0.5"/>
         <DropShadowEffect x:Key="CardShadow" Color="#000000" BlurRadius="25" ShadowDepth="10" Opacity="0.6"/>
 
         <Style x:Key="TabPillStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#64748b"/>
+            <Setter Property="Foreground" Value="#888890"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -32,10 +32,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#1f1133"/>
-                                <Setter TargetName="Bg" Property="BorderBrush" Value="#8b5cf6"/>
+                                <Setter TargetName="Bg" Property="Background" Value="#2A2A30"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#B388FF"/>
                                 <Setter TargetName="Bg" Property="BorderThickness" Value="1"/>
-                                <Setter Property="Foreground" Value="#f5f3ff"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -44,21 +44,21 @@
         </Style>
 
         <Style x:Key="SimpleCheckBoxStyle" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#94a3b8"/>
+            <Setter Property="Foreground" Value="#888890"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
-                            <Border Width="14" Height="14" Background="#0d1017" BorderBrush="#334155" BorderThickness="1" CornerRadius="2" VerticalAlignment="Center">
-                                <Path x:Name="CheckMark" Data="M3,7 L6,10 L11,3" Stroke="#c084fc" StrokeThickness="2" Stretch="Uniform" Margin="1" Visibility="Collapsed"/>
+                            <Border Width="14" Height="14" Background="#141416" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="2" VerticalAlignment="Center">
+                                <Path x:Name="CheckMark" Data="M3,7 L6,10 L11,3" Stroke="#B388FF" StrokeThickness="2" Stretch="Uniform" Margin="1" Visibility="Collapsed"/>
                             </Border>
                             <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
-                                <Setter Property="Foreground" Value="#f5f3ff"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -67,24 +67,50 @@
         </Style>
 
         <Style x:Key="SyncToggleStyle" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#64748b"/>
+            <Setter Property="Foreground" Value="#888890"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <Border x:Name="Bg" Background="Transparent" CornerRadius="6" Padding="12,6">
                             <StackPanel Orientation="Horizontal">
-                                <Path x:Name="Icon" Data="M6,3H8A2,2 0 0,1 10,5V7A2,2 0 0,1 8,9H6 M4,7H2A2,2 0 0,1 0,5V3A2,2 0 0,1 2,1H4" Stroke="#64748b" StrokeThickness="1.4" Stretch="Uniform" Width="12" Height="10" Margin="0,0,6,0"/>
+                                <Path x:Name="Icon" Data="M6,3H8A2,2 0 0,1 10,5V7A2,2 0 0,1 8,9H6 M4,7H2A2,2 0 0,1 0,5V3A2,2 0 0,1 2,1H4" Stroke="#888890" StrokeThickness="1.4" Stretch="Uniform" Width="12" Height="10" Margin="0,0,6,0"/>
                                 <TextBlock Text="Sync" Foreground="{TemplateBinding Foreground}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bg" Property="Background" Value="#1f1133"/>
-                                <Setter TargetName="Bg" Property="BorderBrush" Value="#8b5cf6"/>
+                                <Setter TargetName="Bg" Property="Background" Value="#2A2A30"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#B388FF"/>
                                 <Setter TargetName="Bg" Property="BorderThickness" Value="1"/>
-                                <Setter Property="Foreground" Value="#f5f3ff"/>
-                                <Setter TargetName="Icon" Property="Stroke" Value="#f5f3ff"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                                <Setter TargetName="Icon" Property="Stroke" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="RampPillStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#888890"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="5" Padding="10,4">
+                            <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#2A2A30"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="#B388FF"/>
+                                <Setter TargetName="Bg" Property="BorderThickness" Value="1"/>
+                                <Setter Property="Foreground" Value="#B388FF"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -95,7 +121,7 @@
 
     <Grid Background="Transparent" Margin="20">
         <!-- Main Card -->
-        <Border Background="#121622" CornerRadius="18" BorderBrush="#1d2332" BorderThickness="1.2" Effect="{StaticResource CardShadow}">
+        <Border Background="#1C1C1F" CornerRadius="18" BorderBrush="#2A2A30" BorderThickness="1.2" Effect="{StaticResource CardShadow}">
             <Grid Margin="26,24,26,26">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -109,16 +135,16 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Propeller Icon -->
                         <Grid Width="24" Height="24" Margin="0,0,12,0">
-                            <Ellipse Stroke="#334155" StrokeThickness="1.2"/>
-                            <Ellipse Width="6" Height="6" Fill="#c084fc"/>
-                            <Path Data="M12 9a3 3 0 0 1 3-3c1.5 0 2 1.5 1 3l-3 1 M15 12a3 3 0 0 1 3 3c0 1.5-1.5 2-3 1l-1-3 M12 15a3 3 0 0 1-3 3c-1.5 0-2-1.5-1-3l3-1 M9 12a3 3 0 0 1-3-3c0-1.5 1.5-2 3-1l1 3" Stroke="#c084fc" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="Uniform"/>
+                            <Ellipse Stroke="#2A2A30" StrokeThickness="1.2"/>
+                            <Ellipse Width="6" Height="6" Fill="#B388FF"/>
+                            <Path Data="M12 9a3 3 0 0 1 3-3c1.5 0 2 1.5 1 3l-3 1 M15 12a3 3 0 0 1 3 3c0 1.5-1.5 2-3 1l-1-3 M12 15a3 3 0 0 1-3 3c-1.5 0-2-1.5-1-3l3-1 M9 12a3 3 0 0 1-3-3c0-1.5 1.5-2 3-1l1 3" Stroke="#B388FF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="Uniform"/>
                         </Grid>
-                        <TextBlock Text="Custom Fan Curve" Foreground="#f8fafc" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <TextBlock Text="Custom Fan Curve" Foreground="#FFFFFF" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Tabs & Close Button -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Border Background="#0b0e15" BorderBrush="#1d2433" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,15,0">
+                        <Border Background="#141416" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,15,0">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="TabCpu" Content="CPU" IsChecked="True" Style="{StaticResource TabPillStyle}" Checked="Tab_Checked"/>
                                 <RadioButton x:Name="TabGpu" Content="GPU" Style="{StaticResource TabPillStyle}" Checked="Tab_Checked"/>
@@ -126,7 +152,7 @@
                         </Border>
 
                         <!-- Fixed Close Button -->
-                        <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#64748b" Cursor="Hand" Click="CloseBtn_Click">
+                        <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="#888890" Cursor="Hand" Click="CloseBtn_Click">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
                                     <Border x:Name="Bg" Background="Transparent" CornerRadius="4" Padding="6,2">
@@ -134,8 +160,8 @@
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Bg" Property="Background" Value="#1A1F2E"/>
-                                            <Setter Property="Foreground" Value="#f8fafc"/>
+                                            <Setter TargetName="Bg" Property="Background" Value="#2A2A30"/>
+                                            <Setter Property="Foreground" Value="#FFFFFF"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -145,7 +171,7 @@
                 </Grid>
 
                 <!-- GRAPH AREA -->
-                <Border Grid.Row="1" Background="#090c13" CornerRadius="12" BorderBrush="#19202f" BorderThickness="1" Margin="0,0,0,25">
+                <Border Grid.Row="1" Background="#141416" CornerRadius="12" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,0,0,25">
                     <Grid Margin="15,20,20,15">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="40"/>
@@ -164,13 +190,13 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0" Text="100%" Foreground="#64748b" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
-                            <TextBlock Grid.Row="1" Text="75%" Foreground="#475569" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
-                            <TextBlock Grid.Row="2" Text="50%" Foreground="#475569" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
-                            <TextBlock Grid.Row="3" Text="25%" Foreground="#475569" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBlock Grid.Row="0" Text="100%" Foreground="#888890" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBlock Grid.Row="1" Text="75%" Foreground="#6E6E76" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBlock Grid.Row="2" Text="50%" Foreground="#6E6E76" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
+                            <TextBlock Grid.Row="3" Text="25%" Foreground="#6E6E76" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Top"/>
                         </Grid>
                         <!-- 1% label at absolute bottom (0% is not a valid request) -->
-                        <TextBlock Grid.Column="0" Grid.Row="0" Text="1%" Foreground="#64748b" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,5,-7"/>
+                        <TextBlock Grid.Column="0" Grid.Row="0" Text="1%" Foreground="#888890" FontSize="10" FontWeight="SemiBold" TextAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,5,-7"/>
 
                         <!-- PLOT AREA -->
                         <Grid Grid.Column="1" Grid.Row="0">
@@ -182,13 +208,13 @@
                                     <RowDefinition Height="*"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <Border Grid.Row="0" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
-                                <Border Grid.Row="1" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
-                                <Border Grid.Row="2" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
-                                <Border Grid.Row="3" BorderBrush="#141924" BorderThickness="0,1,0,0"/>
+                                <Border Grid.Row="0" BorderBrush="#232328" BorderThickness="0,1,0,0"/>
+                                <Border Grid.Row="1" BorderBrush="#232328" BorderThickness="0,1,0,0"/>
+                                <Border Grid.Row="2" BorderBrush="#232328" BorderThickness="0,1,0,0"/>
+                                <Border Grid.Row="3" BorderBrush="#232328" BorderThickness="0,1,0,0"/>
                             </Grid>
                             <!-- Baseline 1% line -->
-                            <Border BorderBrush="#1c2333" BorderThickness="0,0,0,1" VerticalAlignment="Bottom"/>
+                            <Border BorderBrush="#2A2A30" BorderThickness="0,0,0,1" VerticalAlignment="Bottom"/>
 
                             <!-- Vertical Grid Lines (30, 45, 60, 75, 90, 100) -->
                             <Grid>
@@ -199,20 +225,20 @@
                                     <ColumnDefinition Width="15*"/>
                                     <ColumnDefinition Width="10*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" BorderBrush="#121722" BorderThickness="1,0,0,0"/>
-                                <Border Grid.Column="1" BorderBrush="#121722" BorderThickness="1,0,0,0"/>
-                                <Border Grid.Column="2" BorderBrush="#121722" BorderThickness="1,0,0,0"/>
-                                <Border Grid.Column="3" BorderBrush="#121722" BorderThickness="1,0,0,0"/>
-                                <Border Grid.Column="4" BorderBrush="#121722" BorderThickness="1,0,1,0"/>
+                                <Border Grid.Column="0" BorderBrush="#232328" BorderThickness="1,0,0,0"/>
+                                <Border Grid.Column="1" BorderBrush="#232328" BorderThickness="1,0,0,0"/>
+                                <Border Grid.Column="2" BorderBrush="#232328" BorderThickness="1,0,0,0"/>
+                                <Border Grid.Column="3" BorderBrush="#232328" BorderThickness="1,0,0,0"/>
+                                <Border Grid.Column="4" BorderBrush="#232328" BorderThickness="1,0,1,0"/>
                             </Grid>
 
                             <!-- Canvas -->
                             <Canvas x:Name="GraphCanvas" ClipToBounds="False" MouseMove="GraphCanvas_MouseMove" MouseUp="GraphCanvas_MouseUp" MouseLeave="GraphCanvas_MouseLeave" Background="Transparent">
                                 <Polyline x:Name="CurveLine" Stroke="{StaticResource CurveStrokeGrad}" StrokeThickness="3" StrokeLineJoin="Round" IsHitTestVisible="False" Effect="{StaticResource PurpleGlowLine}"/>
-                                <Border x:Name="NodeTooltip" Visibility="Hidden" Background="#140f22" BorderBrush="#a855f7" BorderThickness="1.2" CornerRadius="6" Padding="10,4" Panel.ZIndex="999" Effect="{StaticResource PurpleGlowTooltip}" IsHitTestVisible="False">
+                                <Border x:Name="NodeTooltip" Visibility="Hidden" Background="#1C1C1F" BorderBrush="#B388FF" BorderThickness="1.2" CornerRadius="6" Padding="10,4" Panel.ZIndex="999" Effect="{StaticResource PurpleGlowTooltip}" IsHitTestVisible="False">
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <Ellipse Width="6" Height="6" Fill="#a855f7" Margin="0,0,6,0"/>
-                                        <TextBlock x:Name="TooltipText" Text="68°C · 43%" Foreground="#f5f3ff" FontSize="11.5" FontWeight="Bold"/>
+                                        <Ellipse Width="6" Height="6" Fill="#B388FF" Margin="0,0,6,0"/>
+                                        <TextBlock x:Name="TooltipText" Text="68°C · 43%" Foreground="#FFFFFF" FontSize="11.5" FontWeight="Bold"/>
                                     </StackPanel>
                                 </Border>
                             </Canvas>
@@ -227,12 +253,12 @@
                                 <ColumnDefinition Width="15*"/>
                                 <ColumnDefinition Width="10*"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="30°C" Foreground="#64748b" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
-                            <TextBlock Grid.Column="1" Text="45°C" Foreground="#64748b" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
-                            <TextBlock Grid.Column="2" Text="60°C" Foreground="#64748b" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
-                            <TextBlock Grid.Column="3" Text="75°C" Foreground="#64748b" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
-                            <TextBlock Grid.Column="4" Text="90°C" Foreground="#64748b" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
-                            <TextBlock Grid.Column="4" Text="100°C" Foreground="#f43f5e" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,-15,0"/>
+                            <TextBlock Grid.Column="0" Text="30°C" Foreground="#888890" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
+                            <TextBlock Grid.Column="1" Text="45°C" Foreground="#888890" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
+                            <TextBlock Grid.Column="2" Text="60°C" Foreground="#888890" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
+                            <TextBlock Grid.Column="3" Text="75°C" Foreground="#888890" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
+                            <TextBlock Grid.Column="4" Text="90°C" Foreground="#888890" FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Left" Margin="-12,0,0,0"/>
+                            <TextBlock Grid.Column="4" Text="100°C" Foreground="#FF5C7A" FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,-15,0"/>
                         </Grid>
                     </Grid>
                 </Border>
@@ -243,14 +269,24 @@
                         <CheckBox x:Name="TogEnableCurve" Content="Enable Curve Override" IsChecked="{Binding IsCurveModeEnabled}" Style="{StaticResource SimpleCheckBoxStyle}"/>
                         <CheckBox x:Name="TogSnapToGrid" Content="Snap to Grid (5% / 5°C)" IsChecked="True" Margin="25,0,0,0" Style="{StaticResource SimpleCheckBoxStyle}"/>
                     </StackPanel>
+
+                    <!-- Ramp down belongs with the curve it shapes. -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="RAMP DOWN" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"
+                                   ToolTip="How quickly the fans may slow down after a load burst. Rises are always instant."/>
+                        <RadioButton x:Name="RampOff" Content="Off" Tag="Off" Style="{StaticResource RampPillStyle}" Checked="Ramp_Checked"/>
+                        <RadioButton x:Name="RampGentle" Content="Gentle" Tag="Gentle" Style="{StaticResource RampPillStyle}" Checked="Ramp_Checked"/>
+                        <RadioButton x:Name="RampBalanced" Content="Balanced" Tag="Balanced" Style="{StaticResource RampPillStyle}" Checked="Ramp_Checked"/>
+                        <RadioButton x:Name="RampFast" Content="Fast" Tag="Fast" Style="{StaticResource RampPillStyle}" Checked="Ramp_Checked"/>
+                    </StackPanel>
                 </Grid>
 
-                <Border Grid.Row="3" BorderBrush="#171d2b" BorderThickness="0,1,0,0" Padding="0,15,0,0">
+                <Border Grid.Row="3" BorderBrush="#2A2A30" BorderThickness="0,1,0,0" Padding="0,15,0,0">
                     <Grid>
-                        <TextBlock Text="Tip: Drag any waypoint circle to adjust temperature thresholds." Foreground="#64748b" FontSize="11.5" VerticalAlignment="Center"/>
+                        <TextBlock Text="Tip: Drag any waypoint circle to adjust temperature thresholds." Foreground="#888890" FontSize="11.5" VerticalAlignment="Center"/>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <Button Content="Reset to Defaults" Click="ResetBtn_Click" Foreground="#a855f7" Cursor="Hand" Margin="0,0,15,0">
+                            <Button Content="Reset to Defaults" Click="ResetBtn_Click" Foreground="#B388FF" Cursor="Hand" Margin="0,0,15,0">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bg" Background="Transparent" CornerRadius="6" Padding="10,6">
@@ -258,8 +294,8 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bg" Property="Background" Value="#1A1F2E"/>
-                                                <Setter Property="Foreground" Value="#c084fc"/>
+                                                <Setter TargetName="Bg" Property="Background" Value="#2A2A30"/>
+                                                <Setter Property="Foreground" Value="#B388FF"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -269,7 +305,7 @@
                             <Button Content="SAVE &amp; APPLY" Click="SaveBtn_Click" Foreground="#ffffff" FontSize="12" FontWeight="Heavy" Height="36" Width="140" Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
-                                        <Border Background="#a855f7" CornerRadius="6">
+                                        <Border Background="#B388FF" CornerRadius="6">
                                             <Grid>
                                                 <!-- Subtle 15% white overlay for a premium hover effect -->
                                                 <Border x:Name="HoverOverlay" Background="White" Opacity="0" CornerRadius="6"/>

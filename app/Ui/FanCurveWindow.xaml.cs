@@ -41,6 +41,8 @@ public partial class FanCurveWindow : Window
         _viewModel = viewModel;
         DataContext = _viewModel;
 
+        SyncRampSelection();
+
         // Listen for Power Profile changes from the Dashboard
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
@@ -48,6 +50,22 @@ public partial class FanCurveWindow : Window
         LoadCurvesForProfile(_viewModel.ActivePowerProfile);
 
         this.Loaded += (s, e) => RedrawGraph();
+    }
+
+    /// <summary>Marks the ramp option the view model already holds, without writing it back.</summary>
+    private void SyncRampSelection()
+    {
+        var current = _viewModel.FanRampDown;
+        RampOff.IsChecked = current == FanRamp.Off;
+        RampGentle.IsChecked = current == FanRamp.Gentle;
+        RampBalanced.IsChecked = current == FanRamp.Balanced;
+        RampFast.IsChecked = current == FanRamp.Fast;
+    }
+
+    private void Ramp_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.RadioButton { Tag: string value })
+            _viewModel.FanRampDown = value;
     }
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
