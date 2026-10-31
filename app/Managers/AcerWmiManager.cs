@@ -206,6 +206,18 @@ public static class AcerWmiManager
                     var state = (int)((value >> 8) & 0xFF);
                     var floor = (int)((value >> 16) & 0xFF);
 
+                    // The firmware answers 0x0F or 0x1F for this function. Anything else means it
+                    // does not implement it, and reading that as "off" would offer a toggle that
+                    // cannot do anything. A BIOS that answers a constant for every function does
+                    // exactly this.
+                    if (state != AcerWmiProtocol.UsbChargingOn &&
+                        state != AcerWmiProtocol.UsbChargingOff)
+                    {
+                        Logger.Info($"WMI: USB charging answered 0x{value:X} " +
+                                    $"(state 0x{state:X2}); treating it as unsupported.");
+                        return null;
+                    }
+
                     return new UsbChargingState(
                         state == AcerWmiProtocol.UsbChargingOn,
                         AcerWmiProtocol.UsbChargingFloors.Contains(floor) ? floor : null);
