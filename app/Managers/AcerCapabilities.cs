@@ -73,6 +73,18 @@ internal sealed record AcerCapabilities(
     /// <summary>True when Nitrous can actually change the operating mode here.</summary>
     public bool CanSetPowerMode => PowerModeChannel is PowerModeChannel.EcHid or PowerModeChannel.Wmi;
 
+    /// <summary>
+    /// Whether the channel Nitrous would use can select Turbo. This is what the UI shows, so it
+    /// has to agree with what <see cref="AcerWmiManager.SetPowerModeAsync"/> will do — the WMI
+    /// mask alone disagreed on models whose controller lists the mode but whose register does not.
+    /// </summary>
+    public bool SupportsTurbo => PowerModeChannel switch
+    {
+        PowerModeChannel.EcHid => EcHid is { } hid && hid.Modes.Contains(PowerProfile.Turbo),
+        PowerModeChannel.Wmi => Wmi.SupportedProfiles.Contains(PowerProfile.Turbo),
+        _ => false
+    };
+
     public string Describe() =>
         $"model {Model ?? "unknown"} ({BiosVersion ?? "unknown BIOS"}); " +
         $"channel {PowerModeChannel}; " +

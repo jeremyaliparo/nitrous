@@ -24,7 +24,6 @@ public static class AcerWmiManager
     private static ManagementObject? _battery;
 
     private static bool? _hardwareSupported;
-    private static bool? _turboSupported;
     private static bool _telemetryFailureLogged;
     private static bool _batteryFailureLogged;
 
@@ -52,43 +51,36 @@ public static class AcerWmiManager
         }
     }
 
+    /// <summary>
+    /// Whether Turbo can be selected here. Asked of the capability probe, so it agrees with the
+    /// channel the mode write actually uses: the WMI mask alone hid Turbo on models whose
+    /// controller lists the mode but whose register does not advertise it.
+    /// </summary>
     public static bool IsTurboModeSupported()
     {
-        lock (Gate)
+        try
         {
-            if (_turboSupported.HasValue) return _turboSupported.Value;
+            var capabilities = AcerCapabilitiesProvider.Current;
+            var supported =
+                (capabilities.PowerModeChannel is PowerModeChannel.EcHid or PowerModeChannel.Wmi) &&
+                capabilities.SupportsTurbo;
 
-            try
+            // An empty WMI mask is more often a read that failed once than a model with no modes,
+            // so ask again rather than caching "no Turbo" for the session.
+            if (!supported &&
+                capabilities.PowerModeChannel == PowerModeChannel.Wmi &&
+                capabilities.Wmi.SupportedProfiles.Count == 0)
             {
-                var instance = GetGamingInstanceLocked();
-                if (instance == null)
-                {
-                    _turboSupported = false;
-                    return false;
-                }
-
-                using var inParams = instance.GetMethodParameters(AcerWmiProtocol.GetGamingMiscSetting);
-                inParams["gmInput"] = AcerWmiProtocol.SupportedProfilesSetting;
-
-                using var outParams = instance.InvokeMethod(AcerWmiProtocol.GetGamingMiscSetting, inParams, null);
-                var rawValue = outParams?.Properties["gmOutput"]?.Value ?? outParams?.Properties["outValue"]?.Value;
-                if (rawValue == null)
-                {
-                    _turboSupported = false;
-                    return false;
-                }
-
-                var supportedBitmap = (int)((Convert.ToUInt64(rawValue) >> 8) & 0xFF);
-                _turboSupported = (supportedBitmap & (1 << AcerWmiProtocol.TurboProfileBit)) != 0;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("WMI: failed to query supported power profiles.", ex);
-                InvalidateGamingLocked();
-                _turboSupported = false;
+                supported = AcerCapabilitiesProvider.Refresh().SupportsTurbo;
             }
 
-            return _turboSupported.Value;
+            return supported;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Capabilities: could not determine whether Turbo is supported.", ex);
+            AcerCapabilitiesProvider.Invalidate();
+            return false;
         }
     }
 

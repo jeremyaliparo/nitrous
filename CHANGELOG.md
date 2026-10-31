@@ -16,6 +16,9 @@ Nitrous 1.0.0 is the first stable release.
   nothing. On models with an embedded-controller HID interface the mode is set there instead, and
   the mode is read back after every change so a refused one is never shown as active.
 - Models without that interface keep the WMI path.
+- Turbo is offered whenever the channel Nitrous actually uses lists it, not only when the WMI
+  register advertises it, so models that used to hide the button now show it. A failed read is
+  retried instead of being remembered for the session.
 
 ### Fans
 
