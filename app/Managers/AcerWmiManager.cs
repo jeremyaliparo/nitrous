@@ -245,6 +245,63 @@ public static class AcerWmiManager
         return false;
     }
 
+    /// <summary>
+    /// LCD overdrive: whether the panel has it, and whether it is on. Null when the firmware does
+    /// not answer. Overdrive is a panel property, so 0xFF means this panel does not have it.
+    /// </summary>
+    public static (bool Supported, bool On)? GetLcdOverdrive()
+    {
+        lock (Gate)
+        {
+            if (ReadGamingMethodLocked(AcerWmiProtocol.GetGamingProfile, AcerWmiProtocol.ProfileQuery)
+                is not { } raw)
+            {
+                return null;
+            }
+
+            var supported = AcerWmiProtocol.LcdOverdriveSupported(raw);
+            return (supported, supported && AcerWmiProtocol.LcdOverdriveOn(raw));
+        }
+    }
+
+    /// <summary>Turns LCD overdrive on or off.</summary>
+    public static bool SetLcdOverdrive(bool on)
+    {
+        lock (Gate)
+        {
+            return InvokeGamingLocked(
+                AcerWmiProtocol.SetGamingProfile,
+                AcerWmiProtocol.LcdOverdrivePayload(on).ToString());
+        }
+    }
+
+    /// <summary>Invokes a gaming method that answers a value; used by the profile reads.</summary>
+    private static ulong? ReadGamingMethodLocked(string methodName, uint input)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return null;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                inParams["gmInput"] = input;
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+
+                var raw = outParams?.Properties["gmOutput"]?.Value;
+                return raw == null ? null : Convert.ToUInt64(raw);
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                if (attempt == 1) Logger.Warn($"WMI: {methodName} failed.", ex);
+            }
+        }
+
+        return null;
+    }
+
     private static bool TrySetPowerModeViaEcHid(PowerProfile profile, EcHidInfo info)
     {
         try

@@ -62,6 +62,12 @@ Nitrous 1.0.0 is the first stable release.
 - The GPU page reports the power limit the laptop is enforcing (`draw / enforced / max W`) and
   never writes it directly.
 
+### Display
+
+- **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
+  panel rather than the model, so the toggle is only enabled where the firmware reports the panel
+  supports it; it is left disabled rather than pretending to work.
+
 ### Diagnostics
 
 - New **EC PROBE** button writes a read-only report of this machine's Acer firmware: the WMI

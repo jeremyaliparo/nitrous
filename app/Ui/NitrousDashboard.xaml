@@ -650,6 +650,20 @@
 							<RadioButton x:Name="BtnRefreshMax" TabIndex="1" GroupName="Refresh" Uid="MaxHz" Tag="M13,2L4,14H11L9,22L20,10H13L15,2Z" Content="{Binding MaxRefreshText}" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetRefreshCommand}" CommandParameter="MaxHz"/>
 						</UniformGrid>
 					</Border>
+					<!-- LCD Overdrive -->
+					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,16">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<StackPanel Grid.Column="0" VerticalAlignment="Center">
+								<TextBlock Text="LCD Overdrive" Foreground="White" FontWeight="Bold" FontSize="11"/>
+								<TextBlock Text="Faster panel response. Shown only on panels that support it." Foreground="#888890" FontSize="9.5" TextWrapping="Wrap"/>
+							</StackPanel>
+							<CheckBox Grid.Column="1" x:Name="TogLcdOverdrive" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
+						</Grid>
+					</Border>
 					<!-- Fans -->
 					<TextBlock Text="FANS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
 					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">

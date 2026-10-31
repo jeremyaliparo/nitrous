@@ -51,6 +51,7 @@ public partial class NitrousDashboard : Window
 
         InitializeKeyboardLighting();
         InitializeUsbCharging();
+        InitializeLcdOverdrive();
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -608,6 +609,43 @@ public partial class NitrousDashboard : Window
         catch (Exception ex)
         {
             Logger.Warn("USB charging: could not apply the setting.", ex);
+        }
+    }
+
+    private bool _lcdOverdriveLoading = true;
+    private bool _lcdOverdriveAvailable;
+
+    /// <summary>
+    /// LCD overdrive is a panel property, not a model one: the firmware answers 0xFF for panels
+    /// that do not have it, so the toggle stays disabled rather than pretending to work.
+    /// </summary>
+    private void InitializeLcdOverdrive()
+    {
+        var state = AcerWmiManager.GetLcdOverdrive();
+        _lcdOverdriveAvailable = state is { Supported: true };
+
+        TogLcdOverdrive.IsEnabled = _lcdOverdriveAvailable;
+
+        if (state is { Supported: true, On: var on })
+            TogLcdOverdrive.IsChecked = on;
+        else
+            TogLcdOverdrive.ToolTip = "This panel does not support LCD overdrive.";
+
+        _lcdOverdriveLoading = false;
+    }
+
+    private void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_lcdOverdriveLoading || !_lcdOverdriveAvailable) return;
+
+        try
+        {
+            if (!AcerWmiManager.SetLcdOverdrive(TogLcdOverdrive.IsChecked == true))
+                Logger.Warn("LCD overdrive: the firmware refused the change.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("LCD overdrive: could not apply the change.", ex);
         }
     }
 

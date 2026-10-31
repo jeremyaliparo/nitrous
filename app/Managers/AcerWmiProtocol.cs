@@ -50,6 +50,22 @@ internal static class AcerWmiProtocol
     public const byte BatteryNumber = 1;
     public const byte BatteryFunctionMask = 1;
 
+    // SetGamingProfile: the gaming profile settings (Windows key lock, LCD overdrive).
+    public const string SetGamingProfile = "SetGamingProfile";
+    public const string GetGamingProfile = "GetGamingProfile";
+    public const uint ProfileQuery = 0;
+
+    public static ulong LcdOverdrivePayload(bool on) => 0x10UL | ((on ? 1UL : 0UL) << 48);
+
+    /// <summary>1 = on; anything else = off.</summary>
+    public static bool LcdOverdriveOn(ulong output) => ((output >> 48) & 0xFF) == 1;
+
+    /// <summary>
+    /// Overdrive depends on the panel, not the model: the firmware answers 0 or 1 for panels that
+    /// have it and 0xFF for the others.
+    /// </summary>
+    public static bool LcdOverdriveSupported(ulong output) => ((output >> 48) & 0xFF) is 0 or 1;
+
     // APGeAction: power-off USB charging (function 4).
     public const string ActionClass = "APGeAction";
     public const uint UsbChargingQuery = 0x04;
