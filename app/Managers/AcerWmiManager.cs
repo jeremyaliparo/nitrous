@@ -163,21 +163,12 @@ public static class AcerWmiManager
                 return false;
             }
 
-            // Acer's software keeps the firmware's own WMI copy in step after a HID write. The value
-            // is informational there, so a failure is not worth reporting.
-            try
-            {
-                lock (Gate)
-                {
-                    InvokeGamingLocked(
-                        AcerWmiProtocol.SetGamingMiscSetting,
-                        AcerWmiProtocol.PowerModePayload(profile).ToString());
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("EC HID: could not mirror the mode into the WMI register.", ex);
-            }
+            // Deliberately no WMI mirror write here. AcerQAAgent, which NitroSense drives, sends only
+            // the HID Mode report (captured 31 Oct): Mode Set, then Mode Get. The extra
+            // SetGamingMiscSetting(0x0B) write makes the controller acknowledge a second time with
+            // its own colour, which is why Nitrous flashed one colour for every profile while
+            // NitroSense showed the firmware's per-mode colour. The WMI register is informational
+            // and reads back stale, exactly as Acer's own software leaves it.
 
             var readBack = hid.ReadMode();
             Logger.Info($"EC HID: power mode set to {profile} (read back {readBack?.ToString() ?? "unknown"}).");
