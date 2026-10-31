@@ -10,23 +10,22 @@ Nitrous 1.0.0 is the first stable release.
 ### Power modes
 
 - `QUIET / BALANCED / PERFORMANCE / TURBO` now actually change the laptop's operating mode, and
-  the enforced GPU power limit follows it (80 W on Quiet, 115 W on Turbo on the AN16S-61).
+  the enforced GPU power limit follows it. On the AN16S-61 that is 80 / 85 / 100 / 115 W.
 - Nitrous used to write the Acer WMI misc register for this. The firmware stores that value and
-  echoes it back, but does not apply it, so the buttons looked like they worked and changed
-  nothing. On models with an embedded-controller HID interface the mode is now set there.
-- Nitrous asks the controller which modes it supports before sending one, and reads the mode back
-  after every change, so a mode the firmware refuses is never shown as active.
-- Models without that interface keep the existing WMI path.
+  echoes it back but does not apply it, so the buttons looked like they worked and changed
+  nothing. On models with an embedded-controller HID interface the mode is set there instead, and
+  the mode is read back after every change so a refused one is never shown as active.
+- Models without that interface keep the WMI path.
 
 ### Fans
 
 - Fan curves rise instantly but no longer fall instantly. When the target drops, the fans hold for
   3 seconds and then step down at a chosen rate, so a short burst of load no longer makes them rev
-  up and drop again — and the heatsink keeps shedding the heat it just took.
-- **Ramp down** on the Custom fan panel: `Off`, `Gentle` (5 %/s), `Balanced` (10 %/s, default) and
+  up and drop again.
+- **Ramp down** in the curve editor: `Off`, `Gentle` (5 %/s), `Balanced` (10 %/s, default) and
   `Fast` (20 %/s). `Off` keeps the previous behaviour.
-- The ramp never applies while the chip is at or above 90 °C: the fans go straight to the curve's
-  speed.
+- The ramp never applies at or above 90 °C: the fans go straight to the curve's speed.
+- The curve editor now uses the dashboard's colours instead of the old blue theme.
 
 ### Other Nitro models
 
@@ -34,8 +33,8 @@ Nitrous 1.0.0 is the first stable release.
   Acer SMBIOS tables, which Acer WMI methods exist, whether the embedded controller has a HID
   interface and which modes it lists — and picks the mode channel from that. An unlisted Nitro
   that follows the same protocol works without a new build.
-- The only per-model data is a short list of firmware quirks that cannot be probed, and a model
-  that is not on it simply gets the plain protocol.
+- The only per-model data is a short list of firmware quirks that cannot be probed; a model that
+  is not on it gets the plain protocol.
 
 ### GPU page
 
@@ -44,11 +43,12 @@ Nitrous 1.0.0 is the first stable release.
 
 ### Diagnostics
 
-- New **EC PROBE** button writes a read-only report of this machine's Acer firmware interface:
-  the WMI classes and method IDs it exposes, the sensor addresses Nitrous uses, and the
-  power-mode and supported-profile registers. It never calls a `Set*` method. Reports are saved
-  to `%LOCALAPPDATA%\Nitrous\ec-probe`, so a report from another Nitro model can be compared
-  against one that is known to work.
+- New **EC PROBE** button writes a read-only report of this machine's Acer firmware: the WMI
+  classes and method IDs it exposes, the EC HID interface and the modes it lists, the SMBIOS
+  gaming version, the sensor addresses Nitrous uses, and the power-mode and supported-profile
+  registers. It never calls a `Set*` method. Reports are saved to
+  `%LOCALAPPDATA%\Nitrous\ec-probe`, so a report from another Nitro model can be compared against
+  one that is known to work.
 
 ## 0.8.5 - 2026-10-27
 
