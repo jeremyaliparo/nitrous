@@ -94,15 +94,121 @@ public static class AcerWmiManager
 
     public static Task SetPowerModeAsync(PowerProfile profile)
     {
-        var payload = AcerWmiProtocol.PowerModePayload(profile).ToString();
         return Task.Run(() =>
         {
+            var capabilities = AcerCapabilitiesProvider.Current;
+
+            if (capabilities.PowerModeChannel == PowerModeChannel.EcHid &&
+                capabilities.EcHid is { Modes.Count: > 0 } ecHid &&
+                TrySetPowerModeViaEcHid(profile, ecHid))
+            {
+                return;
+            }
+
             lock (Gate)
             {
-                if (!InvokeGamingLocked(AcerWmiProtocol.SetGamingMiscSetting, payload))
-                    Logger.Warn($"WMI: failed to set power mode {profile}.");
+                if (SetPowerModeViaWmiLocked(profile, capabilities.Profile))
+                    return;
             }
+
+            if (capabilities.PowerModeChannel == PowerModeChannel.ActionFunction7)
+            {
+                Logger.Warn(
+                    $"Power mode {profile} was not applied: this model keeps the mode on APGeAction " +
+                    "function 7, which Nitrous does not write yet.");
+                return;
+            }
+
+            Logger.Warn($"WMI: failed to set power mode {profile}.");
         });
+    }
+
+    /// <summary>
+    /// The operating mode the EC's HID interface reports, or null when this model has none. Reading
+    /// never changes anything and never touches the GPU.
+    /// </summary>
+    public static PowerProfile? GetEcPowerMode()
+    {
+        if (AcerCapabilitiesProvider.Current.EcHid is not { Modes.Count: > 0 } info) return null;
+
+        try
+        {
+            using var hid = AcerEcHid.OpenWith(info.Modes);
+            return hid?.ReadMode();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("EC HID: could not read the power mode.", ex);
+            AcerCapabilitiesProvider.Invalidate();
+            return null;
+        }
+    }
+
+    private static bool TrySetPowerModeViaEcHid(PowerProfile profile, EcHidInfo info)
+    {
+        try
+        {
+            // The mode list came from the capability probe, so opening costs no extra exchanges.
+            using var hid = AcerEcHid.OpenWith(info.Modes);
+            if (hid == null)
+            {
+                AcerCapabilitiesProvider.Invalidate();
+                return false;
+            }
+
+            if (!hid.WriteMode(profile))
+            {
+                Logger.Warn($"EC HID: the controller refused power mode {profile}.");
+                AcerCapabilitiesProvider.Invalidate();
+                return false;
+            }
+
+            // Acer's software keeps the firmware's own WMI copy in step after a HID write. The value
+            // is informational there, so a failure is not worth reporting.
+            try
+            {
+                lock (Gate)
+                {
+                    InvokeGamingLocked(
+                        AcerWmiProtocol.SetGamingMiscSetting,
+                        AcerWmiProtocol.PowerModePayload(profile).ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("EC HID: could not mirror the mode into the WMI register.", ex);
+            }
+
+            var readBack = hid.ReadMode();
+            Logger.Info($"EC HID: power mode set to {profile} (read back {readBack?.ToString() ?? "unknown"}).");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("EC HID: power mode write failed.", ex);
+            AcerCapabilitiesProvider.Invalidate();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The WMI fallback for models without the EC HID interface. Some firmware moves the mode
+    /// relative to the one in force and only Balanced resets the Intel DTT profile index, so on
+    /// those models the target has to go out from Balanced (see <see cref="AcerModelProfile"/>).
+    /// </summary>
+    private static bool SetPowerModeViaWmiLocked(PowerProfile profile, AcerModelProfile model)
+    {
+        if (model.RequiresBalancedModeReset && profile != PowerProfile.Balanced &&
+            !InvokeGamingLocked(
+                AcerWmiProtocol.SetGamingMiscSetting,
+                AcerWmiProtocol.PowerModePayload(PowerProfile.Balanced).ToString()))
+        {
+            return false;
+        }
+
+        return InvokeGamingLocked(
+            AcerWmiProtocol.SetGamingMiscSetting,
+            AcerWmiProtocol.PowerModePayload(profile).ToString());
     }
 
     public static Task<bool> SetFansAsync(FanProfile profile)
