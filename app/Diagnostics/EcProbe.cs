@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 9,
+            ["probeVersion"] = 10,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -108,6 +108,7 @@ public static class EcProbe
         report["ledState"] = CollectLedState(errors);
         report["fans"] = CollectFans(errors);
         report["battery"] = CollectBattery(errors);
+        report["keyboardAutoOff"] = CollectKeyboardAutoOff(errors);
         report["hidDevices"] = CollectHidDevices(errors);
         report["errors"] = errors;
 
@@ -690,6 +691,73 @@ public static class EcProbe
         }, errors, "battery");
 
         return result;
+    }
+
+    /// <summary>
+    /// The keyboard backlight auto-off, read-only. Acer's agent reads it with
+    /// <c>APGeAction.GetFunction((hotkey &lt;&lt; 8) | 0x80001)</c> and treats the answer's byte 5 as the
+    /// timeout in seconds, 0x1E meaning "off after 30 s". The whole raw value is reported, plus
+    /// bytes 4, 5 and 6, because one published analysis puts the timeout at byte 6 while the code
+    /// here reads byte 5.
+    /// </summary>
+    private static Dictionary<string, object?> CollectKeyboardAutoOff(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        var hotkey = ReadAcerHotkeyNumber();
+        var input = (uint)((hotkey << 8) | 0x80001);
+
+        result["bkHotkeyNumber"] = hotkey;
+        result["readInput"] = $"0x{input:X}";
+
+        WithInstance(AcerWmiProtocol.ActionClass, instance =>
+        {
+            var (value, error) = TryReadRaw(instance, "GetFunction", "uiInput", input, "uiOutput");
+            result["getFunctionRaw"] = value;
+
+            if (error != null)
+            {
+                result["getFunctionError"] = error;
+                return true;
+            }
+
+            if (value != null &&
+                ulong.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var raw))
+            {
+                result["byte4"] = (int)((raw >> 32) & 0xFF);
+                result["byte5"] = (int)((raw >> 40) & 0xFF);
+                result["byte6"] = (int)((raw >> 48) & 0xFF);
+                result["enabled30s"] = ((raw >> 40) & 0xFF) == 0x1E;
+            }
+
+            result["note"] =
+                "Read-only. The write value is not sent by this probe; it is " +
+                "((brightness << 24 | hotkey) << 8) | 0x1E0000080002 to enable and " +
+                "((brightness << 24 | hotkey) << 8) | 0x80002 to disable.";
+
+            return true;
+        }, errors, "keyboardAutoOff");
+
+        return result;
+    }
+
+    /// <summary>The hotkey number Acer's agent uses as the command's second byte.</summary>
+    private static int ReadAcerHotkeyNumber()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\OEM\AcerAgentService");
+
+            if (key?.GetValue("BK_Hotkey_Number") is int value && value > 0 && value <= 0xFF)
+                return value;
+        }
+        catch
+        {
+            // Absent on machines without Acer's agent; the observed default is 132.
+        }
+
+        return 132;
     }
 
     /// <summary>
