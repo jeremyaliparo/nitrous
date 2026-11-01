@@ -411,6 +411,7 @@ public partial class NitrousDashboard : Window
     };
 
     private bool _keyboardTimeoutAvailable;
+    private bool _keyboardAutoOffViaWmi;
 
     /// <summary>
     /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
@@ -441,15 +442,31 @@ public partial class NitrousDashboard : Window
         KeyboardBrightness.Value = _keyboardBrightness;
         KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
 
-        foreach (var (name, _) in KeyboardTimeouts)
-            KeyboardTimeoutBox.Items.Add(name);
-
         // The auto-off lives on the embedded controller, not the lighting controller, so it can be
         // missing even where the zones work. A controller that answers but stores nothing is
         // remembered as not supporting it, so the box does not look usable on every launch.
         var timeoutRefused = SettingsManager.Get("KbTimeoutRefused", 0) == 1;
         var controllerTimeout = timeoutRefused ? null : AcerWmiManager.GetKeyboardBacklightTimeout();
         _keyboardTimeoutAvailable = controllerTimeout is not null;
+
+        // Where there is no EC HID, the same setting is a firmware timeout reachable over
+        // APGeAction. It is only a 30-second on/off there, so the list is trimmed to those two.
+        _keyboardAutoOffViaWmi = false;
+        bool? firmwareAutoOff = null;
+        if (!_keyboardTimeoutAvailable)
+        {
+            firmwareAutoOff = AcerWmiManager.GetKeyboardAutoOff();
+            _keyboardAutoOffViaWmi = firmwareAutoOff.HasValue;
+        }
+
+        var usable = _keyboardTimeoutAvailable || _keyboardAutoOffViaWmi;
+
+        var offeredTimeouts = _keyboardAutoOffViaWmi
+            ? KeyboardTimeouts.Take(2).ToArray()
+            : KeyboardTimeouts;
+
+        foreach (var (name, _) in offeredTimeouts)
+            KeyboardTimeoutBox.Items.Add(name);
 
         // The controller is the truth. NitroSense, a firmware reset or another tool can change the
         // auto-off without Nitrous knowing, and showing the saved value would then claim a state the
@@ -468,12 +485,16 @@ public partial class NitrousDashboard : Window
             Logger.Info($"Keyboard: controller reports an auto-off of {unexpected.TimeoutSeconds}s, " +
                         "which is not one of the offered values; keeping the saved preference.");
         }
+        else if (firmwareAutoOff is { } on)
+        {
+            savedTimeout = on ? 30 : 0;
+        }
 
         var timeoutIndex = Array.FindIndex(KeyboardTimeouts, t => t.Seconds == savedTimeout);
         KeyboardTimeoutBox.SelectedIndex = timeoutIndex >= 0 ? timeoutIndex : 0;
 
-        KeyboardTimeoutBox.IsEnabled = _keyboardTimeoutAvailable;
-        KeyboardTimeoutBox.ToolTip = _keyboardTimeoutAvailable
+        KeyboardTimeoutBox.IsEnabled = usable;
+        KeyboardTimeoutBox.ToolTip = usable
             ? null
             : timeoutRefused
                 ? "This keyboard controller does not store an auto-off."
@@ -482,7 +503,7 @@ public partial class NitrousDashboard : Window
         UpdateZoneButtons();
 
         KeyboardLightingStatus.Text = !_keyboardAvailable
-            ? "Not reachable on this model"
+            ? "Colours not reachable"
             : !_keyboardZoned
                 ? "Single-colour keyboard"
                 : string.Empty;
@@ -637,7 +658,19 @@ public partial class NitrousDashboard : Window
         var seconds = KeyboardTimeouts[KeyboardTimeoutBox.SelectedIndex].Seconds;
         SettingsManager.Save("KbBacklightTimeout", seconds);
 
-        if (!_keyboardTimeoutAvailable) return;
+        if (!_keyboardTimeoutAvailable)
+        {
+            if (!_keyboardAutoOffViaWmi) return;
+
+            // This model keeps the setting as a firmware timeout reachable over APGeAction, and it
+            // only offers 30 seconds or never. SetKeyboardAutoOff reads the value back, so a write
+            // the firmware ignores is reported rather than shown as applied.
+            KeyboardLightingStatus.Text = AcerWmiManager.SetKeyboardAutoOff(seconds != 0)
+                ? string.Empty
+                : "Auto-off refused";
+
+            return;
+        }
 
         try
         {

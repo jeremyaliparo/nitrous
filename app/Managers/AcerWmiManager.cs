@@ -232,6 +232,124 @@ public static class AcerWmiManager
         return null;
     }
 
+    /// <summary>
+    /// The keyboard backlight auto-off as the firmware holds it: true when it turns the backlight off
+    /// after 30 seconds, false when it never does, null when this model does not answer.
+    ///
+    /// Acer's agent reads it with <c>GetFunction((hotkey &lt;&lt; 8) | 0x80001)</c> and treats byte 5 as
+    /// the timeout in seconds. Verified against an ANV15-41: 0x1E with the switch on, 0 with it off.
+    /// </summary>
+    public static bool? GetKeyboardAutoOff()
+    {
+        var hotkey = KeyboardAutoOffHotkey();
+        if (!TryReadActionFunction((uint)((hotkey << 8) | 0x80001), out var raw))
+            return null;
+
+        return ((raw >> 40) & 0xFF) == 0x1E;
+    }
+
+    /// <summary>
+    /// Enables or disables the 30-second keyboard backlight auto-off. The write carries the brightness
+    /// as well, so the value is built the way Acer's agent builds it, and the result is read back:
+    /// a write that the firmware ignores is reported as a failure rather than shown as applied.
+    /// </summary>
+    public static bool SetKeyboardAutoOff(bool enabled)
+    {
+        var hotkey = KeyboardAutoOffHotkey();
+
+        var value = (((ulong)KeyboardAutoOffBrightness << 24) | (uint)hotkey) << 8
+                    | (enabled ? KeyboardAutoOffEnable : KeyboardAutoOffDisable);
+
+        if (!TryWriteActionFunction(value)) return false;
+
+        return GetKeyboardAutoOff() == enabled;
+    }
+
+    private const int KeyboardAutoOffBrightness = 100;
+    private const ulong KeyboardAutoOffEnable = 0x1E0000080002;
+    private const ulong KeyboardAutoOffDisable = 0x00080002;
+
+    /// <summary>
+    /// The second byte of the command. Acer keeps it in the registry and both machines tested use
+    /// 132; the constant is the fallback when the key is absent.
+    /// </summary>
+    private static int KeyboardAutoOffHotkey()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\OEM\AcerAgentService");
+
+            if (key?.GetValue("BK_Hotkey_Number") is int value && value > 0 && value <= 0xFF)
+                return value;
+        }
+        catch
+        {
+            // Not fatal: the default is what both machines report.
+        }
+
+        return 132;
+    }
+
+    private static bool TryReadActionFunction(uint input, out ulong value)
+    {
+        value = 0;
+
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                AcerWmiProtocol.WmiNamespace, $"SELECT * FROM {AcerWmiProtocol.ActionClass}");
+
+            foreach (ManagementObject instance in searcher.Get())
+            {
+                using (instance)
+                {
+                    using var inParams = instance.GetMethodParameters("GetFunction");
+                    inParams["uiInput"] = input;
+                    using var outParams = instance.InvokeMethod("GetFunction", inParams, null);
+
+                    var raw = outParams?.Properties["uiOutput"]?.Value;
+                    if (raw == null) return false;
+
+                    value = Convert.ToUInt64(raw);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"WMI: GetFunction(0x{input:X}) failed.", ex);
+        }
+
+        return false;
+    }
+
+    private static bool TryWriteActionFunction(ulong value)
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                AcerWmiProtocol.WmiNamespace, $"SELECT * FROM {AcerWmiProtocol.ActionClass}");
+
+            foreach (ManagementObject instance in searcher.Get())
+            {
+                using (instance)
+                {
+                    using var inParams = instance.GetMethodParameters("SetFunction");
+                    inParams["uiInput"] = value;
+                    using var outParams = instance.InvokeMethod("SetFunction", inParams, null);
+                    return outParams != null;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("WMI: SetFunction for the keyboard auto-off failed.", ex);
+        }
+
+        return false;
+    }
+
     /// <summary>Enables or disables power-off USB charging, stopping at the given battery level.</summary>
     public static bool SetUsbCharging(bool on, int floor)
     {
