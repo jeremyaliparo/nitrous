@@ -390,13 +390,15 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6" Padding="0,4,0,0">
+                                CornerRadius="6" Padding="0">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1128,7 +1130,13 @@
 				</ScrollViewer>
 
 				<!-- 4. KEYBOARD PAGE -->
-                <StackPanel x:Name="KeyboardPage" Visibility="Collapsed" Margin="20,10,20,0">
+                <ScrollViewer x:Name="KeyboardPage" Visibility="Collapsed" Margin="20,10,20,0"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
+                	<ScrollViewer.Resources>
+                		<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+                	</ScrollViewer.Resources>
+                	<StackPanel Margin="0,0,4,16">
 					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
@@ -1210,7 +1218,8 @@
                             <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="#6E6E76" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                    </Border>
-                </StackPanel>
+                	</StackPanel>
+                </ScrollViewer>
 			</Grid>
 			<!-- Bottom Navigation -->
 			<Border Grid.Row="2" Background="#1C1C1F" CornerRadius="0,0,15,15">

@@ -100,6 +100,8 @@ controls depend on firmware that varies between models, and a few are still out 
 - A disabled control's tooltip now appears. WPF hides tooltips on disabled elements by default, so
   the explanation of why a control was unavailable could never be read.
 - The Dashboard scrolls. The custom fan section was cut off at the bottom on shorter windows.
+- The `KB` page scrolls too, for the same reason, and hotkey text is centred in its box instead of
+  sitting against the left edge.
 - The GPU temperature no longer shows `--` while the GPU is awake: the embedded controller reports
   0 on some models, so the driver's reading is used instead when it is available.
 
