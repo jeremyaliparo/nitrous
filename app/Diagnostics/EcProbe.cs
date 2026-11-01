@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 7,
+            ["probeVersion"] = 8,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -726,9 +726,7 @@ public static class EcProbe
             {
                 var asArray = (mask & (1 << i)) != 0;
                 shaped[i] = (inputs[i].Name,
-                    asArray
-                        ? new byte[] { Convert.ToByte(inputs[i].Value) }
-                        : inputs[i].Value);
+                    asArray ? ArrayFor(inputs[i].Name, inputs[i].Value) : inputs[i].Value);
 
                 shape.Add($"{inputs[i].Name}={(asArray ? "array" : "scalar")}");
             }
@@ -744,6 +742,20 @@ public static class EcProbe
         }
 
         return attempts;
+    }
+
+    /// <summary>
+    /// The reserved parameters are five bytes, as <c>SetBatteryHealthControl</c> passes them; every
+    /// other parameter is a single byte. A one-byte array is accepted by the marshaller and then
+    /// rejected by the provider as an invalid parameter, which is what hid this.
+    /// </summary>
+    private static byte[] ArrayFor(string name, object value)
+    {
+        var first = Convert.ToByte(value);
+
+        return name.Contains("Reserved", StringComparison.OrdinalIgnoreCase)
+            ? new byte[] { first, 0, 0, 0, 0 }
+            : new byte[] { first };
     }
 
     /// <summary>
