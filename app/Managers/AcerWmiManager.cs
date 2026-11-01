@@ -181,38 +181,10 @@ public static class AcerWmiManager
     }
 
     /// <summary>
-    /// Power-off USB charging, or null when this machine offers no path to it.
-    ///
-    /// Two transports exist. Older models answer <c>APGeAction.GetFunction(4)</c>; newer NitroSense
-    /// moved the same feature onto Acer's QuickAccess agent, so the WMI answer is tried first and the
-    /// agent second.
-    /// </summary>
-    public static UsbChargingState? GetUsbCharging()
-    {
-        var viaWmi = GetUsbChargingViaWmi();
-        if (viaWmi != null)
-        {
-            _usbChargingViaAgent = false;
-            return viaWmi;
-        }
-
-        if (QuickAccessClient.TryGetUsbCharging(out var on, out var floor))
-        {
-            _usbChargingViaAgent = true;
-            return new UsbChargingState(on, floor);
-        }
-
-        return null;
-    }
-
-    /// <summary>True once the QuickAccess agent, rather than WMI, answered the read.</summary>
-    private static bool _usbChargingViaAgent;
-
-    /// <summary>
     /// Power-off USB charging as the firmware has it; null when this model does not answer
     /// (the APGeAction class is only partly implemented on some BIOSes).
     /// </summary>
-    private static UsbChargingState? GetUsbChargingViaWmi()
+    public static UsbChargingState? GetUsbCharging()
     {
         try
         {
@@ -265,18 +237,6 @@ public static class AcerWmiManager
     {
         if (!AcerWmiProtocol.UsbChargingFloors.Contains(floor)) return false;
 
-        // The transport that answered the read is the one that can write. On models where
-        // APGeAction answers an unrecognised state, the agent is the only path.
-        if (_usbChargingViaAgent)
-            return QuickAccessClient.TrySetUsbCharging(on, floor);
-
-        if (SetUsbChargingViaWmi(on, floor)) return true;
-
-        return QuickAccessClient.TrySetUsbCharging(on, floor);
-    }
-
-    private static bool SetUsbChargingViaWmi(bool on, int floor)
-    {
         try
         {
             using var searcher = new ManagementObjectSearcher(
