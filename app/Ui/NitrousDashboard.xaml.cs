@@ -53,6 +53,7 @@ public partial class NitrousDashboard : Window
         _autoOffRearmTimer.Tick += (_, _) => RearmKeyboardAutoOff();
 
         InitializeKeyboardLighting();
+        InitializeStickyKeys();
         InitializeUsbCharging();
         InitializeLcdOverdrive();
 
@@ -267,6 +268,83 @@ public partial class NitrousDashboard : Window
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out Win32Rect rect);
+
+    // --- Sticky keys ---------------------------------------------------------------------
+    // A Windows accessibility setting, not firmware: Acer's toggle flips SKF_STICKYKEYSON in the
+    // same per-user preference. The two calls below are the documented way to read and change it.
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct StickyKeysState
+    {
+        public uint cbSize;
+        public uint dwFlags;
+    }
+
+    private const uint SpiGetStickyKeys = 0x003A;
+    private const uint SpiSetStickyKeys = 0x003B;
+    private const uint SpifUpdateIniFile = 0x01;
+    private const uint SpifSendChange = 0x02;
+    private const uint SkfStickyKeySon = 0x00000001;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(
+        uint uiAction, uint uiParam, ref StickyKeysState pvParam, uint fWinIni);
+
+    private bool _stickyKeysLoading = true;
+
+    private void InitializeStickyKeys()
+    {
+        _stickyKeysLoading = true;
+
+        try
+        {
+            var state = new StickyKeysState { cbSize = (uint)Marshal.SizeOf<StickyKeysState>() };
+            if (SystemParametersInfo(SpiGetStickyKeys, 0, ref state, 0))
+            {
+                TogStickyKeys.IsChecked = (state.dwFlags & SkfStickyKeySon) != 0;
+            }
+            else
+            {
+                TogStickyKeys.IsEnabled = false;
+                TogStickyKeys.ToolTip = "Windows did not report the sticky keys setting.";
+                Logger.Warn("Sticky Keys: the setting could not be read.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Sticky Keys: could not read the setting.", ex);
+        }
+
+        _stickyKeysLoading = false;
+    }
+
+    private void StickyKeys_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_stickyKeysLoading) return;
+
+        try
+        {
+            // Read first: the flags carry other preferences (confirmation, sound) that must survive.
+            var state = new StickyKeysState { cbSize = (uint)Marshal.SizeOf<StickyKeysState>() };
+            if (!SystemParametersInfo(SpiGetStickyKeys, 0, ref state, 0))
+            {
+                Logger.Warn("Sticky Keys: could not read the setting before writing it.");
+                return;
+            }
+
+            var wanted = TogStickyKeys.IsChecked == true;
+            state.dwFlags = wanted
+                ? state.dwFlags | SkfStickyKeySon
+                : state.dwFlags & ~SkfStickyKeySon;
+
+            if (!SystemParametersInfo(SpiSetStickyKeys, 0, ref state, SpifUpdateIniFile | SpifSendChange))
+                Logger.Warn("Sticky Keys: Windows refused the change.");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Sticky Keys: could not apply the change.", ex);
+        }
+    }
 
     private void EnsureWindowVisible()
     {

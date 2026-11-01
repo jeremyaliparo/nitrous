@@ -63,6 +63,12 @@ controls depend on firmware that varies between models, and a few are still out 
   and the backlight returns on the next key press after the timer has already switched it off —
   the firmware's behaviour, not a Nitrous choice.
 
+### Accessibility
+
+- **Sticky Keys** on the `KB` page: the Windows setting that lets you press one key at a time for
+  shortcuts. It is a per-user preference rather than firmware, so it works on every model. The flags
+  are read from Windows before changing them, so the confirmation and sound preferences are kept.
+
 ### Battery and USB
 
 - **USB Charging While Off** on the Setup page: keeps charging USB devices while the laptop is

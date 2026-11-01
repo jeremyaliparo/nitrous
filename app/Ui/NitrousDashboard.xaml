@@ -1156,6 +1156,17 @@
                         </StackPanel>
                     </Border>
  
+                   <!-- Sticky keys: a Windows accessibility setting, not firmware -->
+                   <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
+                   	<Grid>
+                   		<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                   			<TextBlock Text="Sticky Keys" Foreground="White" FontSize="12"/>
+                   			<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="#888890" FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                   		</StackPanel>
+                   		<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
+                   	</Grid>
+                   </Border>
+
                    <!-- Keyboard Lighting -->
                    <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
                         <StackPanel>
