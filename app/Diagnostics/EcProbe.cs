@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 4,
+            ["probeVersion"] = 5,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -670,7 +670,7 @@ public static class EcProbe
 
         WithInstance(AcerWmiProtocol.BatteryClass, instance =>
         {
-            result["getBatteryFunctionData"] = DescribeOutputWith(
+            result["getBatteryFunctionData"] = DescribeBattery(
                 instance,
                 "GetBatteryFunctionData",
                 new (string Name, object Value)[]
@@ -679,7 +679,7 @@ public static class EcProbe
                     ("uReservedIn", (byte)0)
                 });
 
-            result["getBatteryHealthControlStatus"] = DescribeOutputWith(
+            result["getBatteryHealthControlStatus"] = DescribeBattery(
                 instance,
                 "GetBatteryHealthControlStatus",
                 new (string Name, object Value)[]
@@ -702,6 +702,28 @@ public static class EcProbe
         }, errors, "battery");
 
         return result;
+    }
+
+    /// <summary>
+    /// BatteryControl methods whose parameters the MOF declares as UInt8 but which the provider
+    /// rejects with an array cast. The scalar form is tried first and the array form second; both
+    /// outcomes are kept so a model that wants one or the other can be told apart.
+    /// </summary>
+    private static Dictionary<string, object?> DescribeBattery(
+        ManagementObject instance,
+        string method,
+        (string Name, object Value)[] inputs)
+    {
+        var scalar = DescribeOutputWith(instance, method, inputs);
+        if (!scalar.ContainsKey("<error>")) return scalar;
+
+        var asArrays = inputs
+            .Select(input => (input.Name, (object)new byte[] { Convert.ToByte(input.Value) }))
+            .ToArray();
+
+        var array = DescribeOutputWith(instance, method, asArrays);
+        array["<scalarError>"] = scalar["<error>"];
+        return array;
     }
 
     /// <summary>
