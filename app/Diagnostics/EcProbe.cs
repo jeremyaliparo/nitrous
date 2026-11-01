@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 5,
+            ["probeVersion"] = 6,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -872,12 +872,35 @@ public static class EcProbe
     }
 
     /// <summary>A scalar as text, and a byte array as hex, so the layout survives the report.</summary>
-    private static string? DescribeValue(object? value) => value switch
+    /// <summary>
+    /// Renders any output value without throwing. Acer answers scalars, byte arrays and other array
+    /// types depending on the method, and a value this cannot convert must still reach the report:
+    /// an exception here is reported as the call failing, which is misleading.
+    /// </summary>
+    private static string? DescribeValue(object? value)
     {
-        null => null,
-        byte[] bytes => Convert.ToHexString(bytes),
-        _ => Convert.ToString(value, CultureInfo.InvariantCulture)
-    };
+        switch (value)
+        {
+            case null:
+                return null;
+
+            case byte[] bytes:
+                return Convert.ToHexString(bytes);
+
+            case Array array:
+                return "[" + string.Join(",", array.Cast<object?>().Select(DescribeValue)) + "]";
+
+            default:
+                try
+                {
+                    return Convert.ToString(value, CultureInfo.InvariantCulture);
+                }
+                catch
+                {
+                    return value.ToString();
+                }
+        }
+    }
 
     private static void WithInstance(
         string className,
