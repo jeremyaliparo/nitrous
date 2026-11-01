@@ -137,6 +137,37 @@ internal sealed class AcerEcHid : IDisposable
                 hid.FeatureLength, hid.Version, hid.Capability, hid.Modes);
     }
 
+    /// <summary>A HID interface whose vendor is Acer, as the configuration manager reports it.</summary>
+    public sealed record HidSummary(
+        ushort VendorId, ushort ProductId, ushort UsagePage, ushort Usage, int FeatureLength);
+
+    /// <summary>
+    /// Every Acer-vendor HID interface present on the machine. Read-only: it enumerates interfaces
+    /// and reads their caps, and never sends a feature report.
+    /// </summary>
+    public static IReadOnlyList<HidSummary> ListAcerDevices()
+    {
+        var devices = new List<HidSummary>();
+
+        foreach (var path in HidInterop.DevicePaths())
+        {
+            using var handle = HidInterop.Open(path);
+            if (handle == null) continue;
+
+            var info = HidInterop.Describe(handle, path);
+            if (info == null) continue;
+
+            // 0x1025 is Acer's embedded-controller interface, 0x0CF2 the keyboard/lid lighting
+            // controller. Anything else is not ours to interpret.
+            if (info.VendorId != 0x1025 && info.VendorId != 0x0CF2) continue;
+
+            devices.Add(new HidSummary(
+                info.VendorId, info.ProductId, info.UsagePage, info.Usage, info.FeatureLength));
+        }
+
+        return devices;
+    }
+
     private static AcerEcHid? OpenInternal(IReadOnlyList<PowerProfile>? knownModes)
     {
         foreach (var path in HidInterop.DevicePaths())

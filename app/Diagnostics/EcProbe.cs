@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 3,
+            ["probeVersion"] = 4,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -106,6 +106,9 @@ public static class EcProbe
         report["genericFunction"] = CollectGenericFunction(errors);
         report["keyboardBacklight"] = CollectKeyboardBacklight(errors);
         report["ledState"] = CollectLedState(errors);
+        report["fans"] = CollectFans(errors);
+        report["battery"] = CollectBattery(errors);
+        report["hidDevices"] = CollectHidDevices(errors);
         report["errors"] = errors;
 
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -614,6 +617,124 @@ public static class EcProbe
     }
 
     /// <summary>
+    /// Fan behaviour and speed, read-only. A model that cannot answer these is a model where the fan
+    /// controls will be disabled, so the report should say so rather than leave it to guesswork.
+    /// </summary>
+    private static Dictionary<string, object?> CollectFans(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        WithGamingInstance(instance =>
+        {
+            var behavior = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            for (uint index = 0; index <= 3; index++)
+            {
+                var (value, error) = TryReadRaw(
+                    instance, "GetGamingFanBehavior", "gmInput", index, "gmOutput");
+
+                behavior[$"{index}"] = value;
+                if (error != null) behavior[$"{index}Error"] = error;
+            }
+
+            result["getGamingFanBehavior"] = behavior;
+
+            var speeds = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var device in new uint[] { 1, 2, 4, 7 })
+            {
+                var (value, error) = TryReadRaw(
+                    instance, "GetGamingFanSpeed", "gmInput", device, "gmOutput");
+
+                speeds[$"0x{device:X}"] = value;
+                if (error != null) speeds[$"0x{device:X}Error"] = error;
+            }
+
+            result["getGamingFanSpeed"] = speeds;
+
+            // This one takes no parameters, so its whole answer is reported.
+            result["getGamingFanTable"] = DescribeOutputWith(
+                instance, "GetGamingFanTable", Array.Empty<(string Name, object Value)>());
+
+            return true;
+        }, errors, "fans");
+
+        return result;
+    }
+
+    /// <summary>
+    /// BatteryControl, where the charge limit lives. The output property names differ between
+    /// BIOSes, so each method is called once and its entire answer is reported.
+    /// </summary>
+    private static Dictionary<string, object?> CollectBattery(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        WithInstance(AcerWmiProtocol.BatteryClass, instance =>
+        {
+            result["getBatteryFunctionData"] = DescribeOutputWith(
+                instance,
+                "GetBatteryFunctionData",
+                new (string Name, object Value)[]
+                {
+                    ("uFunctionMask", (byte)1),
+                    ("uReservedIn", (byte)0)
+                });
+
+            result["getBatteryHealthControlStatus"] = DescribeOutputWith(
+                instance,
+                "GetBatteryHealthControlStatus",
+                new (string Name, object Value)[]
+                {
+                    ("uBatteryNo", (byte)1),
+                    ("uFunctionQuery", (byte)1),
+                    ("uReserved", (byte)0)
+                });
+
+            result["getBattInfoInterface"] = DescribeOutputWith(
+                instance,
+                "GetBattInfoInterface",
+                new (string Name, object Value)[]
+                {
+                    ("uBatteryInfoIndex", 0u),
+                    ("uBatteryNo", 1u)
+                });
+
+            return true;
+        }, errors, "battery");
+
+        return result;
+    }
+
+    /// <summary>
+    /// Every Acer-vendor HID interface on the machine, by usage page. This is what identifies an
+    /// unknown model's keyboard and embedded-controller variants from a report alone.
+    /// </summary>
+    private static List<Dictionary<string, object?>> CollectHidDevices(List<string> errors)
+    {
+        var devices = new List<Dictionary<string, object?>>();
+
+        try
+        {
+            foreach (var device in AcerEcHid.ListAcerDevices())
+            {
+                devices.Add(new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["vendorId"] = $"0x{device.VendorId:X4}",
+                    ["productId"] = $"0x{device.ProductId:X4}",
+                    ["usagePage"] = $"0x{device.UsagePage:X4}",
+                    ["usage"] = $"0x{device.Usage:X2}",
+                    ["featureLength"] = device.FeatureLength
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"hidDevices: {ex.Message}");
+        }
+
+        return devices;
+    }
+
+    /// <summary>
     /// Every property the method answered, by name. Read-only: the method name must start with Get,
     /// which <see cref="InvokeGetLocked"/> already enforces for the other probes.
     /// </summary>
@@ -653,6 +774,17 @@ public static class EcProbe
         string methodName,
         string inputName,
         uint input,
+        string outputName) =>
+        TryReadWith(instance, methodName, new (string Name, object Value)[] { (inputName, input) }, outputName);
+
+    /// <summary>
+    /// The same, for methods that take several parameters (BatteryControl does). Everything here is
+    /// a Get, enforced below.
+    /// </summary>
+    private static (string? Value, string? Error) TryReadWith(
+        ManagementObject instance,
+        string methodName,
+        (string Name, object Value)[] inputs,
         string outputName)
     {
         try
@@ -661,7 +793,7 @@ public static class EcProbe
                 throw new InvalidOperationException($"EC probe is read-only; refusing {methodName}.");
 
             using var inParams = instance.GetMethodParameters(methodName);
-            inParams[inputName] = input;
+            foreach (var (name, value) in inputs) inParams[name] = value;
 
             using var outParams = instance.InvokeMethod(methodName, inParams, null);
             if (outParams == null) return (null, "no output object");
@@ -678,6 +810,43 @@ public static class EcProbe
         {
             return (null, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Calls a Get method with the given parameters and returns every output property by name. Used
+    /// where the output names are not known in advance, which is the case for BatteryControl.
+    /// </summary>
+    private static Dictionary<string, object?> DescribeOutputWith(
+        ManagementObject instance,
+        string methodName,
+        (string Name, object Value)[] inputs)
+    {
+        var dump = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            if (!methodName.StartsWith(ReadOnlyPrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException($"EC probe is read-only; refusing {methodName}.");
+
+            using var inParams = instance.GetMethodParameters(methodName);
+            foreach (var (name, value) in inputs) inParams[name] = value;
+
+            using var outParams = instance.InvokeMethod(methodName, inParams, null);
+            if (outParams == null)
+            {
+                dump["<no output object>"] = true;
+                return dump;
+            }
+
+            foreach (PropertyData property in outParams.Properties)
+                dump[property.Name] = DescribeValue(property.Value);
+        }
+        catch (Exception ex)
+        {
+            dump["<error>"] = ex.Message;
+        }
+
+        return dump;
     }
 
     /// <summary>A scalar as text, and a byte array as hex, so the layout survives the report.</summary>
