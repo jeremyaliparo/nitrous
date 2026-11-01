@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 6,
+            ["probeVersion"] = 7,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -705,25 +705,45 @@ public static class EcProbe
     }
 
     /// <summary>
-    /// BatteryControl methods whose parameters the MOF declares as UInt8 but which the provider
-    /// rejects with an array cast. The scalar form is tried first and the array form second; both
-    /// outcomes are kept so a model that wants one or the other can be told apart.
+    /// BatteryControl rejects a mixture of shapes: a parameter declared UInt8 can want an array
+    /// while its neighbour wants a scalar, and WMI reports whichever mismatch it hits first. Every
+    /// scalar/array combination is tried - at most eight for three parameters - and the first that
+    /// answers is returned along with the shape that worked.
     /// </summary>
     private static Dictionary<string, object?> DescribeBattery(
         ManagementObject instance,
         string method,
         (string Name, object Value)[] inputs)
     {
-        var scalar = DescribeOutputWith(instance, method, inputs);
-        if (!scalar.ContainsKey("<error>")) return scalar;
+        var attempts = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-        var asArrays = inputs
-            .Select(input => (input.Name, (object)new byte[] { Convert.ToByte(input.Value) }))
-            .ToArray();
+        for (var mask = 0; mask < (1 << inputs.Length); mask++)
+        {
+            var shaped = new (string Name, object Value)[inputs.Length];
+            var shape = new List<string>(inputs.Length);
 
-        var array = DescribeOutputWith(instance, method, asArrays);
-        array["<scalarError>"] = scalar["<error>"];
-        return array;
+            for (var i = 0; i < inputs.Length; i++)
+            {
+                var asArray = (mask & (1 << i)) != 0;
+                shaped[i] = (inputs[i].Name,
+                    asArray
+                        ? new byte[] { Convert.ToByte(inputs[i].Value) }
+                        : inputs[i].Value);
+
+                shape.Add($"{inputs[i].Name}={(asArray ? "array" : "scalar")}");
+            }
+
+            var answer = DescribeOutputWith(instance, method, shaped);
+            if (!answer.ContainsKey("<error>"))
+            {
+                answer["<parameters>"] = string.Join(", ", shape);
+                return answer;
+            }
+
+            attempts[$"<attempt {mask}>"] = $"{string.Join(", ", shape)}: {answer["<error>"]}";
+        }
+
+        return attempts;
     }
 
     /// <summary>

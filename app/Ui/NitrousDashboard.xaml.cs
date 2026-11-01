@@ -482,7 +482,7 @@ public partial class NitrousDashboard : Window
         UpdateZoneButtons();
 
         KeyboardLightingStatus.Text = !_keyboardAvailable
-            ? "No lighting interface on this model"
+            ? "Not reachable on this model"
             : !_keyboardZoned
                 ? "Single-colour keyboard"
                 : string.Empty;
