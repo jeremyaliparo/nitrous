@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 8,
+            ["probeVersion"] = 9,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -661,8 +661,10 @@ public static class EcProbe
     }
 
     /// <summary>
-    /// BatteryControl, where the charge limit lives. The output property names differ between
-    /// BIOSes, so each method is called once and its entire answer is reported.
+    /// BatteryControl, where the charge limit lives. Only the interface is reported: the two Get
+    /// methods reject every parameter shape tried - scalar and array, with reserved lengths one and
+    /// five - and Nitrous does not call them, because the charge limit is applied with
+    /// SetBatteryHealthControl and never read back. GetBattInfoInterface does answer, so it is kept.
     /// </summary>
     private static Dictionary<string, object?> CollectBattery(List<string> errors)
     {
@@ -670,25 +672,6 @@ public static class EcProbe
 
         WithInstance(AcerWmiProtocol.BatteryClass, instance =>
         {
-            result["getBatteryFunctionData"] = DescribeBattery(
-                instance,
-                "GetBatteryFunctionData",
-                new (string Name, object Value)[]
-                {
-                    ("uFunctionMask", (byte)1),
-                    ("uReservedIn", (byte)0)
-                });
-
-            result["getBatteryHealthControlStatus"] = DescribeBattery(
-                instance,
-                "GetBatteryHealthControlStatus",
-                new (string Name, object Value)[]
-                {
-                    ("uBatteryNo", (byte)1),
-                    ("uFunctionQuery", (byte)1),
-                    ("uReserved", (byte)0)
-                });
-
             result["getBattInfoInterface"] = DescribeOutputWith(
                 instance,
                 "GetBattInfoInterface",
@@ -698,64 +681,15 @@ public static class EcProbe
                     ("uBatteryNo", 1u)
                 });
 
+            result["note"] =
+                "GetBatteryFunctionData and GetBatteryHealthControlStatus reject every parameter shape " +
+                "tried: scalar and array, reserved length one and five. Nitrous does not call them; the " +
+                "charge limit is applied with SetBatteryHealthControl and is not read back.";
+
             return true;
         }, errors, "battery");
 
         return result;
-    }
-
-    /// <summary>
-    /// BatteryControl rejects a mixture of shapes: a parameter declared UInt8 can want an array
-    /// while its neighbour wants a scalar, and WMI reports whichever mismatch it hits first. Every
-    /// scalar/array combination is tried - at most eight for three parameters - and the first that
-    /// answers is returned along with the shape that worked.
-    /// </summary>
-    private static Dictionary<string, object?> DescribeBattery(
-        ManagementObject instance,
-        string method,
-        (string Name, object Value)[] inputs)
-    {
-        var attempts = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-        for (var mask = 0; mask < (1 << inputs.Length); mask++)
-        {
-            var shaped = new (string Name, object Value)[inputs.Length];
-            var shape = new List<string>(inputs.Length);
-
-            for (var i = 0; i < inputs.Length; i++)
-            {
-                var asArray = (mask & (1 << i)) != 0;
-                shaped[i] = (inputs[i].Name,
-                    asArray ? ArrayFor(inputs[i].Name, inputs[i].Value) : inputs[i].Value);
-
-                shape.Add($"{inputs[i].Name}={(asArray ? "array" : "scalar")}");
-            }
-
-            var answer = DescribeOutputWith(instance, method, shaped);
-            if (!answer.ContainsKey("<error>"))
-            {
-                answer["<parameters>"] = string.Join(", ", shape);
-                return answer;
-            }
-
-            attempts[$"<attempt {mask}>"] = $"{string.Join(", ", shape)}: {answer["<error>"]}";
-        }
-
-        return attempts;
-    }
-
-    /// <summary>
-    /// The reserved parameters are five bytes, as <c>SetBatteryHealthControl</c> passes them; every
-    /// other parameter is a single byte. A one-byte array is accepted by the marshaller and then
-    /// rejected by the provider as an invalid parameter, which is what hid this.
-    /// </summary>
-    private static byte[] ArrayFor(string name, object value)
-    {
-        var first = Convert.ToByte(value);
-
-        return name.Contains("Reserved", StringComparison.OrdinalIgnoreCase)
-            ? new byte[] { first, 0, 0, 0, 0 }
-            : new byte[] { first };
     }
 
     /// <summary>
