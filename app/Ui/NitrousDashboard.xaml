@@ -293,6 +293,7 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="Height" Value="28"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="ItemContainerStyle" Value="{StaticResource CompactComboBoxItemStyle}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -310,7 +311,7 @@
                                                   ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                                                   TextElement.Foreground="{TemplateBinding Foreground}"
                                                   VerticalAlignment="Center"
-                                                  HorizontalAlignment="Left"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   IsHitTestVisible="False"/>
                                 <Path Grid.Column="1" Data="M7,10L12,15L17,10H7Z" Fill="#888890" Stretch="Uniform" Width="8" Height="6" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </Grid>
@@ -667,7 +668,7 @@
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
 							<TextBlock Grid.Column="0" Text="Refresh" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
-							<ComboBox Grid.Column="1" x:Name="RefreshModeBox" Width="118" Margin="8,0,16,0" HorizontalAlignment="Left" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
+							<ComboBox Grid.Column="1" x:Name="RefreshModeBox" HorizontalContentAlignment="Center" Width="118" Margin="8,0,16,0" HorizontalAlignment="Left" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
 							<TextBlock Grid.Column="2" x:Name="LcdOverdriveLabel" Text="Overdrive" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
 							<CheckBox Grid.Column="3" x:Name="TogLcdOverdrive" ToolTipService.ShowOnDisabled="True" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Margin="8,0,0,0" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
 						</Grid>
