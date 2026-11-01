@@ -17,6 +17,9 @@ controls depend on firmware that varies between models, and a few are still out 
   nothing. On models with an embedded-controller HID interface the mode is set there instead, and
   the mode is read back after every change so a refused one is never shown as active.
 - Models without that interface keep the WMI path.
+- That path is not a fallback in name only. On an ANV15-41, which has no embedded-controller
+  interface, `Performance` moves the enforced limit to 65 W — confirmed with `nvidia-smi`, not
+  assumed from the register.
 - Turbo is offered whenever the channel Nitrous actually uses lists it, not only when the WMI
   register advertises it, so models that used to hide the button now show it. A failed read is
   retried instead of being remembered for the session.
@@ -54,12 +57,20 @@ controls depend on firmware that varies between models, and a few are still out 
   re-arming the auto-off, so the keyboard stayed lit until the timeout was picked again. Any
   lighting change now re-arms the saved auto-off, debounced so dragging the brightness slider
   costs one write rather than one per tick.
+- Where there is no embedded-controller interface, the same 30-second auto-off is a firmware timeout
+  reachable over Acer's `APGeAction`. Nitrous sets that too and reads it back, so the feature now
+  works on models that only expose it that way. That path is on/off at 30 seconds rather than a list,
+  and the backlight returns on the next key press after the timer has already switched it off —
+  the firmware's behaviour, not a Nitrous choice.
 
 ### Battery and USB
 
 - **USB Charging While Off** on the Setup page: keeps charging USB devices while the laptop is
   off, stopping at 10 %, 20 % or 30 % battery. Nitrous reads the firmware's current state when the
   page opens, and the controls stay disabled on models that do not implement it.
+- The state is validated before it is trusted. A firmware that answers something other than on or
+  off is treated as not implementing the feature, rather than that value being read as "off" and
+  offering a toggle that cannot work.
 
 ### Other Nitro models
 
@@ -94,7 +105,9 @@ controls depend on firmware that varies between models, and a few are still out 
   actually running are both visible.
 - **LCD Overdrive** on the Dashboard, beside the refresh controls. Overdrive is a property of the
   panel rather than the model, so the control only appears where the firmware reports the panel
-  supports it; where it does not, the refresh list takes the whole row instead of leaving a gap.
+  supports it; where it does not, the whole row is collapsed instead of leaving a gap.
+- Refresh and overdrive are two rows in one card, each with its label on the left and its control on
+  the right, and the selected rate is centred in the list rather than pinned to the left edge.
 - A panel without overdrive can answer the same `0` as a panel that has it switched off, so the
   change is read back after it is written. A panel that ignores the write is hidden with a log
   entry instead of looking like it worked.
@@ -112,6 +125,12 @@ controls depend on firmware that varies between models, and a few are still out 
   whether a model without the EC interface can still set the auto-off over WMI.
 - **Export Diagnostics** now includes the newest EC probe report. It is written to a separate
   folder, so it used to be missing from the bundle even when someone had just run it.
+- The probe covers more of the machine: the fan behaviour, speed and table, the battery interface,
+  every Acer-vendor HID interface by usage page, and the keyboard auto-off state. Both
+  `APGeAction` and `AcerGenericMethod` are swept, because they are separate function spaces and
+  reading the wrong one answers `0xE1` for everything.
+- Every call records why it failed rather than reporting a silent null, and answers that are byte
+  arrays are reported as hex instead of being dropped.
 
 ## 0.8.5 - 2026-10-27
 
