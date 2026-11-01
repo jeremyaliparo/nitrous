@@ -3,9 +3,10 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 1.0.0 - 2026-10-31
+## 0.9.0 - 2026-11-01
 
-Nitrous 1.0.0 is the first stable release.
+Nitrous 0.9.0 is the first release for external testing. It is not a stable release: several
+controls depend on firmware that varies between models, and a few are still out of reach.
 
 ### Power modes
 

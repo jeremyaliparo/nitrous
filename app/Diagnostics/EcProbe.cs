@@ -47,6 +47,10 @@ public static class EcProbe
     private static readonly string[] ProbedClasses =
     {
         AcerWmiProtocol.GamingClass,
+
+        // The class power-off USB charging actually lives on. It was missing from this list, so
+        // every sweep ran against AcerGenericMethod instead and answered 0xE1 for everything.
+        AcerWmiProtocol.ActionClass,
         "AcerGenericMethod",
         AcerWmiProtocol.BatteryClass,
     };
@@ -72,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 2,
+            ["probeVersion"] = 3,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -470,21 +474,29 @@ public static class EcProbe
     {
         var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-        WithInstance("AcerGenericMethod", instance =>
+        // Two classes expose GetFunction and they are different function spaces. APGeAction is the
+        // one Nitrous and Acer's QuickAccess agent use for power-off USB charging; AcerGenericMethod
+        // is a separate space that some models implement instead. Sweeping only the latter answered
+        // 0xE1 for every input on an ANV15-41 and hid whatever the real one is.
+        foreach (var className in new[] { AcerWmiProtocol.ActionClass, "AcerGenericMethod" })
         {
-            // 0..0x40 rather than 0..7. Acer's own QuickAccess agent reaches power-off USB
-            // charging through this same class, and the ANV15-41 answers 0xE1 for every function
-            // in the low range, so whatever it uses is probably further up.
-            for (uint index = 0; index <= 0x40; index++)
+            WithInstance(className, instance =>
             {
-                var (value, error) = TryReadRaw(
-                    instance, "GetFunction", "uiInput", index, "uiOutput");
-                result[$"{index}"] = value;
-                if (error != null) result[$"{index}Error"] = error;
-            }
+                var values = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
 
-            return true;
-        }, errors, "genericFunction");
+                for (uint index = 0; index <= 0x40; index++)
+                {
+                    var (value, error) = TryReadRaw(
+                        instance, "GetFunction", "uiInput", index, "uiOutput");
+
+                    values[$"{index}"] = value;
+                    if (error != null) values[$"{index}Error"] = error;
+                }
+
+                result[className] = values;
+                return true;
+            }, errors, $"genericFunction/{className}");
+        }
 
         return result;
     }
@@ -546,11 +558,11 @@ public static class EcProbe
             result["getGamingKBBacklightErrors"] = failures;
 
             // A null value cannot say whether the method returned nothing or returned a property
-            // with another name, so the first response is described in full.
+            // with another name, so the live address is described in full.
             try
             {
                 result["getGamingKBBacklightOutput"] = DescribeOutput(
-                    instance, "GetGamingKBBacklight", "gmInput", 0x00);
+                    instance, "GetGamingKBBacklight", "gmInput", 0x01);
             }
             catch (Exception ex)
             {
