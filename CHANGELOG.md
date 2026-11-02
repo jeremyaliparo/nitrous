@@ -3,7 +3,7 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## Unreleased
+## 0.9.1 - 2026-11-02
 
 ### Appearance
 
