@@ -129,6 +129,10 @@ static class Program
                 e.Handled = true;
             };
 
+            // Appearance is installed before the window is parsed so no control ever renders
+            // with an unresolved brush.
+            Nitrous.Ui.Theme.ThemeManager.Initialise(app);
+
             app.Run(new NitrousDashboard());
         }
         finally

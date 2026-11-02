@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,9 +13,13 @@ using Nitrous.Diagnostics;
 using Nitrous.Enums;
 using Nitrous.Helpers;
 using Nitrous.Managers;
+using Nitrous.Ui.Theme;
 
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
+using Button = System.Windows.Controls.Button;
 using MessageBox = System.Windows.MessageBox;
 using TextBox = System.Windows.Controls.TextBox;
 
@@ -34,6 +39,10 @@ public partial class NitrousDashboard : Window
     public NitrousDashboard()
     {
         InitializeComponent();
+
+        ThemeManager.Changed += OnThemeChanged;
+        Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
+        BuildAppearanceSwatches();
 
         DataContext = new DashboardViewModel();
 
@@ -133,18 +142,11 @@ public partial class NitrousDashboard : Window
         _activeNavIndex = index;
 
         var pages = new UIElement[] { DashPage, GpuPage, KeyboardPage, SettingsPage };
-        var icons = new Shape[] { NavDashIcon, NavGpuIcon, NavKeyboardIcon, NavSetIcon };
-        var labels = new TextBlock[] { NavDashText, NavGpuText, NavKeyboardText, NavSetText };
-
-        var activeBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B388FF"));
-        var inactiveBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#888890"));
 
         for (var i = 0; i < pages.Length; i++)
-        {
             pages[i].Visibility = i == index ? Visibility.Visible : Visibility.Collapsed;
-            icons[i].Fill = i == index ? activeBrush : inactiveBrush;
-            labels[i].Foreground = i == index ? activeBrush : inactiveBrush;
-        }
+
+        ApplyNavColours();
 
         UpdateGpuTelemetryScope();
 
@@ -152,6 +154,113 @@ public partial class NitrousDashboard : Window
         // page's last snapshot.
         if (index == 1 && DataContext is DashboardViewModel vm)
             vm.RefreshGpuOffsets();
+    }
+
+    /// <summary>
+    /// Separated from <see cref="SetActiveNav"/> so a theme change can repaint the rail without
+    /// re-running the page-entry side effects.
+    /// </summary>
+    private void ApplyNavColours()
+    {
+        var icons = new Shape[] { NavDashIcon, NavGpuIcon, NavKeyboardIcon, NavSetIcon };
+        var labels = new TextBlock[] { NavDashText, NavGpuText, NavKeyboardText, NavSetText };
+
+        // Resolved from the palette rather than hard-coded so the rail follows the accent.
+        var activeBrush = (Brush)FindResource("AccentBrush");
+        var inactiveBrush = (Brush)FindResource("TextMutedBrush");
+
+        for (var i = 0; i < icons.Length; i++)
+        {
+            var brush = i == _activeNavIndex ? activeBrush : inactiveBrush;
+            icons[i].Fill = brush;
+            labels[i].Foreground = brush;
+        }
+    }
+
+    /// <summary>
+    /// Builds the accent row from the palette instead of hand-written XAML: the selected ring has
+    /// to track a runtime value, and eight near-identical blocks are easy to get wrong by hand.
+    /// </summary>
+    private void BuildAppearanceSwatches()
+    {
+        AccentSwatchRow.Children.Clear();
+        AccentSwatchRow.Children.Add(CreateSwatch(ThemeManager.Auto, "Match the Windows accent", null));
+
+        foreach (var (name, hex) in ThemePalette.Choices)
+            AccentSwatchRow.Children.Add(CreateSwatch(hex, name, ThemePalette.Parse(hex)));
+
+        RefreshAppearanceSelection();
+    }
+
+    private Button CreateSwatch(string choice, string tooltip, Color? colour)
+    {
+        var inner = new Border
+        {
+            Width = 22,
+            Height = 22,
+            CornerRadius = new CornerRadius(6),
+            Background = colour is { } c ? new SolidColorBrush(c) : null
+        };
+
+        if (colour is null)
+        {
+            // "Auto" has no colour of its own, so it shows a letter on a quiet outline.
+            inner.BorderThickness = new Thickness(1);
+            inner.BorderBrush = (Brush)FindResource("BorderSubtleBrush");
+            inner.Child = new TextBlock
+            {
+                Text = "A",
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = (Brush)FindResource("TextPrimaryBrush"),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
+            };
+        }
+
+        var ring = new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(9),
+            BorderThickness = new Thickness(2),
+            BorderBrush = Brushes.Transparent,
+            Child = inner
+        };
+
+        var button = new Button
+        {
+            Style = (Style)FindResource("AccentSwatchStyle"),
+            Content = ring,
+            Tag = choice,
+            ToolTip = tooltip,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+
+        // Appearance only: this writes a preference, never a hardware setting.
+        button.Click += (_, _) => ThemeManager.Set(System.Windows.Application.Current, choice);
+        return button;
+    }
+
+    private void RefreshAppearanceSelection()
+    {
+        var selected = (Brush)FindResource("TextPrimaryBrush");
+
+        foreach (var button in AccentSwatchRow.Children.OfType<Button>())
+        {
+            if (button.Content is not Border ring)
+                continue;
+
+            ring.BorderBrush = string.Equals(button.Tag as string, ThemeManager.Choice, StringComparison.OrdinalIgnoreCase)
+                ? selected
+                : Brushes.Transparent;
+        }
+    }
+
+    private void OnThemeChanged()
+    {
+        ApplyNavColours();
+        RefreshAppearanceSelection();
     }
 
     /// <summary>
@@ -185,7 +294,7 @@ public partial class NitrousDashboard : Window
     {
         var isOnline = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
                        System.Windows.Forms.PowerLineStatus.Online;
-        var powerColor = new SolidColorBrush((Color)ColorConverter.ConvertFromString(isOnline ? "#FF453A" : "#34C759"));
+        var powerColor = (Brush)FindResource(isOnline ? "DangerBrush" : "SuccessBrush");
         var powerText = isOnline ? "AC POWER" : "BATTERY";
 
         var acGeom = Geometry.Parse("M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z");

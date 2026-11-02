@@ -12,6 +12,7 @@ using Nitrous.Enums;
 using Nitrous.Helpers;
 using Nitrous.Managers;
 using Nitrous.Mvvm;
+using Nitrous.Ui.Theme;
 
 using MessageBox = System.Windows.MessageBox;
 
@@ -55,7 +56,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _cpuTempText = "--°C";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
 
-    private string _cpuTempColor = "White";
+    private string _cpuTempColor = ThemeManager.TextPrimaryHex;
     public string CpuTempColor { get => _cpuTempColor; set => SetProperty(ref _cpuTempColor, value); }
 
     private string _cpuRpmText = "-- RPM";
@@ -67,13 +68,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _gpuRpmText = "-- RPM";
     public string GpuRpmText { get => _gpuRpmText; set => SetProperty(ref _gpuRpmText, value); }
 
-    private string _gpuTempColor = "White";
+    private string _gpuTempColor = ThemeManager.TextPrimaryHex;
     public string GpuTempColor { get => _gpuTempColor; set => SetProperty(ref _gpuTempColor, value); }
 
     private string _applyBtnText = "APPLY";
     public string ApplyBtnText { get => _applyBtnText; set => SetProperty(ref _applyBtnText, value); }
 
-    private string _applyBtnColor = "#a855f7";
+    private string _applyBtnColor = ThemeManager.AccentDeepHex;
     public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
 
     private int _gpuCoreOffset;
@@ -251,10 +252,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _gpuPStateText = "P0";
     public string GpuPStateText { get => _gpuPStateText; set => SetProperty(ref _gpuPStateText, value); }
 
-    private string _gpuLoadColor = "#B388FF";
+    private string _gpuLoadColor = ThemeManager.AccentHex;
     public string GpuLoadColor { get => _gpuLoadColor; set => SetProperty(ref _gpuLoadColor, value); }
 
-    private string _gpuDeepTempColor = "#B388FF";
+    private string _gpuDeepTempColor = ThemeManager.AccentHex;
     public string GpuDeepTempColor { get => _gpuDeepTempColor; set => SetProperty(ref _gpuDeepTempColor, value); }
 
     private string _gpuCoreClockText = "0 MHz";
@@ -544,14 +545,14 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 if (applied)
                 {
                     ApplyBtnText = "APPLIED!";
-                    ApplyBtnColor = "#34C759";
+                    ApplyBtnColor = ThemeManager.SuccessHex;
                     GpuClockStatusText =
                         $"Applied {FormatOffset(GpuCoreOffset)} / {FormatOffset(GpuMemoryOffset)} MHz to {currentProfile}.";
                 }
                 else
                 {
                     ApplyBtnText = "ERROR";
-                    ApplyBtnColor = "#FF453A";
+                    ApplyBtnColor = ThemeManager.DangerHex;
                     GpuClockStatusText = _gpuManager.IsGpuSleeping
                         ? "The GPU is asleep. Nitrous saved the offsets but did not wake it to write them."
                         : $"Could not apply GPU clocks: {error}";
@@ -560,7 +561,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 await Task.Delay(2000);
                 ApplyBtnText = "APPLY";
-                ApplyBtnColor = "#a855f7";
+                ApplyBtnColor = ThemeManager.AccentDeepHex;
             }
             catch (Exception ex)
             {
@@ -749,10 +750,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
         GpuNameText = "NVIDIA GPU (NO DATA)";
         GpuArchText = "--";
         GpuLoadText = "-- %";
-        GpuLoadColor = "#888890";
+        GpuLoadColor = ThemeManager.TextMutedHex;
         GpuVramText = "-- / -- MB";
         GpuDeepTempText = "-- C";
-        GpuDeepTempColor = "#888890";
+        GpuDeepTempColor = ThemeManager.TextMutedHex;
         GpuPStateText = "--";
         GpuCoreClockText = "-- MHz";
         GpuMemClockText = "-- MHz";
@@ -1361,12 +1362,12 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                             CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
                             CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
-                            CpuTempColor = telemetry.CpuTemp > 85 ? "#FF453A" : "White";
+                            CpuTempColor = telemetry.CpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
                             var gpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
                             GpuTempText = gpuTemp > 0 ? $"{gpuTemp} C" : "-- C";
                             GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
-                            GpuTempColor = gpuTemp > 85 ? "#FF453A" : "White";
+                            GpuTempColor = gpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
                             if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                             {
@@ -1374,12 +1375,12 @@ public class DashboardViewModel : ObservableObject, IDisposable
                                 GpuArchText = smi.Architecture;
 
                                 GpuLoadText = $"{smi.GpuLoad}%";
-                                GpuLoadColor = smi.GpuLoad >= 95 ? "#FF453A" : (smi.GpuLoad >= 80 ? "#FF9F0A" : "White");
+                                GpuLoadColor = smi.GpuLoad >= 95 ? ThemeManager.DangerHex : (smi.GpuLoad >= 80 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
 
                                 GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
 
                                 GpuDeepTempText = $"{smi.CoreTemp} C";
-                                GpuDeepTempColor = smi.CoreTemp >= 85 ? "#FF453A" : (smi.CoreTemp >= 78 ? "#FF9F0A" : "White");
+                                GpuDeepTempColor = smi.CoreTemp >= 85 ? ThemeManager.DangerHex : (smi.CoreTemp >= 78 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
 
                                 GpuPStateText = smi.PState;
                                 GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";

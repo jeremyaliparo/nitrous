@@ -5,16 +5,19 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using Nitrous.Helpers;
 using Nitrous.Managers;
 using Nitrous.Enums;
 using System.ComponentModel;
+using Nitrous.Ui.Theme;
 
 using Point = System.Windows.Point;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using Brush = System.Windows.Media.Brush;
 using Cursors = System.Windows.Input.Cursors;
 using Panel = System.Windows.Controls.Panel;
 
@@ -41,6 +44,8 @@ public partial class FanCurveWindow : Window
         _viewModel = viewModel;
         DataContext = _viewModel;
 
+        ApplyThemeGlow();
+
         SyncRampSelection();
 
         // Listen for Power Profile changes from the Dashboard
@@ -50,6 +55,24 @@ public partial class FanCurveWindow : Window
         LoadCurvesForProfile(_viewModel.ActivePowerProfile);
 
         this.Loaded += (s, e) => RedrawGraph();
+    }
+
+    /// <summary>
+    /// The accent-tinted glows are built here rather than declared in XAML: WPF may freeze a
+    /// Freezable that lives in a resource dictionary, and a frozen effect cannot be recoloured.
+    /// </summary>
+    private void ApplyThemeGlow()
+    {
+        var glow = new DropShadowEffect
+        {
+            Color = ThemeManager.Accent,
+            BlurRadius = 12,
+            ShadowDepth = 2,
+            Opacity = 0.5
+        };
+
+        CurveLine.Effect = glow;
+        NodeTooltip.Effect = glow.Clone();
     }
 
     /// <summary>Marks the ramp option the view model already holds, without writing it back.</summary>
@@ -184,8 +207,8 @@ public partial class FanCurveWindow : Window
             {
                 Width = 18,
                 Height = 18,
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0c1018")),
-                Stroke = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#a855f7")),
+                Fill = (Brush)FindResource("PanelDeepBrush"),
+                Stroke = (Brush)FindResource("AccentDeepBrush"),
                 StrokeThickness = 2.5,
                 Cursor = Cursors.Hand,
                 Tag = i
@@ -196,7 +219,7 @@ public partial class FanCurveWindow : Window
             {
                 Width = 6,
                 Height = 6,
-                Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#a855f7")),
+                Fill = (Brush)FindResource("AccentDeepBrush"),
                 IsHitTestVisible = false // Let the outer ring handle clicks
             };
 

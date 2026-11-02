@@ -14,7 +14,7 @@
 		<Style x:Key="ActionButtonStyle" TargetType="RadioButton">
 			<!-- Default state: Transparent background to blend into the rail -->
 			<Setter Property="Background" Value="Transparent"/>
-			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
 			<Setter Property="BorderBrush" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="Cursor" Value="Hand"/>
@@ -26,7 +26,7 @@
 							<Border x:Name="LeftDivider"
                                     Width="1"
                                     Height="16"
-                                    Background="#2A2A30"
+                                    Background="{DynamicResource BorderSubtleBrush}"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Center"/>
 							<!-- Main Floating Pill -->
@@ -59,8 +59,8 @@
 							</Trigger>
 							<!-- Hover State -->
 							<Trigger Property="IsMouseOver" Value="True">
-								<Setter TargetName="MainBorder" Property="Background" Value="#222226"/>
-								<Setter Property="Foreground" Value="#E0E0E0"/>
+								<Setter TargetName="MainBorder" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+								<Setter Property="Foreground" Value="{DynamicResource TextStrongBrush}"/>
 								<Setter TargetName="LeftDivider" Property="Opacity" Value="0"/>
 								<!-- Expanding by 1px horizontally seamlessly masks adjacent dividers -->
 								<Setter TargetName="MainBorder" Property="Margin" Value="-1,0,-1,0"/>
@@ -68,9 +68,9 @@
 							</Trigger>
 							<!-- Checked State -->
 							<Trigger Property="IsChecked" Value="True">
-								<Setter TargetName="MainBorder" Property="Background" Value="#1A1225"/>
-								<Setter Property="Foreground" Value="#B388FF"/>
-								<Setter TargetName="MainBorder" Property="BorderBrush" Value="#B388FF"/>
+								<Setter TargetName="MainBorder" Property="Background" Value="{DynamicResource AccentWashBrush}"/>
+								<Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+								<Setter TargetName="MainBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
 								<Setter TargetName="LeftDivider" Property="Opacity" Value="0"/>
 								<!-- Expanding by 1px horizontally seamlessly masks adjacent dividers -->
 								<Setter TargetName="MainBorder" Property="Margin" Value="-1,0,-1,0"/>
@@ -93,15 +93,15 @@
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="CheckBox">
-						<Border x:Name="BgBorder" Width="44" Height="24" CornerRadius="12" Background="#35353A">
-							<Ellipse x:Name="Thumb" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0"/>
+						<Border x:Name="BgBorder" Width="44" Height="24" CornerRadius="12" Background="{DynamicResource ToggleTrackBrush}">
+							<Ellipse x:Name="Thumb" Width="18" Height="18" Fill="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
 						</Border>
 						<ControlTemplate.Triggers>
 							<Trigger Property="IsChecked" Value="True">
-								<Setter TargetName="BgBorder" Property="Background" Value="#B388FF"/>
+								<Setter TargetName="BgBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
 								<Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
 								<Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0"/>
-								<Setter TargetName="Thumb" Property="Fill" Value="#121214"/>
+								<Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource WindowBgBrush}"/>
 							</Trigger>
 							<!-- A disabled toggle used to look exactly like an enabled one, so a control the
 							     model does not support invited a click that could never do anything. -->
@@ -116,7 +116,7 @@
 		</Style>
 		<!-- Modern Slider -->
 		<Style x:Key="ModernSliderStyle" TargetType="Slider">
-			<Setter Property="Foreground" Value="#B388FF"/>
+			<Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
 			<Setter Property="SmallChange" Value="1"/>
 			<Setter Property="LargeChange" Value="10"/>
 			<Setter Property="IsMoveToPointEnabled" Value="True"/>
@@ -124,7 +124,7 @@
 				<Setter.Value>
 					<ControlTemplate TargetType="Slider">
 						<Grid Height="20">
-							<Border Height="4" Background="#2A2A30" CornerRadius="2" VerticalAlignment="Center"/>
+							<Border Height="4" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="2" VerticalAlignment="Center"/>
 							<Track x:Name="PART_Track">
 								<Track.DecreaseRepeatButton>
 									<RepeatButton Command="Slider.DecreaseLarge">
@@ -139,7 +139,7 @@
 									<Thumb>
 										<Thumb.Template>
 											<ControlTemplate TargetType="Thumb">
-												<Ellipse Width="14" Height="14" Fill="White" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" StrokeThickness="1" Cursor="Hand"/>
+												<Ellipse Width="14" Height="14" Fill="{DynamicResource TextPrimaryBrush}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" StrokeThickness="1" Cursor="Hand"/>
 											</ControlTemplate>
 										</Thumb.Template>
 									</Thumb>
@@ -167,14 +167,14 @@
 		</Style>
 		<!-- Custom Fan Toggle -->
 		<Style x:Key="SquareCheckBoxStyle" TargetType="CheckBox">
-			<Setter Property="Foreground" Value="#B388FF"/>
+			<Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
 			<Setter Property="Cursor" Value="Hand"/>
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="CheckBox">
 						<StackPanel Orientation="Horizontal">
-							<Border Width="12" Height="12" Background="White" CornerRadius="2" VerticalAlignment="Center" Margin="0,0,6,0">
-								<Path x:Name="CheckIcon" Data="M3,8L6,11L11,3" Stroke="#121214" StrokeThickness="2" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
+							<Border Width="12" Height="12" Background="{DynamicResource TextPrimaryBrush}" CornerRadius="2" VerticalAlignment="Center" Margin="0,0,6,0">
+								<Path x:Name="CheckIcon" Data="M3,8L6,11L11,3" Stroke="{DynamicResource WindowBgBrush}" StrokeThickness="2" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
 							</Border>
 							<TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 						</StackPanel>
@@ -202,7 +202,7 @@
 						</Border>
 						<ControlTemplate.Triggers>
 							<Trigger Property="IsMouseOver" Value="True">
-								<Setter Property="Background" Value="#17171A"/>
+								<Setter Property="Background" Value="{DynamicResource RailHoverBrush}"/>
 							</Trigger>
 						</ControlTemplate.Triggers>
 					</ControlTemplate>
@@ -213,8 +213,8 @@
 
 		<Style x:Key="GhostBtn" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#888890"/>
-            <Setter Property="BorderBrush" Value="#2A2A30"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
@@ -228,8 +228,8 @@
                                 <Setter Property="Opacity" Value="0.3"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="BtnBorder" Property="Background" Value="#222226"/>
-                                <Setter Property="Foreground" Value="#E0E0E0"/>
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource SurfaceHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextStrongBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -238,16 +238,16 @@
         </Style>
 
         <Style x:Key="SetupCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#1C1C1F"/>
+            <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
             <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="BorderBrush" Value="#2A2A30"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
             <Setter Property="MinHeight" Value="58"/>
         </Style>
 
         <Style x:Key="SetupSectionLabelStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#888890"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
             <Setter Property="FontSize" Value="9"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="4,4,0,6"/>
@@ -261,7 +261,7 @@
         </Style>
 
         <Style x:Key="CompactComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrongBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="8,5"/>
             <Setter Property="FontSize" Value="10"/>
@@ -274,11 +274,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#2A2A30"/>
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource BorderSubtleBrush}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#1A1225"/>
-                                <Setter Property="Foreground" Value="#B388FF"/>
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AccentWashBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -287,9 +287,9 @@
         </Style>
 
         <Style x:Key="CompactComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Foreground" Value="#E0E0E0"/>
-            <Setter Property="Background" Value="#26262A"/>
-            <Setter Property="BorderBrush" Value="#2A2A30"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextStrongBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="Height" Value="28"/>
@@ -313,7 +313,7 @@
                                                   VerticalAlignment="Center"
                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                                   IsHitTestVisible="False"/>
-                                <Path Grid.Column="1" Data="M7,10L12,15L17,10H7Z" Fill="#888890" Stretch="Uniform" Width="8" Height="6" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                <Path Grid.Column="1" Data="M7,10L12,15L17,10H7Z" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="8" Height="6" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </Grid>
                             <ToggleButton x:Name="DropDownToggle"
                                           Background="Transparent"
@@ -334,8 +334,8 @@
                                    AllowsTransparency="True"
                                    Focusable="False"
                                    PopupAnimation="Slide">
-                                <Border Background="#1C1C1F"
-                                        BorderBrush="#2A2A30"
+                                <Border Background="{DynamicResource CardBgBrush}"
+                                        BorderBrush="{DynamicResource BorderSubtleBrush}"
                                         BorderThickness="1"
                                         CornerRadius="6"
                                         Margin="0,2,0,0"
@@ -348,10 +348,10 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Border" Property="BorderBrush" Value="#45454D"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource DividerBrush}"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter TargetName="Border" Property="BorderBrush" Value="#B388FF"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Opacity" Value="0.35"/>
@@ -363,14 +363,14 @@
         </Style>
 
         <Style x:Key="AccentBtn" TargetType="Button">
-            <Setter Property="Foreground" Value="#121214"/>
+            <Setter Property="Foreground" Value="{DynamicResource WindowBgBrush}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="8">
                             <Grid>
-                                <Border x:Name="HoverOverlay" Background="White" Opacity="0" CornerRadius="8"/>
+                                <Border x:Name="HoverOverlay" Background="{DynamicResource TextPrimaryBrush}" Opacity="0" CornerRadius="8"/>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                             </Grid>
                         </Border>
@@ -385,8 +385,8 @@
         </Style>
 
         <Style x:Key="HotkeyTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Background" Value="#26262A"/>
-            <Setter Property="Foreground" Value="#a855f7"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentDeepBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -404,12 +404,12 @@
                         <ControlTemplate.Triggers>
                             <!-- Hover effect -->
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#2D2D32"/>
+                                <Setter Property="Background" Value="{DynamicResource SurfaceActiveBrush}"/>
                             </Trigger>
                             <!-- Clicked / Active effect -->
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="#a855f7"/>
-                                <Setter Property="Background" Value="#1C1C1F"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentDeepBrush}"/>
+                                <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -444,13 +444,13 @@
                                     <Thumb MinHeight="24" Cursor="Hand">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="{x:Type Thumb}">
-                                                <Border x:Name="ThumbBorder" Background="#45454D" CornerRadius="2" Margin="2,0"/>
+                                                <Border x:Name="ThumbBorder" Background="{DynamicResource DividerBrush}" CornerRadius="2" Margin="2,0"/>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#B388FF"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsDragging" Value="True">
-                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="#CDB4FF"/>
+                                                        <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsEnabled" Value="False">
                                                         <Setter TargetName="ThumbBorder" Property="Opacity" Value="0.35"/>
@@ -479,21 +479,21 @@
         </Style>
         <Style x:Key="ZoneSwatchStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#26262A"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Swatch" Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1">
-                            <Border Background="#99000000" CornerRadius="4" Padding="7,2" Margin="6" VerticalAlignment="Bottom" HorizontalAlignment="Center">
-                                <TextBlock Text="{TemplateBinding Content}" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <Border x:Name="Swatch" Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                            <Border Background="{DynamicResource ScrimBrush}" CornerRadius="4" Padding="7,2" Margin="6" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+                                <TextBlock Text="{TemplateBinding Content}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
                             </Border>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Swatch" Property="BorderBrush" Value="#B388FF"/>
+                                <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Swatch" Property="BorderBrush" Value="#FFFFFF"/>
+                                <Setter TargetName="Swatch" Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Swatch" Property="Opacity" Value="0.35"/>
@@ -503,9 +503,22 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+		<!-- A swatch is a colour chip, so the button chrome is stripped and the content is the ring. -->
+		<Style x:Key="AccentSwatchStyle" TargetType="Button">
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Focusable" Value="False"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<ContentPresenter/>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 	</Window.Resources>
 	<!-- Outer Frame with Rounded Corners -->
-	<Border Background="#121214" CornerRadius="16" BorderBrush="#2A2A30" BorderThickness="1">
+	<Border Background="{DynamicResource WindowBgBrush}" CornerRadius="16" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
 		<Grid>
 			<Grid.RowDefinitions>
 				<RowDefinition Height="50"/>
@@ -514,11 +527,11 @@
 			</Grid.RowDefinitions>
 			<!-- Title Bar -->
 			<Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseDown" Background="Transparent">
-				<TextBlock x:Name="SystemModelText" Text="NITROUS ON SYSTEM" Foreground="White" FontSize="13" FontWeight="Bold" Margin="20,0,0,0" VerticalAlignment="Center"/>
+				<TextBlock x:Name="SystemModelText" Text="NITROUS ON SYSTEM" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="Bold" Margin="20,0,0,0" VerticalAlignment="Center"/>
 				<!-- Right Side: Power Pill, Pin to Top & Close -->
 				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
 					<!-- 1. Dynamic Power State Pill -->
-                    <Border x:Name="DashPowerPillBorder" BorderBrush="#FF453A" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0"
+                    <Border x:Name="DashPowerPillBorder" BorderBrush="{DynamicResource DangerBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0"
                             ToolTip="Measured battery charge/discharge rate. Windows does not expose the adapter's rated wattage.">
                         <Grid>
                             <!-- Auto-tinting subtle background -->
@@ -526,8 +539,8 @@
 
                             <StackPanel Orientation="Horizontal" Margin="8,4">
                                 <!-- Updated to an AC Power Plug icon -->
-                                <Path x:Name="DashPowerPillIcon" Fill="#FF453A" Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0" Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z"/>
-                                <TextBlock x:Name="DashPowerPillText" Text="AC POWER" Foreground="#FF453A" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <Path x:Name="DashPowerPillIcon" Fill="{DynamicResource DangerBrush}" Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0" Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z"/>
+                                <TextBlock x:Name="DashPowerPillText" Text="AC POWER" Foreground="{DynamicResource DangerBrush}" FontSize="9" FontWeight="Bold" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding PowerPillWattsText}"
                                            Foreground="{Binding Foreground, ElementName=DashPowerPillText}"
                                            FontSize="9" FontWeight="Bold" VerticalAlignment="Center" Margin="4,0,0,0"/>
@@ -544,7 +557,7 @@
 							<ControlTemplate TargetType="ToggleButton">
 								<Grid Background="Transparent">
 									<Path x:Name="PinIcon"
-                                        Fill="#888890"
+                                        Fill="{DynamicResource TextMutedBrush}"
                                         Stretch="Uniform"
                                         Width="13"
                                         Height="13"
@@ -554,18 +567,18 @@
 								<ControlTemplate.Triggers>
 									<!-- Hover state: Brightens up like the close button -->
 									<Trigger Property="IsMouseOver" Value="True">
-										<Setter TargetName="PinIcon" Property="Fill" Value="#E0E0E0"/>
+										<Setter TargetName="PinIcon" Property="Fill" Value="{DynamicResource TextStrongBrush}"/>
 									</Trigger>
 									<!-- Checked state: Lights up with your purple accent color -->
 									<Trigger Property="IsChecked" Value="True">
-										<Setter TargetName="PinIcon" Property="Fill" Value="#B388FF"/>
+										<Setter TargetName="PinIcon" Property="Fill" Value="{DynamicResource AccentBrush}"/>
 									</Trigger>
 								</ControlTemplate.Triggers>
 							</ControlTemplate>
 						</ToggleButton.Template>
 					</ToggleButton>
 					<!-- 3. Close Button -->
-					<Button Content="✕" Foreground="#888890" Background="Transparent" BorderThickness="0" FontSize="14" FontWeight="Bold" Click="CloseBtn_Click" Cursor="Hand">
+					<Button Content="✕" Foreground="{DynamicResource TextMutedBrush}" Background="Transparent" BorderThickness="0" FontSize="14" FontWeight="Bold" Click="CloseBtn_Click" Cursor="Hand">
 						<Button.Template>
 							<ControlTemplate TargetType="Button">
 								<TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"/>
@@ -573,7 +586,7 @@
 						</Button.Template>
 					</Button>
 				</StackPanel>
-				<Border VerticalAlignment="Bottom" Height="1" Background="#2A2A30"/>
+				<Border VerticalAlignment="Bottom" Height="1" Background="{DynamicResource BorderSubtleBrush}"/>
 			</Grid>
 			<!-- PAGES -->
 			<Grid Grid.Row="1">
@@ -585,14 +598,14 @@
 						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
-					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
-								<TextBlock x:Name="DashVersionText" Text="Nitrous" Foreground="White" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="#888890" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock x:Name="DashVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -604,7 +617,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<!-- CPU Telemetry -->
-						<Border Grid.Column="0" Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="10,8">
+						<Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -614,18 +627,18 @@
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="CPU" Foreground="#888890" FontSize="10" FontWeight="Bold"/>
+								<TextBlock Grid.Row="0" Grid.Column="0" Text="CPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
 								<!-- Inline Fan RPM -->
 								<StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,2,0,0">
-									<Path Fill="#B388FF" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M9,2V4H15V2H17V4H19A2,2 0 0,1 21,6V8H23V10H21V16H23V18H21V20A2,2 0 0,1 19,22H17V24H15V22H9V24H7V22H5A2,2 0 0,1 3,20V18H1V16H3V10H1V8H3V6A2,2 0 0,1 5,4H7V2H9M5,6V20H19V6H5M7,8H17V18H7V8M9,10H15V16H9V10Z"/>
-									<TextBlock Text="{Binding CpuRpmText}" Foreground="#A0A0A8" FontSize="10" FontWeight="SemiBold"/>
+									<Path Fill="{DynamicResource AccentBrush}" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M9,2V4H15V2H17V4H19A2,2 0 0,1 21,6V8H23V10H21V16H23V18H21V20A2,2 0 0,1 19,22H17V24H15V22H9V24H7V22H5A2,2 0 0,1 3,20V18H1V16H3V10H1V8H3V6A2,2 0 0,1 5,4H7V2H9M5,6V20H19V6H5M7,8H17V18H7V8M9,10H15V16H9V10Z"/>
+									<TextBlock Text="{Binding CpuRpmText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" FontWeight="SemiBold"/>
 								</StackPanel>
 								<!-- Temperature on the Right -->
 								<TextBlock Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Text="{Binding CpuTempText}" Foreground="{Binding CpuTempColor}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="6,0,0,0"/>
 							</Grid>
 						</Border>
 						<!-- GPU Telemetry -->
-						<Border Grid.Column="2" Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="10,8">
+						<Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -635,11 +648,11 @@
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="GPU" Foreground="#888890" FontSize="10" FontWeight="Bold"/>
+								<TextBlock Grid.Row="0" Grid.Column="0" Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
 								<!-- Inline Fan RPM -->
 								<StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,2,0,0">
-									<Path Fill="#B388FF" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
-									<TextBlock Text="{Binding GpuRpmText}" Foreground="#A0A0A8" FontSize="10" FontWeight="SemiBold"/>
+									<Path Fill="{DynamicResource AccentBrush}" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
+									<TextBlock Text="{Binding GpuRpmText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" FontWeight="SemiBold"/>
 								</StackPanel>
 								<!-- Temperature on the Right -->
 								<TextBlock Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Text="{Binding GpuTempText}" Foreground="{Binding GpuTempColor}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="6,0,0,0"/>
@@ -647,8 +660,8 @@
 						</Border>
 					</Grid>
 					<!-- Power Modes -->
-					<TextBlock Text="POWER" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+					<TextBlock Text="POWER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
 						<UniformGrid Rows="1" Height="34">
 							<RadioButton x:Name="BtnPowerQuiet" TabIndex="0" GroupName="Power" Uid="Quiet" Tag="M1,13 L9.4,11.5 A3,3 0 1,1 9.4,14.5 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Quiet" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Quiet"/>
 							<RadioButton x:Name="BtnPowerBal" TabIndex="1" GroupName="Power" Uid="Balanced" Tag="M12,2 L13.5,10.4 A3,3 0 1,1 10.5,10.4 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Bal" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Balanced"/>
@@ -658,27 +671,27 @@
 					</Border>
 					<!-- Display: refresh rate and panel overdrive -->
 					<Grid Margin="0,0,0,8">
-						<TextBlock Text="DISPLAY" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-						<TextBlock x:Name="DisplayCurrentText" Foreground="#6E6E76" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+						<TextBlock Text="DISPLAY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+						<TextBlock x:Name="DisplayCurrentText" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 					</Grid>
-					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,16">
 						<StackPanel>
 							<!-- Refresh rate -->
 							<Grid>
-								<TextBlock Text="Refresh" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
+								<TextBlock Text="Refresh" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 								<ComboBox x:Name="RefreshModeBox" HorizontalContentAlignment="Center" Width="120" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="RefreshMode_Changed"/>
 							</Grid>
 
 							<!-- Panel overdrive: the whole row is collapsed where the panel has none -->
 							<Grid x:Name="LcdOverdriveRow" Margin="0,10,0,0">
-								<TextBlock x:Name="LcdOverdriveLabel" Text="LCD Overdrive" Foreground="#C8C8D0" FontSize="10.5" VerticalAlignment="Center"/>
+								<TextBlock x:Name="LcdOverdriveLabel" Text="LCD Overdrive" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 								<CheckBox x:Name="TogLcdOverdrive" ToolTipService.ShowOnDisabled="True" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
 							</Grid>
 						</StackPanel>
 					</Border>
 					<!-- Fans -->
-					<TextBlock Text="FANS" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-					<Border Background="#1C1C1F" BorderBrush="#2A2A30" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+					<TextBlock Text="FANS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
 						<UniformGrid Rows="1" Height="34">
 							<RadioButton x:Name="BtnFanAuto" TabIndex="0" GroupName="Fans" Uid="Auto" Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Auto"/>
 							<RadioButton x:Name="BtnFanMax" TabIndex="1" GroupName="Fans" Uid="Max" Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Max" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Max"/>
@@ -686,10 +699,10 @@
 						</UniformGrid>
 					</Border>
 					<StackPanel x:Name="CustomFanSection" Opacity="{Binding CustomFanOpacity}">
-						<Border Background="#1C1C1F" CornerRadius="8" BorderBrush="#2A2A30" BorderThickness="1" Padding="12,12,12,16">
+						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="12,12,12,16">
 							<StackPanel>
 								<Grid Margin="0,0,0,12">
-                                    <TextBlock Text="CUSTOM FAN SPEED" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Text="CUSTOM FAN SPEED" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <!-- Button to open Fan Curve Editor Window -->
                                         <Button Content="CURVE EDITOR"
@@ -709,13 +722,13 @@
                                 </Grid>
 								<!-- CPU Slider -->
 								<Grid Margin="0,0,0,4">
-									<TextBlock Text="CPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+									<TextBlock Text="CPU Fan Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 									<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-										<TextBox x:Name="CpuFanInput" Text="{Binding CpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding IsManualSliderEnabled}"/>
-										<TextBlock Text="%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center">
+										<TextBox x:Name="CpuFanInput" Text="{Binding CpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding IsManualSliderEnabled}"/>
+										<TextBlock Text="%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center">
       										<TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="#B388FF"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsManualSliderEnabled}" Value="False">
                                                             <Setter Property="Opacity" Value="0.3"/>
@@ -729,13 +742,13 @@
 								<Slider x:Name="CpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="1" Maximum="100" Value="{Binding CpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,12"/>
 								<!-- GPU Slider -->
 								<Grid Margin="0,0,0,4">
-									<TextBlock Text="GPU Fan Speed" Foreground="White" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+									<TextBlock Text="GPU Fan Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 									<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-										<TextBox x:Name="GpuFanInput" Text="{Binding GpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding IsManualSliderEnabled}"/>
-										<TextBlock Text="%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center">
+										<TextBox x:Name="GpuFanInput" Text="{Binding GpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="3" Width="26" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding IsManualSliderEnabled}"/>
+										<TextBlock Text="%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center">
     										<TextBlock.Style>
                                                 <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="#B388FF"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsManualSliderEnabled}" Value="False">
                                                             <Setter Property="Opacity" Value="0.3"/>
@@ -760,14 +773,14 @@
 						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,10">
-					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,10" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,10" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
-								<TextBlock x:Name="SettingsVersionText" Text="Nitrous" Foreground="White" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="#888890" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock x:Name="SettingsVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -784,21 +797,21 @@
 								</Grid.ColumnDefinitions>
 								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
 									<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-										<Path Data="M7,4V6H5C3.89,6 3,6.89 3,8V10H1V12H3V14H1V16H3V18C3,19.1 3.89,20 5,20H7V22H9V20H11V22H13V20H15V22H17V20H19C20.1,20 21,19.1 21,18V16H23V14H21V12H23V10H21V8C21,6.89 20.1,6 19,6H17V4H15V6H13V4H11V6H9V4H7M5,8H19V18H5V8M7,10V16H17V10H7M9,12H15V14H9V12Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-										<TextBlock Text="CPU Power" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										<Path Data="M7,4V6H5C3.89,6 3,6.89 3,8V10H1V12H3V14H1V16H3V18C3,19.1 3.89,20 5,20H7V22H9V20H11V22H13V20H15V22H17V20H19C20.1,20 21,19.1 21,18V16H23V14H21V12H23V10H21V8C21,6.89 20.1,6 19,6H17V4H15V6H13V4H11V6H9V4H7M5,8H19V18H5V8M7,10V16H17V10H7M9,12H15V14H9V12Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+										<TextBlock Text="CPU Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 									</StackPanel>
-									<TextBlock Text="Adjust Windows CPU power limits and processor boost for the active profile." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+									<TextBlock Text="Adjust Windows CPU power limits and processor boost for the active profile." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 								</StackPanel>
 								<CheckBox Grid.Column="1" x:Name="TogManageCpu" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ManageCpuPower, UpdateSourceTrigger=PropertyChanged}"/>
 							</Grid>
-							<Border Height="1" Background="#2A2A30" Margin="0,10,0,10"/>
-							<TextBlock Text="PROCESSOR BOOST" Foreground="#888890" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
+							<TextBlock Text="PROCESSOR BOOST" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="Auto"/>
 									<ColumnDefinition Width="*"/>
 								</Grid.ColumnDefinitions>
-								<TextBlock Text="Plugged in" Foreground="#A0A0A8" FontSize="10" VerticalAlignment="Center"/>
+								<TextBlock Text="Plugged in" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
 								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
 								          Style="{StaticResource CompactComboBoxStyle}"
 								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
@@ -811,7 +824,7 @@
 									<ColumnDefinition Width="Auto"/>
 									<ColumnDefinition Width="*"/>
 								</Grid.ColumnDefinitions>
-								<TextBlock Text="On battery" Foreground="#A0A0A8" FontSize="10" VerticalAlignment="Center"/>
+								<TextBlock Text="On battery" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
 								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
 								          Style="{StaticResource CompactComboBoxStyle}"
 								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
@@ -824,7 +837,7 @@
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<TextBlock Grid.Column="0" Text="{Binding BoostStatusText}" Foreground="#888890" FontSize="9"
+								<TextBlock Grid.Column="0" Text="{Binding BoostStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"
 								           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
 								<Button Grid.Column="1" Content="RESTORE" Command="{Binding RestoreBoostCommand}"
 								        Style="{StaticResource SetupActionButtonStyle}"
@@ -842,10 +855,10 @@
 							</Grid.ColumnDefinitions>
 							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="White" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="80% Battery Limit" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+									<Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+									<TextBlock Text="80% Battery Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Extends battery lifespan by capping max charge." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+								<TextBlock Text="Extends battery lifespan by capping max charge." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
 							<CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
@@ -858,12 +871,12 @@
 							</Grid.ColumnDefinitions>
 							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="White" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="USB Charging While Off" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+									<TextBlock Text="USB Charging While Off" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Keeps charging USB devices while the laptop is off, until the battery reaches the level below." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+								<TextBlock Text="Keeps charging USB devices while the laptop is off, until the battery reaches the level below." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 								<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-									<TextBlock Text="Stop at" Foreground="#A0A0A8" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
+									<TextBlock Text="Stop at" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
 									<ComboBox x:Name="UsbChargingFloorBox" Width="90" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="UsbChargingFloor_Changed"/>
 								</StackPanel>
 							</StackPanel>
@@ -879,10 +892,10 @@
 							</Grid.ColumnDefinitions>
 							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="White" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="Auto-Switch Power" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+									<TextBlock Text="Auto-Switch Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+								<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
 							<CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
@@ -899,10 +912,10 @@
                             <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
                                     <!-- Eye / Monitoring Icon -->
-                                    <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" Fill="White" Stretch="Uniform" Width="14" Height="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Deep GPU Telemetry" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+                                    <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Deep GPU Telemetry" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="Live NVIDIA statistics." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+                                <TextBlock Text="Live NVIDIA statistics." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
                             </StackPanel>
                             <CheckBox Grid.Column="1" x:Name="TogGpuTelemetry" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding DeepGpuTelemetry, UpdateSourceTrigger=PropertyChanged}"/>
                         </Grid>
@@ -916,13 +929,26 @@
 							</Grid.ColumnDefinitions>
 							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
 								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="Run on Startup" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+									<Path Data="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+									<TextBlock Text="Run on Startup" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 								</StackPanel>
-								<TextBlock Text="Launch Nitrous silently at boot." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
+								<TextBlock Text="Launch Nitrous silently at boot." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 							</StackPanel>
 							<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
 						</Grid>
+					</Border>
+
+					<TextBlock Text="APPEARANCE" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
+
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+								<Path Data="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Accent Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Follows Windows unless you pick one. Appearance only." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+							<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
+						</StackPanel>
 					</Border>
 
 					<TextBlock Text="ACER SERVICES" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
@@ -931,12 +957,12 @@
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
 						<StackPanel>
 							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-								<Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.66 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.02L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.02C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.66 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="White" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Acer Background Services" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+								<Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.66 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.02L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.02C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.66 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Acer Background Services" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 							</StackPanel>
-							<TextBlock Text="Stops OEM services and background telemetry. Original start types are backed up." Foreground="#888890" FontSize="10.5" TextWrapping="Wrap"/>
-							<TextBlock Text="{Binding AcerServicesStatusText}" Foreground="#E0E0E0" FontSize="10" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap"/>
-							<TextBlock Text="{Binding AcerServicesDetailText}" Foreground="#888890" FontSize="9" Margin="0,2,0,0" TextWrapping="Wrap"/>
+							<TextBlock Text="Stops OEM services and background telemetry. Original start types are backed up." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+							<TextBlock Text="{Binding AcerServicesStatusText}" Foreground="{DynamicResource TextStrongBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap"/>
+							<TextBlock Text="{Binding AcerServicesDetailText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" Margin="0,2,0,0" TextWrapping="Wrap"/>
 							<Grid Margin="0,8,0,0">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -958,14 +984,14 @@
 					</Border>
 
 					<!-- Diagnostics -->
-					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
 						<StackPanel>
 							<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="White" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Diagnostics" Foreground="White" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Diagnostics" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 							</StackPanel>
 							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. EC PROBE records this model's Acer firmware interface without changing anything. Nothing is uploaded automatically."
-							           Foreground="#888890" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
+							           Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -983,7 +1009,7 @@
 								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
 								        Margin="8,0,0,0"/>
 							</Grid>
-							<TextBlock x:Name="ExportDiagnosticsStatus" Foreground="#888890" FontSize="10"
+							<TextBlock x:Name="ExportDiagnosticsStatus" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
 							           TextWrapping="Wrap" Margin="0,8,0,0"/>
 						</StackPanel>
 					</Border>
@@ -998,19 +1024,19 @@
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
 					<!-- Compact Hero Banner -->
-					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
-								<TextBlock x:Name="GpuVersionText" Text="Nitrous Tuning" Foreground="White" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="#888890" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock x:Name="GpuVersionText" Text="Nitrous Tuning" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
 					<!-- GPU TELEMETRY STATS GRID -->
-					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Padding="16" Margin="0,0,0,12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16" Margin="0,0,0,12">
 						<StackPanel>
 							<!-- GPU Name Header -->
 							<Grid Margin="0,0,0,16">
@@ -1019,11 +1045,11 @@
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<Path Grid.Column="0" Fill="#B388FF" Stretch="Uniform" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
-								<TextBlock Grid.Column="1" Text="{Binding GpuNameText}" Foreground="White" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"
+								<Path Grid.Column="0" Fill="{DynamicResource AccentBrush}" Stretch="Uniform" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
+								<TextBlock Grid.Column="1" Text="{Binding GpuNameText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"
 								           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,0,8,0" ToolTip="{Binding GpuNameText}"/>
-								<Border Grid.Column="2" Background="#2A2A30" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-									<TextBlock Text="{Binding GpuArchText}" Foreground="#B388FF" FontSize="9" FontWeight="Bold"/>
+								<Border Grid.Column="2" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+									<TextBlock Text="{Binding GpuArchText}" Foreground="{DynamicResource AccentBrush}" FontSize="9" FontWeight="Bold"/>
 								</Border>
 							</Grid>
 							<!-- 2-Column Stats Grid -->
@@ -1046,82 +1072,82 @@
 								</Grid.RowDefinitions>
 								<!-- Row 0 -->
 								<StackPanel Grid.Row="0" Grid.Column="0">
-									<TextBlock Text="CORE LOAD" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="CORE LOAD" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
 									<TextBlock Text="{Binding GpuLoadText}" Foreground="{Binding GpuLoadColor}" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<StackPanel Grid.Row="0" Grid.Column="1">
-									<TextBlock Text="CORE TEMP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="CORE TEMP" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
 									<TextBlock Text="{Binding GpuDeepTempText}" Foreground="{Binding GpuDeepTempColor}" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<!-- Row 2 -->
 								<StackPanel Grid.Row="2" Grid.Column="0">
-									<TextBlock Text="CORE CLOCK" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
-									<TextBlock Text="{Binding GpuCoreClockText}" Foreground="White" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
+									<TextBlock Text="CORE CLOCK" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuCoreClockText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<StackPanel Grid.Row="2" Grid.Column="1">
-									<TextBlock Text="MEMORY CLOCK" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
-									<TextBlock Text="{Binding GpuMemClockText}" Foreground="White" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
+									<TextBlock Text="MEMORY CLOCK" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuMemClockText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<!-- Row 4 -->
 								<StackPanel Grid.Row="4" Grid.Column="0">
-									<TextBlock Text="VRAM USAGE" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
-									<TextBlock Text="{Binding GpuVramText}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
+									<TextBlock Text="VRAM USAGE" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuVramText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 								<StackPanel Grid.Row="4" Grid.Column="1">
-									<TextBlock Text="POWER / ENFORCED / CAP" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
-									<TextBlock Text="{Binding GpuPowerText}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
+									<TextBlock Text="POWER / ENFORCED / CAP" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuPowerText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
                                 <StackPanel Grid.Row="6" Grid.Column="0">
-									<TextBlock Text="PERFORMANCE STATE" Foreground="#888890" FontSize="9" FontWeight="Bold"/>
-									<TextBlock Text="{Binding GpuPStateText}" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
+									<TextBlock Text="PERFORMANCE STATE" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuPStateText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="Bold" Margin="0,2,0,0"/>
 								</StackPanel>
 							</Grid>
 						</StackPanel>
 					</Border>
 					<!-- CLOCK OFFSETS SLIDERS -->
-					<Border Background="#1C1C1F" CornerRadius="10" BorderBrush="#2A2A30" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,16">
 						<StackPanel>
 							<Grid Margin="0,0,0,8">
-								<TextBlock Text="CLOCK OFFSETS" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								<TextBlock Text="CLOCK OFFSETS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-									<TextBlock Text="Manage GPU clocks" Foreground="#C8C8D0" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Let Nitrous apply per-profile GPU core and memory offsets. When off, Nitrous never writes GPU clocks."/>
+									<TextBlock Text="Manage GPU clocks" Foreground="{DynamicResource TextBodyBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Let Nitrous apply per-profile GPU core and memory offsets. When off, Nitrous never writes GPU clocks."/>
 									<CheckBox x:Name="TogManageGpuClocks" Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding ManageGpuClocks, UpdateSourceTrigger=PropertyChanged}" ToolTip="When off, Nitrous never writes GPU clocks or memory offsets."/>
 								</StackPanel>
 							</Grid>
-							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="#888890" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
+							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
 							<!-- Core Slider -->
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="Core Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<TextBlock Text="Core Clock" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
-									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding ManageGpuClocks}"/>
+									<TextBlock Text=" MHz" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
 							<Slider x:Name="GpuCoreSlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="300" Value="{Binding GpuCoreOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="5" IsEnabled="{Binding ManageGpuClocks}"/>
 							<Grid Margin="0,2,0,10">
-								<TextBlock Text="0" Foreground="#6E6E76" FontSize="9"/>
-								<TextBlock Text="+300 MHz" Foreground="#6E6E76" FontSize="9" HorizontalAlignment="Right"/>
+								<TextBlock Text="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
+								<TextBlock Text="+300 MHz" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
 							<!-- Memory Slider -->
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="Memory Clock" Foreground="White" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<TextBlock Text="Memory Clock" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="#B388FF" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="#B388FF" IsEnabled="{Binding ManageGpuClocks}"/>
-									<TextBlock Text=" MHz" Foreground="#B388FF" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding ManageGpuClocks}"/>
+									<TextBlock Text=" MHz" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
 								</StackPanel>
 							</Grid>
 							<Slider x:Name="GpuMemorySlider" Style="{StaticResource ModernSliderStyle}" Minimum="0" Maximum="1000" Value="{Binding GpuMemoryOffset, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="10" IsEnabled="{Binding ManageGpuClocks}"/>
 							<Grid Margin="0,2,0,10">
-								<TextBlock Text="0" Foreground="#6E6E76" FontSize="9"/>
-								<TextBlock Text="+1000 MHz" Foreground="#6E6E76" FontSize="9" HorizontalAlignment="Right"/>
+								<TextBlock Text="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
+								<TextBlock Text="+1000 MHz" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
-							<Border Height="1" Background="#2A2A30" Margin="0,0,0,10"/>
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
 							<!-- Compact action row: ghost RESET beside the accent APPLY -->
 							<Grid>
-								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="#6E6E76" FontSize="9.5" VerticalAlignment="Center"/>
+								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
 									<Button Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Height="30" Padding="14,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save 0 / 0 MHz for this profile and return the GPU to stock clocks when it is awake."/>
-									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="White" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save and apply these offsets to the active profile."/>
+									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="{DynamicResource TextPrimaryBrush}" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save and apply these offsets to the active profile."/>
 								</StackPanel>
 							</Grid>
 						</StackPanel>
@@ -1137,50 +1163,50 @@
                 		<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
                 	</ScrollViewer.Resources>
                 	<StackPanel Margin="0,0,4,16">
-					<Border Background="#1C1C1F" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="#26262A" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
-								<TextBlock x:Name="KeyboardVersionText" Text="Nitrous" Foreground="White" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="#888890" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock x:Name="KeyboardVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
 
                     <!-- Custom Hotkeys Setup -->
-                   <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
+                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
                         <StackPanel>
-                            <TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." Foreground="#888890" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
+                            <TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
                             <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Cycle Power Mode" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="Cycle Power Mode" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                                 <TextBox x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>
                             </Grid>
                             <Grid>
-                                <TextBlock Text="Open Dashboard" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="Open Dashboard" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                                 <TextBox x:Name="TxtHkDash" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_Dashboard"/>
                             </Grid>
                         </StackPanel>
                     </Border>
  
                    <!-- Sticky keys: a Windows accessibility setting, not firmware -->
-                   <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
+                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
                    	<Grid>
                    		<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                   			<TextBlock Text="Sticky Keys" Foreground="White" FontSize="12"/>
-                   			<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="#888890" FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                   			<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+                   			<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
                    		</StackPanel>
                    		<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
                    	</Grid>
                    </Border>
 
                    <!-- Keyboard Lighting -->
-                   <Border Background="#1C1C1F" CornerRadius="10" Margin="0,0,0,10" BorderBrush="#2A2A30" BorderThickness="1" Padding="15">
+                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
                         <StackPanel>
                             <Grid Margin="0,0,0,10">
-                                <TextBlock Text="KEYBOARD LIGHTING" Foreground="#888890" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="KeyboardLightingStatus" Foreground="#6E6E76" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                <TextBlock Text="KEYBOARD LIGHTING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="KeyboardLightingStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                             </Grid>
 
                             <Grid Margin="0,0,0,12">
@@ -1197,32 +1223,32 @@
                                 <Button x:Name="Zone4Btn" Grid.Column="3" Height="42" Margin="0,0,6,0" Tag="4" Click="Zone_Click" Content="Z4" ToolTip="Zone 4 colour" Style="{StaticResource ZoneSwatchStyle}"/>
                                 <Button x:Name="ZoneAllBtn" Grid.Column="4" Height="42" Tag="0" Click="Zone_Click" Content="ALL" ToolTip="Set all four zones to one colour." Style="{StaticResource ZoneSwatchStyle}"/>
                             </Grid>
-                            <TextBlock x:Name="ZoneHint" Text="Zone colours apply to Static. Pick Static to use them." Foreground="#6E6E76" FontSize="10" Margin="0,0,0,10" TextWrapping="Wrap" Visibility="Collapsed"/>
+                            <TextBlock x:Name="ZoneHint" Text="Zone colours apply to Static. Pick Static to use them." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,0,0,10" TextWrapping="Wrap" Visibility="Collapsed"/>
 
                             <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Effect" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
                                 <ComboBox x:Name="KeyboardEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardEffect_Changed"/>
                             </Grid>
 
                             <Grid Margin="0,0,0,2">
-                                <TextBlock Text="Brightness" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="#B388FF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+                                <TextBlock Text="Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
                             </Grid>
                             <Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
 
                             <Grid Margin="0,10,0,0">
-                                <TextBlock Text="Auto-off" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="Auto-off" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
                                 <ComboBox x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
                             </Grid>
 
-                            <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="#6E6E76" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                    </Border>
                 	</StackPanel>
                 </ScrollViewer>
 			</Grid>
 			<!-- Bottom Navigation -->
-			<Border Grid.Row="2" Background="#1C1C1F" CornerRadius="0,0,15,15">
+			<Border Grid.Row="2" Background="{DynamicResource CardBgBrush}" CornerRadius="0,0,15,15">
 				<Grid>
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*"/>
@@ -1233,28 +1259,28 @@
 					<!-- Dash Nav -->
 					<Button x:Name="NavDashBtn" Tag="0,0,0,15" Style="{StaticResource NavButtonStyle}" Grid.Column="0" Click="NavDashBtn_Click">
 						<StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
-							<Path x:Name="NavDashIcon" Data="M3,3H11V11H3V3M13,3H21V11H13V3M3,13H11V21H3V13M13,13H21V21H13V13Z" Fill="#B388FF" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
-							<TextBlock x:Name="NavDashText" Text="DASH" Foreground="#B388FF" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+							<Path x:Name="NavDashIcon" Data="M3,3H11V11H3V3M13,3H21V11H13V3M3,13H11V21H3V13M13,13H21V21H13V13Z" Fill="{DynamicResource AccentBrush}" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
+							<TextBlock x:Name="NavDashText" Text="DASH" Foreground="{DynamicResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
 						</StackPanel>
 					</Button>
 					<!-- GPU Nav -->
 					<Button x:Name="NavGpuBtn" Tag="0,0,0,0" Style="{StaticResource NavButtonStyle}" Grid.Column="1" Click="NavGpuBtn_Click">
 						<StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
-							<Path x:Name="NavGpuIcon" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19" Fill="#888890" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
-							<TextBlock x:Name="NavGpuText" Text="GPU" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+							<Path x:Name="NavGpuIcon" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
+							<TextBlock x:Name="NavGpuText" Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
 						</StackPanel>
 					</Button>
 					<Button x:Name="NavKeyboardBtn" Tag="0,0,0,0" Style="{StaticResource NavButtonStyle}" Grid.Column="2" Click="NavKeyboardBtn_Click">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
-                            <Path x:Name="NavKeyboardIcon" Data="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M13,10H11V8H13M13,13H11V11H13M8,10H6V8H8M8,13H6V11H8M5,10H3V8H5M5,13H3V11H5M4,17H20V15H4M22,5H2A2,2 0 0,0 0,7V17A2,2 0 0,0 2,19H22A2,2 0 0,0 24,17V7A2,2 0 0,0 22,5Z" Fill="#888890" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="NavKeyboardText" Text="KB" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                            <Path x:Name="NavKeyboardIcon" Data="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M13,10H11V8H13M13,13H11V11H13M8,10H6V8H8M8,13H6V11H8M5,10H3V8H5M5,13H3V11H5M4,17H20V15H4M22,5H2A2,2 0 0,0 0,7V17A2,2 0 0,0 2,19H22A2,2 0 0,0 24,17V7A2,2 0 0,0 22,5Z" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="NavKeyboardText" Text="KB" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 					<!-- Settings Nav -->
 					<Button x:Name="NavSetBtn" Tag="0,0,15,0" Style="{StaticResource NavButtonStyle}" Grid.Column="3" Click="NavSetBtn_Click">
 						<StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
-							<Path x:Name="NavSetIcon" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="#888890" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
-							<TextBlock x:Name="NavSetText" Text="SETUP" Foreground="#888890" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+							<Path x:Name="NavSetIcon" Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="15" Height="15" HorizontalAlignment="Center"/>
+							<TextBlock x:Name="NavSetText" Text="SETUP" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
 						</StackPanel>
 					</Button>
 				</Grid>

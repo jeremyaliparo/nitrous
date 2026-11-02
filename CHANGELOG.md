@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## Unreleased
+
+### Appearance
+
+- Nitrous now takes its accent colour from Windows, or from one of seven fixed accents picked on
+  the Setup page. The choice is remembered. `Auto` follows the Windows accent, including when it
+  changes while Nitrous is open.
+- The chosen accent is checked for contrast before it is used, so a very dark or very pale Windows
+  accent cannot turn labels into unreadable text. Status colours are deliberately fixed: a
+  temperature crossing a threshold looks the same whatever accent you pick.
+- Every colour in the interface now comes from a single palette rather than ~270 literals spread
+  through the XAML, which is what makes the switch possible at all. Behaviour is unchanged: no
+  control, value, or hardware path was touched.
+
 ## 0.9.0 - 2026-11-01
 
 Nitrous 0.9.0 is the first release for external testing. It is not a stable release: several
