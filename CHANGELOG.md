@@ -7,9 +7,11 @@ published from the matching section of this file.
 
 ### Appearance
 
-- Nitrous now takes its accent colour from Windows, or from one of seven fixed accents picked on
-  the Setup page. The choice is remembered. `Auto` follows the Windows accent, including when it
-  changes while Nitrous is open.
+- Nitrous now takes its accent colour from one of seven fixed accents on the Setup page: violet as
+  before, or blue, cyan, green, amber, orange or pink. The choice is remembered.
+- `Auto` is offered as an eighth option and follows the Windows accent, including when it changes
+  while Nitrous is open. It is not the default: a fresh install stays violet, so the interface
+  matches the screenshots and the branding until you decide otherwise.
 - The chosen accent is checked for contrast before it is used, so a very dark or very pale Windows
   accent cannot turn labels into unreadable text. Status colours are deliberately fixed: a
   temperature crossing a threshold looks the same whatever accent you pick.

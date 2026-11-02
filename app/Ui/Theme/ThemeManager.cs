@@ -21,8 +21,14 @@ internal static class ThemeManager
     private const string ChoiceKey = "AccentChoice";
     public const string Auto = "auto";
 
+    /// <summary>
+    /// What a machine with no saved choice gets. Nitrous is violet: following the Windows accent is
+    /// offered, not assumed, so a fresh install looks like the screenshots and the branding.
+    /// </summary>
+    public static readonly string DefaultChoice = ThemePalette.Hex(ThemePalette.DefaultAccent);
+
     private static ResourceDictionary? _installed;
-    private static string _choice = Auto;
+    private static string _choice = DefaultChoice;
     private static Color _accent = ThemePalette.DefaultAccent;
 
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
@@ -50,8 +56,8 @@ internal static class ThemeManager
     /// <summary>Loads the saved choice and installs the palette. Safe to call twice.</summary>
     public static void Initialise(Application app)
     {
-        var saved = SettingsManager.Get(ChoiceKey, Auto);
-        Install(app, string.IsNullOrWhiteSpace(saved) ? Auto : saved);
+        var saved = SettingsManager.Get(ChoiceKey, DefaultChoice);
+        Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
 
         // The user can change the Windows accent while Nitrous is open.
         SystemParameters.StaticPropertyChanged += (_, e) =>
@@ -79,24 +85,29 @@ internal static class ThemeManager
     /// <summary>The accent a choice resolves to right now.</summary>
     public static Color Resolve(string choice)
     {
-        if (!string.IsNullOrWhiteSpace(choice) && choice != Auto)
+        if (string.IsNullOrWhiteSpace(choice))
+            return ThemePalette.DefaultAccent;
+
+        if (choice == Auto)
+            return WindowsAccent();
+
+        foreach (var (name, hex) in ThemePalette.Choices)
         {
-            foreach (var (name, hex) in ThemePalette.Choices)
-            {
-                if (string.Equals(hex, choice, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(name, choice, StringComparison.OrdinalIgnoreCase))
-                    return ThemePalette.Parse(hex);
-            }
+            if (string.Equals(hex, choice, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, choice, StringComparison.OrdinalIgnoreCase))
+                return ThemePalette.Parse(hex);
         }
 
-        return WindowsAccent();
+        // Anything unrecognised falls back to the shipped accent, not to Windows.
+        return ThemePalette.DefaultAccent;
     }
 
     private static void Install(Application app, string choice)
     {
         var accent = Resolve(choice);
 
-        // Normalises anything unrecognised back to "auto" rather than persisting a bad value.
+        // Normalises anything unrecognised back to the shipped accent rather than persisting a bad
+        // value. Kept in step with Resolve above so the stored choice and the applied accent agree.
         _choice = MatchChoice(choice);
         _accent = accent;
 
@@ -112,7 +123,10 @@ internal static class ThemeManager
 
     private static string MatchChoice(string choice)
     {
-        if (string.IsNullOrWhiteSpace(choice) || choice == Auto)
+        if (string.IsNullOrWhiteSpace(choice))
+            return DefaultChoice;
+
+        if (choice == Auto)
             return Auto;
 
         foreach (var (name, hex) in ThemePalette.Choices)
@@ -122,7 +136,7 @@ internal static class ThemeManager
                 return hex;
         }
 
-        return Auto;
+        return DefaultChoice;
     }
 
     /// <summary>
