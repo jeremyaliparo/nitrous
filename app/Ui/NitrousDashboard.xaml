@@ -392,13 +392,16 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6" Padding="0">
+                                CornerRadius="8" Padding="0">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
                         </Border>
                         <ControlTemplate.Triggers>

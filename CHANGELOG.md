@@ -26,6 +26,8 @@ published from the matching section of this file.
   hotkey you cleared yourself stays cleared.
 - Cycling the power profile is still unbound by default: changing a machine's power mode from a key
   press you forgot you set is a worse surprise than having no binding.
+- The two binding boxes on the KB page are taller, so the shortcut reads as a key rather than as a
+  text field that happens to contain one.
 
 ## 0.9.0 - 2026-11-01
 
