@@ -19,6 +19,14 @@ published from the matching section of this file.
   through the XAML, which is what makes the switch possible at all. Behaviour is unchanged: no
   control, value, or hardware path was touched.
 
+### Hotkeys
+
+- `Ctrl + Home` now opens the dashboard out of the box, which is what the README has claimed since
+  the first release. It is seeded only on a machine that has never stored a dashboard binding, so a
+  hotkey you cleared yourself stays cleared.
+- Cycling the power profile is still unbound by default: changing a machine's power mode from a key
+  press you forgot you set is a worse surprise than having no binding.
+
 ## 0.9.0 - 2026-11-01
 
 Nitrous 0.9.0 is the first release for external testing. It is not a stable release: several

@@ -49,6 +49,10 @@ static class Program
 
         Logger.Info("Elevation: administrator=true.");
 
+        // Runs before either role reads a binding, so the tray registers the seeded hotkey and the
+        // dashboard displays it without a race.
+        Nitrous.Helpers.HotkeyDefaults.EnsureSeeded();
+
         // TRANSIENT UI MODE: run the dashboard in its own process.
         if (isUi)
         {

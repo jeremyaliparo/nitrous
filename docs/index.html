@@ -428,9 +428,10 @@
             </div>
             <h3>Firmware modes, not pretend buttons.</h3>
             <p>
-              Quiet, Balanced, Performance and Turbo are written through the embedded
-              controller, so the enforced GPU power limit follows. On an AN16S-61 that's
-              80 / 85 / 100 / 115 W.
+              Quiet, Balanced, Performance and Turbo go straight to the firmware - through the
+              embedded controller where there is one, through Acer WMI where there isn't - so the
+              enforced GPU power limit follows. On an AN16S-61 that's 80 / 85 / 100 / 115 W; on a
+              WMI-only ANV15-41, 65 W at Performance.
             </p>
             <div class="feature-viz viz-modes" aria-hidden="true">
               <span>Quiet</span><span>Bal</span><span class="is-on">Perf</span><span>Turbo</span>
@@ -890,7 +891,7 @@
               <p>Nitrous disables what your firmware doesn't answer instead of failing silently. Hover the control to see the exact reason.</p>
               <ul>
                 <li><strong>Keyboard zones</strong> need a 4-zone RGB keyboard; single-colour models keep brightness only.</li>
-                <li><strong>Keyboard auto-off</strong> needs the embedded-controller interface.</li>
+                <li><strong>Keyboard auto-off</strong> uses a firmware timeout command, so models with no embedded-controller interface keep it as well.</li>
                 <li><strong>USB charging while off</strong> needs an Acer WMI class that some BIOS versions implement only partially.</li>
                 <li><strong>LCD overdrive</strong> is a panel property, so it is hidden rather than greyed where unsupported.</li>
               </ul>
