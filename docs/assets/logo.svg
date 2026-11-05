@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nitrous">
+  <defs>
+    <linearGradient id="g" x1="12" y1="52" x2="52" y2="12" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8a1e"/>
+      <stop offset=".32" stop-color="#ef2b3f"/>
+      <stop offset=".62" stop-color="#b545e8"/>
+      <stop offset="1" stop-color="#4f8dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#08080c"/>
+  <rect x=".5" y=".5" width="63" height="63" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity=".12"/>
+  <path d="M13 13h10l19 27V13h9v38H42L23 24v27H13z" fill="url(#g)"/>
+</svg>
