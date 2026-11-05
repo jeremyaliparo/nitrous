@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found — Nitrous</title>
+  <meta name="theme-color" content="#06060a">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/nitrous/assets/logo.svg" type="image/svg+xml">
+  <link rel="preload" href="/nitrous/assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/nitrous/css/styles.css">
+  <style>
+    .notfound {
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .notfound-mark { width: 56px; height: 56px; margin: 0 auto 26px; filter: drop-shadow(0 0 30px rgba(181, 69, 232, .5)); }
+    .notfound-code {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+    .notfound h1 { margin-top: 14px; font-size: clamp(2.2rem, 6vw, 3.6rem); letter-spacing: -.04em; line-height: 1.02; }
+    .notfound p { margin: 16px auto 0; max-width: 46ch; color: var(--muted); font-size: 15px; }
+    .notfound-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 30px; }
+    .notfound-foot { margin-top: 44px; font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--faint); max-width: none; }
+  </style>
+</head>
+<body>
+  <main class="notfound">
+    <div>
+      <svg class="notfound-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="g" x1="8" y1="56" x2="56" y2="8" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ff8a1e"/><stop offset=".32" stop-color="#ef2b3f"/>
+            <stop offset=".62" stop-color="#b545e8"/><stop offset="1" stop-color="#4f8dff"/>
+          </linearGradient>
+        </defs>
+        <path d="M8 8h12l24 34V8h12v48H44L20 22v34H8z" fill="url(#g)"/>
+      </svg>
+      <p class="notfound-code">Error 404</p>
+      <h1>This page leaked.</h1>
+      <p>Like a stock NitroSense service, it isn't where it said it would be. Head back to the dashboard.</p>
+      <div class="notfound-actions">
+        <a class="btn btn-primary" href="/nitrous/">Back to Nitrous</a>
+        <a class="btn btn-ghost" href="https://github.com/jeremyaliparo/nitrous" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+      <p class="notfound-foot">Nitrous · MIT licensed · Unofficial project</p>
+    </div>
+  </main>
+</body>
+</html>

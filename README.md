@@ -8,6 +8,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download%20Latest&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Star%20Nitrous&color=ffb703)](https://github.com/jeremyaliparo/nitrous/stargazers)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/PGWzb3mHbG)
+[![Website](https://img.shields.io/badge/Website-nitrous-e60012?style=for-the-badge&logo=githubpages&logoColor=white)](https://jeremyaliparo.github.io/nitrous/)
 
 [**Features**](#key-features) • [**Quick Start**](#quick-start) • [**Compatibility**](#compatibility) • [**Safety & Design**](#safety--non-destructive-design) • [**Troubleshooting**](#troubleshooting) • [**Build**](#building-from-source)
 
