@@ -2244,6 +2244,26 @@ kbd {
   margin-top: 20px;
 }
 
+.footer-brand .footer-status {
+  margin-top: 18px;
+  max-width: none;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.footer-brand .footer-status .pulse-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
 .footer-col h3 {
   font-family: var(--mono);
   font-size: 9.5px;
