@@ -36,6 +36,9 @@ published from the matching section of this file.
   under Nitrous and only worked while NitroSense was in Quiet.
 - This does not change the power cap or the fans. Those were already identical between the two and
   were measured under load to confirm it: the same 80 W ceiling, and the same fan RPM within noise.
+- The POWER row now says `Whisper Mode: On` while it is requested, and the label disappears as soon
+  as another mode releases it. It reflects what Nitrous actually asked the driver for, so a refused
+  request is never shown as on.
 
 ## 0.9.0 - 2026-11-01
 

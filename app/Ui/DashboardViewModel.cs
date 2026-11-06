@@ -270,6 +270,15 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private bool _isTurboSupported = true;
     public bool IsTurboSupported { get => _isTurboSupported; set => SetProperty(ref _isTurboSupported, value); }
 
+    /// <summary>
+    /// True when Nitrous has asked nvtopps for WhisperMode, which is what makes the NVIDIA App offer
+    /// its WhisperMode controls. Read from settings rather than this process's own call, because the
+    /// tray may be the one that changed the mode. It reflects the last request Nitrous made, not a
+    /// live read of driver state.
+    /// </summary>
+    private bool _whisperModeActive;
+    public bool WhisperModeActive { get => _whisperModeActive; set => SetProperty(ref _whisperModeActive, value); }
+
     private PowerProfile _activePowerProfile;
     public PowerProfile ActivePowerProfile
     {

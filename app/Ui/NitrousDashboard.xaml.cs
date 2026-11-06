@@ -345,6 +345,7 @@ public partial class NitrousDashboard : Window
         {
             vm.ActivePowerProfile = activeMode;
             vm.IsCustomFanEnabled = activeFan == FanProfile.Medium;
+            vm.WhisperModeActive = SettingsManager.Get("WhisperActive", 0) == 1;
 
             // The tray applies the new profile's offsets on a hotkey or AC/DC change.
             // Reflect the live values so the sliders match what is actually applied.

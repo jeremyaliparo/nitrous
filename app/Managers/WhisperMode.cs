@@ -61,20 +61,22 @@ internal static class WhisperMode
 
             try
             {
-                if (enable)
-                {
+                var ok = enable
                     // The order matters: enable first, then the profile the client wants, then the
                     // frame target. This is the sequence NitroSense sends.
-                    Send(0, 1);
-                    Send(1, ModeQuiet);
-                    Send(2, MinFps);
-                }
-                else
+                    ? Send(0, 1) && Send(1, ModeQuiet) && Send(2, MinFps)
+                    : Send(0, 0);
+
+                if (!ok)
                 {
-                    Send(0, 0);
+                    // Record nothing: the dashboard shows this flag, and it must not claim a state
+                    // the driver refused.
+                    Logger.Warn($"Whisper mode: the driver refused the {(enable ? "enable" : "release")} request.");
+                    return;
                 }
 
                 _lastRequested = enable;
+                SettingsManager.Save("WhisperActive", enable ? 1 : 0);
                 Logger.Info($"Whisper mode: {(enable ? "requested" : "released")} via NVAPI.");
             }
             catch (Exception ex)
@@ -85,7 +87,7 @@ internal static class WhisperMode
         }
     }
 
-    private static void Send(uint control, uint value)
+    private static bool Send(uint control, uint value)
     {
         var buffer = new byte[StructSize];
         BitConverter.GetBytes(StructVersion).CopyTo(buffer, 0x00);
@@ -95,7 +97,12 @@ internal static class WhisperMode
 
         var rc = _setControl!(buffer);
         if (rc != 0)
+        {
             Logger.Warn($"Whisper mode: set control {control} = {value} returned {rc}.");
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>Resolves the NVAPI entry point once. Returns false when this machine cannot do it.</summary>
