@@ -145,9 +145,21 @@ public partial class NitrousDashboard : Window
 
     private int _activeNavIndex;
 
+    /// <summary>
+    /// Switches to a page by name for <see cref="UiCapture"/>. Kept on the window rather than made
+    /// public API because it is only for offscreen rendering.
+    /// </summary>
+    internal void SelectPageForCapture(string page) =>
+        SetActiveNav(page?.ToLowerInvariant() switch
+        {
+            "gpu" => 1,
+            "kb" or "keyboard" => 2,
+            "setup" or "settings" => 3,
+            _ => 0
+        });
+
     private void SetActiveNav(int index)
-    {
-        _activeNavIndex = index;
+    {        _activeNavIndex = index;
 
         var pages = new UIElement[] { DashPage, GpuPage, KeyboardPage, SettingsPage };
 

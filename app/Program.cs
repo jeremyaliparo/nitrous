@@ -30,6 +30,15 @@ static class Program
         var isUi = args.Any(arg => string.Equals(arg, "--ui", StringComparison.OrdinalIgnoreCase));
         Logger.Initialize(isUi ? "dashboard" : "tray");
 
+        // Offscreen capture runs before the elevation gate on purpose: rendering the visual tree
+        // reads no hardware, so a screenshot should not need an administrator prompt.
+        if (TryParseCapture(args) is { } capture)
+        {
+            Environment.ExitCode = Nitrous.Ui.UiCapture.Run(
+                capture.Page, capture.Output, capture.Scale, capture.SettleMs);
+            return;
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             Logger.Error("Unhandled exception.", e.ExceptionObject as Exception);
 
@@ -110,6 +119,44 @@ static class Program
         mutex.Dispose();
         mutex = null;
         return false;
+    }
+
+    /// <summary>
+    /// Parses the offscreen capture switches: <c>--screenshot &lt;page&gt; [--out &lt;path&gt;]
+    /// [--scale &lt;n&gt;] [--settle &lt;ms&gt;]</c>. Returns null when <c>--screenshot</c> is absent, so
+    /// every other launch path behaves exactly as before.
+    /// </summary>
+    private static (string Page, string Output, double Scale, int SettleMs)? TryParseCapture(string[] args)
+    {
+        string? page = null, output = null;
+        var scale = 1.0;
+        var settle = 0;
+
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            switch (args[i].ToLowerInvariant())
+            {
+                case "--screenshot":
+                    page = args[++i];
+                    break;
+                case "--out":
+                    output = args[++i];
+                    break;
+                case "--scale":
+                    if (double.TryParse(args[++i], out var parsedScale)) scale = parsedScale;
+                    break;
+                case "--settle":
+                    if (int.TryParse(args[++i], out var parsedSettle)) settle = parsedSettle;
+                    break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(page)) return null;
+
+        output ??= System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), $"nitrous-{page.ToLowerInvariant()}.png");
+
+        return (page, output, scale, settle);
     }
 
     private static void RunDashboard()
