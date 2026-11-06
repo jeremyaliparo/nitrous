@@ -69,7 +69,15 @@ public partial class NitrousDashboard : Window
         System.Threading.Tasks.Task.Run(() =>
         {
             var modelName = SystemInfoManager.GetSystemModel();
-            Dispatcher.InvokeAsync(() => SystemModelText.Text = $"{modelName}");
+
+            // Reads as a title rather than a bare asset tag: "The Nitro AN16S-61". A machine whose
+            // model cannot be read keeps the neutral placeholder instead of "The Unknown System".
+            var title = string.IsNullOrWhiteSpace(modelName) ||
+                        modelName.Equals("Unknown System", StringComparison.OrdinalIgnoreCase)
+                ? modelName
+                : $"The {modelName}";
+
+            Dispatcher.InvokeAsync(() => SystemModelText.Text = title);
         });
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
