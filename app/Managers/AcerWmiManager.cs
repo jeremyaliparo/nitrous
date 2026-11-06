@@ -92,29 +92,40 @@ public static class AcerWmiManager
         return Task.Run(() =>
         {
             var capabilities = AcerCapabilitiesProvider.Current;
+            var applied = false;
 
             if (capabilities.PowerModeChannel == PowerModeChannel.EcHid &&
                 capabilities.EcHid is { Modes.Count: > 0 } ecHid &&
                 TrySetPowerModeViaEcHid(profile, ecHid))
             {
-                return;
+                applied = true;
+            }
+            else
+            {
+                lock (Gate)
+                {
+                    applied = SetPowerModeViaWmiLocked(profile, capabilities.Profile);
+                }
             }
 
-            lock (Gate)
+            if (!applied)
             {
-                if (SetPowerModeViaWmiLocked(profile, capabilities.Profile))
+                if (capabilities.PowerModeChannel == PowerModeChannel.ActionFunction7)
+                {
+                    Logger.Warn(
+                        $"Power mode {profile} was not applied: this model keeps the mode on APGeAction " +
+                        "function 7, which Nitrous does not write yet.");
                     return;
-            }
+                }
 
-            if (capabilities.PowerModeChannel == PowerModeChannel.ActionFunction7)
-            {
-                Logger.Warn(
-                    $"Power mode {profile} was not applied: this model keeps the mode on APGeAction " +
-                    "function 7, which Nitrous does not write yet.");
+                Logger.Warn($"WMI: failed to set power mode {profile}.");
                 return;
             }
 
-            Logger.Warn($"WMI: failed to set power mode {profile}.");
+            // Only once the mode is confirmed. This tells nvtopps that a client asked for
+            // WhisperMode when the mode is Quiet, which is what the NVIDIA App reads before it
+            // offers its WhisperMode controls. It does not move the power cap: the EC owns that.
+            WhisperMode.Apply(profile == PowerProfile.Quiet);
         });
     }
 

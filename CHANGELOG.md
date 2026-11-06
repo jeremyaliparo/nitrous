@@ -29,6 +29,14 @@ published from the matching section of this file.
 - The two binding boxes on the KB page are taller, so the shortcut reads as a key rather than as a
   text field that happens to contain one.
 
+### Quiet mode
+
+- Quiet now also tells NVIDIA's driver that a client asked for WhisperMode, which is what the NVIDIA
+  App reads before it offers its WhisperMode FPS controls. Until now those controls were greyed out
+  under Nitrous and only worked while NitroSense was in Quiet.
+- This does not change the power cap or the fans. Those were already identical between the two and
+  were measured under load to confirm it: the same 80 W ceiling, and the same fan RPM within noise.
+
 ## 0.9.0 - 2026-11-01
 
 Nitrous 0.9.0 is the first release for external testing. It is not a stable release: several
