@@ -41,7 +41,7 @@ public static class Logger
         try
         {
             Directory.CreateDirectory(LogDirectoryPath);
-            Info($"Nitrous {typeof(Logger).Assembly.GetName().Version} starting " +
+            Info($"Nitrous {Nitrous.Helpers.AppVersion.Display} starting " +
                  $"(pid={Environment.ProcessId}, role={_role}, os={Environment.OSVersion.Version}, " +
                  $"runtime={RuntimeInformation.FrameworkDescription})");
         }

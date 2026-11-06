@@ -30,8 +30,8 @@ jobs:
         run: |
           $tag = "${{ github.ref_name }}"
           $version = $tag -replace '^v', ''
-          if ($version -notmatch '^(?<version>\d+\.\d+\.\d+)$') {
-            throw "Release tags must look like MAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH (got '$tag')."
+          if ($version -notmatch '^(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)$') {
+            throw "Release tags must look like MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-<suffix> (got '$tag')."
           }
           $version = $Matches.version
 
@@ -117,10 +117,19 @@ jobs:
 
           $notes = $section + "`n" + $footer
 
-          gh release create "$tag" `
-            "dist/Nitrous.exe" `
-            "dist/SHA256SUMS" `
-            "dist/Nitrous.exe.sha256" `
-            --title "Nitrous $version" `
-            --notes $notes `
-            --verify-tag
+          $releaseArgs = @(
+            "dist/Nitrous.exe",
+            "dist/SHA256SUMS",
+            "dist/Nitrous.exe.sha256",
+            "--title", "Nitrous $version",
+            "--notes", $notes,
+            "--verify-tag"
+          )
+
+          # A "-test.N" build is a prerelease, so GitHub keeps releases/latest, the updater and
+          # the website pointing at the last stable build instead of a tester build.
+          if ($version.Contains('-')) {
+            $releaseArgs += '--prerelease'
+          }
+
+          gh release create "$tag" @releaseArgs

@@ -70,11 +70,7 @@ public static class UpdateManager
         SharedClient.DefaultRequestHeaders.UserAgent.ParseAdd("NitrousApp/1.0");
     }
 
-    private static string GetCurrentVersion()
-    {
-        var version = typeof(UpdateManager).Assembly.GetName().Version;
-        return version == null ? "0.0.0" : $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}";
-    }
+    private static string GetCurrentVersion() => Nitrous.Helpers.AppVersion.Display;
 
     public static async Task CheckForUpdatesAsync(bool silent, Action exitCallback)
     {
@@ -115,8 +111,8 @@ public static class UpdateManager
                 : null;
             releaseUrl ??= $"https://github.com/{GithubRepo}/releases/tag/{latestTag}";
 
-            if (!TryNormalizeVersion(latestTag, out var latest) ||
-                !TryNormalizeVersion(CurrentVersion, out var current))
+            if (!TryParseTag(latestTag, out var latest, out var latestIsPrerelease) ||
+                !TryParseTag(CurrentVersion, out var current, out var currentIsPrerelease))
             {
                 Logger.Warn($"Updater: could not parse versions (current '{CurrentVersion}', latest '{latestTag}').");
                 if (!silent)
@@ -125,7 +121,12 @@ public static class UpdateManager
                 return;
             }
 
-            if (latest <= current)
+            // A plain release outranks a test build of the same core, so a tester on 0.10.0-test.1
+            // is offered 0.10.0 when it ships. Two builds of the same core are never nagged about.
+            var newer = latest > current ||
+                        (latest == current && currentIsPrerelease && !latestIsPrerelease);
+
+            if (!newer)
             {
                 if (!silent)
                     MessageBox.Show($"Nitrous is up to date! ({CurrentVersion})",
@@ -365,19 +366,30 @@ public static class UpdateManager
         }
     }
 
-    private static bool TryNormalizeVersion(string value, out Version version)
+    /// <summary>
+    /// Splits a tag into its numeric core and whether it carries a prerelease suffix. The suffix is
+    /// ignored for ordering the core, but a plain release outranks a prerelease of the same core, so
+    /// a tester on 0.10.0-test.1 is offered the real 0.10.0 when it lands.
+    /// </summary>
+    private static bool TryParseTag(string value, out Version version, out bool isPrerelease)
     {
+        version = new Version(0, 0, 0);
+        isPrerelease = false;
+
         value = value.Trim();
         if (value.StartsWith("v", StringComparison.OrdinalIgnoreCase)) value = value[1..];
 
-        if (Version.TryParse(value, out var parsed))
+        var dash = value.IndexOf('-');
+        if (dash >= 0)
         {
-            version = new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0));
-            return true;
+            isPrerelease = true;
+            value = value[..dash];
         }
 
-        version = new Version(0, 0, 0);
-        return false;
+        if (!Version.TryParse(value, out var parsed)) return false;
+
+        version = new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0));
+        return true;
     }
 
     private static string? GetString(JsonElement element, string property) =>
