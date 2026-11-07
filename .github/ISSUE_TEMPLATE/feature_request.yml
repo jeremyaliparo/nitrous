@@ -1,0 +1,101 @@
+name: Feature request
+description: Suggest a feature or an improvement for Nitrous.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest something.
+
+        Nitrous is deliberately standalone: it runs without Acer's services, drivers or
+        background agents, and it is a portable executable rather than an installed system
+        service. Ideas that need that stack to be running are likely to be declined, not because
+        they are bad ideas but because removing that dependency is the point of the project.
+
+        It is also a small app on purpose. A feature that adds a lot of surface to the dashboard
+        for something used once a month is a hard sell, so describing the problem you hit is more
+        useful than describing the control you want.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: The situation where Nitrous falls short, not the feature yet.
+      placeholder: |
+        Example: I dock the laptop every day and have to reopen Nitrous and click the mode I want,
+        because the tray only remembers one profile.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like Nitrous to do?
+      description: The behaviour you expect. A rough idea is fine; it does not have to be a design.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Nitrous does this concern?
+      options:
+        - Power modes and cooling
+        - GPU clocks and power
+        - Keyboard and lighting
+        - Display and refresh rate
+        - Battery and charging
+        - Appearance and dashboard
+        - Tray, hotkeys and startup
+        - Diagnostics
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: laptop-model
+    attributes:
+      label: Laptop model
+      description: |
+        Nitrous is capability-driven, and many features depend on what a given model exposes.
+        The exact Acer model name, for example AN16S-61.
+      placeholder: "Acer Nitro AN16S-61"
+    validations:
+      required: true
+
+  - type: input
+    id: nitrous-version
+    attributes:
+      label: Nitrous version
+      description: Shown at the top of the Settings page (for example, 0.10.0). Optional for a suggestion.
+      placeholder: "0.10.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do instead today?
+      description: Another tool, a manual step, or nothing at all.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, a sketch of where it would sit in the dashboard, or links to another app that does it well.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this has not been requested yet.
+          required: true
+        - label: I understand that Nitrous does not use Acer's services, so a proposal that depends on them may be declined.
+          required: true
