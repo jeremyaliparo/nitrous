@@ -98,8 +98,30 @@ internal static class ThemeManager
                 return ThemePalette.Parse(hex);
         }
 
-        // Anything unrecognised falls back to the shipped accent, not to Windows.
-        return ThemePalette.DefaultAccent;
+        // A colour the user picked themselves. Anything else falls back to the shipped accent.
+        return TryParseHex(choice, out var custom) ? custom : ThemePalette.DefaultAccent;
+    }
+
+    /// <summary>
+    /// <c>#RRGGBB</c>, the same form <see cref="ThemePalette.Hex"/> writes. Kept strict so a bad
+    /// saved value can never reach the palette.
+    /// </summary>
+    private static bool TryParseHex(string? value, out Color colour)
+    {
+        colour = default;
+        var s = value?.Trim();
+
+        if (s is not { Length: 7 } || s[0] != '#')
+            return false;
+
+        for (var i = 1; i < s.Length; i++)
+        {
+            if (!Uri.IsHexDigit(s[i]))
+                return false;
+        }
+
+        colour = ThemePalette.Parse(s);
+        return true;
     }
 
     private static void Install(Application app, string choice)
@@ -135,6 +157,10 @@ internal static class ThemeManager
                 string.Equals(name, choice, StringComparison.OrdinalIgnoreCase))
                 return hex;
         }
+
+        // A colour picked by the user is stored as-is, normalised through the same formatter.
+        if (TryParseHex(choice, out var custom))
+            return ThemePalette.Hex(custom);
 
         return DefaultChoice;
     }

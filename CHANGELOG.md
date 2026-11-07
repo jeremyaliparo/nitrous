@@ -3,6 +3,150 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.10.0-test.26 - 2026-11-07
+
+### Appearance
+
+- **Custom colours added with "Add to Custom Colors" are remembered.** Windows keeps those slots
+  only while the dialog is open, so Nitrous stores them and puts them back. It applies to every
+  colour picker: accent, Global, keyboard zones and the cover logo.
+## 0.10.0-test.25 - 2026-11-07
+
+### Lighting
+
+- **On a model without the keyboard lighting controller, the LIGHT tab is not shown at all.** It
+  used to open a page of disabled controls explaining that colours were unreachable; a page that
+  cannot do anything is worse than no page. The remaining three tabs share the space evenly.
+## 0.10.0-test.24 - 2026-11-07
+
+### Lighting
+
+- Removed the Colour control from **Area -> Keyboard -> Dynamic**. The animated effects run their
+  own palette, so there was nothing to pick there; the keyboard's colour belongs to Static, where it
+  actually applies.
+## 0.10.0-test.23 - 2026-11-07
+
+### Updates
+
+- A tester is now told plainly what they are running: **"You're running a test version of Nitrous
+  (0.10.0-test.22). The release version 0.10.0 is available on GitHub. Update now?"** A normal
+  install keeps the prompt it has always had.
+- The rule is unchanged underneath: a release outranks a test build of the same version, so testers
+  are offered the release as soon as it exists.
+## 0.10.0-test.22 - 2026-11-07
+
+### Appearance
+
+- The custom accent swatch no longer clips at the right edge. The nine swatches now sit inside the
+  card with a small margin to spare.
+## 0.10.0-test.21 - 2026-11-07
+
+### Lighting
+
+- In Area -> Keyboard -> Dynamic, **Brightness now comes before Speed**, matching Global and Cover
+  logo. The Speed row moved out of the Dynamic block and below the shared brightness slider.
+
+### Appearance
+
+- **Accent Colour now accepts any colour.** A custom picker sits after the seven presets, so the
+  shipped palette is unchanged but is no longer the limit. The choice is stored as its hex and
+  restored on the next launch.
+## 0.10.0-test.20 - 2026-11-07
+
+### Lighting
+
+- The Global card's explanation is one line again; the detail about which effects the cover logo
+  supports moved to the effect box's tooltip.
+- A **single-colour keyboard** now gets one `Colour` chip instead of four disabled zone swatches.
+  Before, the zones were disabled and nothing replaced them, so its colour could not be changed at
+  all. The zone row is hidden rather than shown disabled.
+
+### Setup
+
+- **Keyboard backlight auto-off** moved from the LIGHT page to Setup -> KEYBOARD, next to the
+  hotkeys. Its refusals are reported on that card instead of in the lighting header.
+## 0.10.0-test.19 - 2026-11-07
+
+### Lighting
+
+- **Global's speed is five steps, like the OEM software, and each step is a matched pair:** the
+  keyboard takes 1/3/5/7/9 while the cover logo takes 1/2/3/4/5. Captured from NitroSense, whose
+  Global slider has five positions and sends exactly those pairs.
+- Sending the same number to both was the cause of the drift. The keyboard has nine speed steps and
+  the logo five, so above 5 the logo sat at its maximum while the keyboard kept climbing.
+## 0.10.0-test.18 - 2026-11-07
+
+### Lighting
+
+- Global's speed is **1-9** again. The keyboard uses the value directly; the cover logo has five
+  physical steps, so above 5 it runs at its fastest. Capping Global at 5 made the keyboard slower
+  than it should be for the sake of a match the hardware cannot give anyway.
+## 0.10.0-test.17 - 2026-11-07
+
+### Lighting
+
+- Global now says on its card that the keyboard and the cover logo animate independently, so their
+  pulses are not phase-locked. The two devices accept the same effect, speed and brightness, but
+  each controller runs its own clock; stopping both and starting them together does not align them,
+  and the protocol has no phase or sync field.
+## 0.10.0-test.16 - 2026-11-07
+
+### Lighting
+
+- **Global's speed is now 1-5, the range both devices share.** At 6-9 the keyboard ran faster than
+  the cover logo, which tops out at five, so the two visibly drifted apart - which is what "not
+  synced" was. Both devices now run the same rate. The keyboard's full 1-9 range remains under
+  Area -> Keyboard -> Dynamic.
+- Global's two writes are now logged with their results, so a refused write is diagnosable from the
+  log instead of only from the status line.
+## 0.10.0-test.15 - 2026-11-07
+
+### Lighting
+
+- **Global's colour control is now disabled and reads `Auto` unless the effect is Static.** The
+  animated effects run their own palette, so the chosen colour had no effect there.
+- The stored colour is kept, not discarded: selecting Static again restores it, and the hint on the
+  card says why the control is greyed.
+## 0.10.0-test.14 - 2026-11-07
+
+### Setup
+
+- Changing the accent now recolours the **APPLY** button on the GPU page's Clock Offsets straight
+  away. That button took its colour from a captured value rather than a theme resource, so it kept
+  the previous accent until the next press. The transient `APPLIED!`/`ERROR` colours are unchanged.
+## 0.10.0-test.13 - 2026-11-07
+
+### Lighting
+
+- The toggle is now called **Power mode change flash**, and its description says the power mode,
+  so it is clear what changes when it flashes.
+## 0.10.0-test.12 - 2026-11-07
+
+### Lighting
+
+- The segmented buttons on the LIGHT page now carry icons: a globe for Global, a grid for Area, a
+  keyboard and a laptop for the two devices, and a dot and a level meter for Static and Dynamic.
+- That also fixes text that sat right of centre. The button template always reserves an icon slot,
+  and these six had none, so the label was pushed sideways.
+## 0.10.0-test.11 - 2026-11-07
+
+### Lighting
+
+- The Area tab is a single card now. The Keyboard / Cover logo selector sits at the top of it, under
+  a `DEVICE` label and a hairline divider, instead of floating above the settings in its own card.
+- The keyboard's Static / Dynamic selector stays inside that card, so the device level and the mode
+  level read as one control surface: device first, mode second, settings below.
+- No controls were added, removed or renamed.
+## 0.10.0-test.10 - 2026-11-07
+
+### Lighting
+
+- The `LIGHT` page now uses one presentation at every level: a small section label followed by a
+  segmented track (Lighting, Device, Static/Dynamic), then a padded card for the settings. The
+  tracks were previously three different heights and two different container styles.
+- Card padding, row spacing, slider blocks and hint text are now shared across Global, Keyboard and
+  Cover logo, so the page reads as one control surface rather than three.
+- No controls were added, removed or renamed.
 ## 0.10.0-test.9 - 2026-11-07
 
 ### Lighting

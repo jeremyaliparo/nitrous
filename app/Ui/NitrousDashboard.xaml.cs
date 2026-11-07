@@ -155,6 +155,16 @@ public partial class NitrousDashboard : Window
     {
         var key = page?.ToLowerInvariant() ?? string.Empty;
 
+        // Renders the three-tab navigation a model without a lighting controller would get.
+        if (key.Contains("nolight"))
+        {
+            _keyboardAvailable = false;
+            NavKeyboardBtn.Visibility = Visibility.Collapsed;
+            NavKeyboardColumn.Width = new GridLength(0);
+            SetActiveNav(0);
+            return;
+        }
+
         var bottom = key.EndsWith("-bottom");
         if (bottom) key = key[..^"-bottom".Length];
 
@@ -180,8 +190,18 @@ public partial class NitrousDashboard : Window
         if (key.StartsWith("lighting"))
         {
             if (key.Contains("area")) LightingAreaTab.IsChecked = true;
+            if (key.Contains("global")) LightingGlobalTab.IsChecked = true;
             if (key.Contains("logo")) AreaLogoTab.IsChecked = true;
             if (key.Contains("dynamic")) KbDynamicTab.IsChecked = true;
+            if (key.Contains("static")) KbStaticTab.IsChecked = true;
+
+            // Renders the single-colour keyboard layout that SMBIOS hosts report; this machine
+            // reports four zones, so it cannot be reached without forcing it.
+            if (key.Contains("single"))
+            {
+                _keyboardZoned = false;
+                UpdateZoneInteractivity();
+            }
         }
 
         if (bottom)
@@ -250,8 +270,78 @@ public partial class NitrousDashboard : Window
         foreach (var (name, hex) in ThemePalette.Choices)
             AccentSwatchRow.Children.Add(CreateSwatch(hex, name, ThemePalette.Parse(hex)));
 
+        AccentSwatchRow.Children.Add(CreateCustomSwatch());
+
         RefreshAppearanceSelection();
     }
+
+    /// <summary>
+    /// "Pick any colour". A fixed spectrum rather than the current choice, because the row is only
+    /// rebuilt on theme change; the selection ring and the rest of the window show what is in use.
+    /// </summary>
+    private Button CreateCustomSwatch()
+    {
+        var inner = new Border
+        {
+            Width = 22,
+            Height = 22,
+            CornerRadius = new CornerRadius(6),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(1, 1),
+                GradientStops =
+                {
+                    new GradientStop(Color.FromRgb(0xFF, 0x45, 0x3A), 0.0),
+                    new GradientStop(Color.FromRgb(0xFF, 0x9F, 0x0A), 0.25),
+                    new GradientStop(Color.FromRgb(0x34, 0xC7, 0x59), 0.5),
+                    new GradientStop(Color.FromRgb(0x32, 0xAD, 0xE6), 0.75),
+                    new GradientStop(Color.FromRgb(0xBF, 0x5A, 0xF5), 1.0)
+                }
+            }
+        };
+
+        var ring = new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(9),
+            BorderThickness = new Thickness(2),
+            BorderBrush = Brushes.Transparent,
+            Child = inner
+        };
+
+        var button = new Button
+        {
+            Style = (Style)FindResource("AccentSwatchStyle"),
+            Content = ring,
+            Tag = CustomSwatchTag,
+            ToolTip = "Pick any colour",
+            Margin = new Thickness(0)
+        };
+
+        button.Click += (_, _) =>
+        {
+            using var dialog = CreateColourDialog(System.Drawing.Color.FromArgb(
+                ThemeManager.Accent.R, ThemeManager.Accent.G, ThemeManager.Accent.B));
+
+            try
+            {
+                if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+                var chosen = Color.FromRgb(dialog.Color.R, dialog.Color.G, dialog.Color.B);
+                ThemeManager.Set(System.Windows.Application.Current, ThemePalette.Hex(chosen));
+            }
+            finally
+            {
+                RememberCustomColours(dialog);
+            }
+        };
+
+        return button;
+    }
+
+    private const string CustomSwatchTag = "custom";
 
     private Button CreateSwatch(string choice, string tooltip, Color? colour)
     {
@@ -295,7 +385,7 @@ public partial class NitrousDashboard : Window
             Content = ring,
             Tag = choice,
             ToolTip = tooltip,
-            Margin = new Thickness(0, 0, 6, 0)
+            Margin = new Thickness(0, 0, 4, 0)
         };
 
         // Appearance only: this writes a preference, never a hardware setting.
@@ -306,15 +396,25 @@ public partial class NitrousDashboard : Window
     private void RefreshAppearanceSelection()
     {
         var selected = (Brush)FindResource("TextPrimaryBrush");
+        var choice = ThemeManager.Choice;
+
+        // A colour the user picked is stored as its hex, so it matches none of the preset tags; the
+        // custom swatch carries the ring instead.
+        var isPreset = string.Equals(choice, ThemeManager.Auto, StringComparison.OrdinalIgnoreCase) ||
+                       ThemePalette.Choices.Any(c =>
+                           string.Equals(c.Hex, choice, StringComparison.OrdinalIgnoreCase));
 
         foreach (var button in AccentSwatchRow.Children.OfType<Button>())
         {
             if (button.Content is not Border ring)
                 continue;
 
-            ring.BorderBrush = string.Equals(button.Tag as string, ThemeManager.Choice, StringComparison.OrdinalIgnoreCase)
-                ? selected
-                : Brushes.Transparent;
+            var tag = button.Tag as string;
+            var active = string.Equals(tag, CustomSwatchTag, StringComparison.Ordinal)
+                ? !isPreset
+                : string.Equals(tag, choice, StringComparison.OrdinalIgnoreCase);
+
+            ring.BorderBrush = active ? selected : Brushes.Transparent;
         }
     }
 
@@ -322,6 +422,10 @@ public partial class NitrousDashboard : Window
     {
         ApplyNavColours();
         RefreshAppearanceSelection();
+
+        // The GPU APPLY button's colour is a captured string, not a resource, so it has to be
+        // re-read explicitly when the accent changes.
+        if (DataContext is DashboardViewModel vm) vm.RefreshAccentColours();
     }
 
     /// <summary>
@@ -727,6 +831,14 @@ public partial class NitrousDashboard : Window
     {
         _keyboardAvailable = AcerKeyboard.IsAvailable();
 
+        // A model with no lighting controller gets no LIGHT tab at all. A page that can only say it
+        // cannot do anything is worse than no page: it invites a click that can never work.
+        if (!_keyboardAvailable)
+        {
+            NavKeyboardBtn.Visibility = Visibility.Collapsed;
+            NavKeyboardColumn.Width = new GridLength(0);
+        }
+
         // SMBIOS says whether the keyboard has one colour or RGB. A single-colour keyboard can
         // still have a backlight, so only the zones are withheld: offering four swatches on a
         // keyboard that cannot light them is what made this look broken on an unlisted model.
@@ -758,8 +870,9 @@ public partial class NitrousDashboard : Window
         _globalColor = KeyboardColor.FromHex(
             SettingsManager.Get("KbGlobal_Color", _zoneColors[0].ToHex()));
         _globalBrightness = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
-        _globalSpeed = Math.Clamp(
-            SettingsManager.Get("KbGlobal_Speed", 4), AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+
+        // Global speed is five steps, matching the OEM software: keyboard 1/3/5/7/9 and logo 1/2/3/4/5.
+        _globalSpeed = Math.Clamp(SettingsManager.Get("KbGlobal_Speed", 3), 1, LogoMaxSpeed);
         GlobalBrightness.Value = _globalBrightness;
         GlobalBrightnessText.Text = $"{_globalBrightness}%";
         GlobalSpeed.Value = _globalSpeed;
@@ -783,7 +896,6 @@ public partial class NitrousDashboard : Window
 
         PaintColourButton(GlobalColorBtn, _globalColor);
         PaintColourButton(LogoColorBtn, _logoColor);
-        PaintColourButton(KbColorBtn, _zoneColors[0]);
 
         KeyboardBrightness.Value = _keyboardBrightness;
         KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
@@ -919,6 +1031,9 @@ public partial class NitrousDashboard : Window
         // The ALL tile shows the four zones side by side, so it reads as "the whole keyboard"
         // rather than as a fifth zone.
         ZoneAllBtn.Background = BuildZonePreview();
+
+        // Single-colour keyboards get one chip instead of the four swatches.
+        PaintColourButton(KbSingleColorBtn, _zoneColors[0]);
     }
 
     private System.Windows.Media.Brush BuildZonePreview()
@@ -962,7 +1077,13 @@ public partial class NitrousDashboard : Window
         Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
         ZoneAllBtn.IsEnabled = enabled;
 
-        ZoneHint.Text = "This keyboard has a single colour, not four zones.";
+        // A single-colour keyboard still has a colour; offering four disabled swatches left no way
+        // to set it at all.
+        ZoneRow.Visibility = _keyboardZoned ? Visibility.Visible : Visibility.Collapsed;
+        SingleColourRow.Visibility = _keyboardZoned ? Visibility.Collapsed : Visibility.Visible;
+        KbSingleColorBtn.IsEnabled = _keyboardAvailable;
+
+        ZoneHint.Text = "This keyboard has a single colour, so one colour applies to the whole keyboard.";
         ZoneHint.Visibility = !_keyboardZoned ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -974,17 +1095,28 @@ public partial class NitrousDashboard : Window
     private void UpdateLightingInteractivity()
     {
         var globalAnimated = IsAnimated(_globalEffect);
+        var globalHasColour = _globalEffect == KeyboardEffect.Static;
+
         GlobalEffectBox.IsEnabled = _keyboardAvailable;
-        GlobalColorBtn.IsEnabled = _keyboardAvailable;
         GlobalBrightness.IsEnabled = _keyboardAvailable;
         GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated;
         GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
 
+        // The animated effects run their own palette, so a chosen colour does nothing for either
+        // device. It is greyed to "Auto" rather than left looking usable.
+        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour;
+        GlobalColorBtn.ToolTip = globalHasColour
+            ? "Keyboard and cover-logo colour"
+            : "Only Static uses a chosen colour; the animated effects run their own palette.";
+        if (globalHasColour) PaintColourButton(GlobalColorBtn, _globalColor);
+        else PaintColourButton(GlobalColorBtn, new KeyboardColor(60, 60, 60), "Auto");
+
         KeyboardEffectBox.IsEnabled = _keyboardAvailable;
-        KbColorBtn.IsEnabled = _keyboardAvailable;
         KeyboardBrightness.IsEnabled = _keyboardAvailable;
         KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect);
-        KbSpeedRow.Visibility = IsAnimated(_keyboardEffect) ? Visibility.Visible : Visibility.Collapsed;
+        KbSpeedRow.Visibility = KbDynamicTab.IsChecked == true && IsAnimated(_keyboardEffect)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         var logoHasColour = _logoEffect == KeyboardEffect.Static;
         LogoEffectBox.IsEnabled = _keyboardAvailable;
@@ -1092,7 +1224,8 @@ public partial class NitrousDashboard : Window
 
     private void GlobalColor_Click(object sender, RoutedEventArgs e)
     {
-        if (!_keyboardAvailable || PickColour(_globalColor) is not { } chosen) return;
+        if (!_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
+        if (PickColour(_globalColor) is not { } chosen) return;
 
         _globalColor = chosen;
         SettingsManager.Save("KbGlobal_Color", chosen.ToHex());
@@ -1164,7 +1297,6 @@ public partial class NitrousDashboard : Window
         }
 
         UpdateZoneButtons();
-        PaintColourButton(KbColorBtn, chosen);
         ApplyKeyboardLighting();
     }
 
@@ -1178,15 +1310,67 @@ public partial class NitrousDashboard : Window
 
     private static KeyboardColor? PickColour(KeyboardColor current)
     {
-        using var dialog = new System.Windows.Forms.ColorDialog
-        {
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B)
-        };
+        using var dialog = CreateColourDialog(
+            System.Drawing.Color.FromArgb(current.R, current.G, current.B));
 
-        return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK
-            ? new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B)
-            : null;
+        try
+        {
+            return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK
+                ? new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B)
+                : null;
+        }
+        finally
+        {
+            RememberCustomColours(dialog);
+        }
+    }
+
+    /// <summary>
+    /// A colour dialog with the user's saved custom colours restored. Windows keeps the "Add to
+    /// Custom Colors" slots only for the lifetime of the dialog, so they are stored here.
+    /// </summary>
+    private static System.Windows.Forms.ColorDialog CreateColourDialog(System.Drawing.Color initial)
+    {
+        var dialog = new System.Windows.Forms.ColorDialog { FullOpen = true, Color = initial };
+
+        var saved = LoadCustomColours();
+        if (saved.Length > 0)
+            dialog.CustomColors = saved;
+
+        return dialog;
+    }
+
+    private const string CustomColoursKey = "ColorCustoms";
+    private const int CustomColourSlots = 16;
+
+    private static int[] LoadCustomColours()
+    {
+        var saved = SettingsManager.Get(CustomColoursKey, string.Empty);
+        var values = new List<int>();
+
+        foreach (var part in saved.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (values.Count >= CustomColourSlots) break;
+
+            if (int.TryParse(part, System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture, out var value))
+            {
+                values.Add(value);
+            }
+        }
+
+        return values.ToArray();
+    }
+
+    /// <summary>
+    /// Stores the dialog's palette after it closes, whatever the result: a colour added and then
+    /// cancelled is still a colour the user chose and would expect to find next time.
+    /// </summary>
+    private static void RememberCustomColours(System.Windows.Forms.ColorDialog dialog)
+    {
+        var colours = dialog.CustomColors ?? Array.Empty<int>();
+        SettingsManager.Save(CustomColoursKey, string.Join(",",
+            colours.Take(CustomColourSlots).Select(value => value.ToString("X8"))));
     }
 
     private void Zone_Click(object sender, RoutedEventArgs e)
@@ -1260,7 +1444,7 @@ public partial class NitrousDashboard : Window
             // This model keeps the setting as a firmware timeout reachable over APGeAction, and it
             // only offers 30 seconds or never. SetKeyboardAutoOff reads the value back, so a write
             // the firmware ignores is reported rather than shown as applied.
-            KeyboardLightingStatus.Text = AcerWmiManager.SetKeyboardAutoOff(seconds != 0)
+            KeyboardTimeoutStatus.Text = AcerWmiManager.SetKeyboardAutoOff(seconds != 0)
                 ? string.Empty
                 : "Auto-off refused";
 
@@ -1271,7 +1455,7 @@ public partial class NitrousDashboard : Window
         {
             if (!AcerWmiManager.SetKeyboardBacklightTimeout(seconds))
             {
-                KeyboardLightingStatus.Text = "Auto-off refused";
+                KeyboardTimeoutStatus.Text = "Auto-off refused";
                 return;
             }
 
@@ -1281,7 +1465,7 @@ public partial class NitrousDashboard : Window
 
             if (applied is { } state && state.TimeoutSeconds == seconds)
             {
-                KeyboardLightingStatus.Text = string.Empty;
+                KeyboardTimeoutStatus.Text = string.Empty;
                 return;
             }
 
@@ -1298,12 +1482,12 @@ public partial class NitrousDashboard : Window
             _keyboardTimeoutAvailable = false;
             KeyboardTimeoutBox.IsEnabled = false;
             KeyboardTimeoutBox.ToolTip = "This keyboard controller does not store an auto-off.";
-            KeyboardLightingStatus.Text = "Auto-off not supported";
+            KeyboardTimeoutStatus.Text = "Auto-off not supported";
         }
         catch (Exception ex)
         {
             Logger.Warn("Keyboard: could not set the backlight auto-off.", ex);
-            KeyboardLightingStatus.Text = "Auto-off change failed";
+            KeyboardTimeoutStatus.Text = "Auto-off change failed";
         }
     }
 
@@ -1639,26 +1823,34 @@ public partial class NitrousDashboard : Window
 
         try
         {
-            var speed = Math.Clamp(_globalSpeed, AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+            // The Global control is five steps, as the OEM software's is. Each step is a matched
+            // pair: keyboard 1/3/5/7/9 with logo 1/2/3/4/5.
+            var step = Math.Clamp(_globalSpeed, 1, LogoMaxSpeed);
+            var keyboardSpeed = KeyboardSpeedFor(step);
 
             var keyboardApplied = _globalEffect == KeyboardEffect.Static
                 ? AcerKeyboard.SetZoneColors(
                     Enumerable.Repeat(_globalColor, AcerKeyboard.ZoneCount).ToArray(), _globalBrightness)
                 : AcerKeyboard.SetEffect(
-                    _globalEffect, _globalBrightness, speed, leftwards: false, _globalColor);
+                    _globalEffect, _globalBrightness, keyboardSpeed, leftwards: false, _globalColor);
 
             var logoApplied = true;
+            var logoState = "not supported";
             if (LogoEffectFor(_globalEffect) is { } logoEffect)
             {
-                // The logo has five speed steps; 6-9 use its fastest rather than being refused.
                 logoApplied = AcerKeyboard.SetEffect(
-                    logoEffect, _globalBrightness, Math.Clamp(speed, 1, LogoMaxSpeed),
+                    logoEffect, _globalBrightness, step,
                     leftwards: false, _globalColor, AcerKeyboard.LidDevice);
+                logoState = logoApplied ? "applied" : "refused";
             }
 
             KeyboardLightingStatus.Text = keyboardApplied && logoApplied
                 ? string.Empty
                 : "A device refused the change";
+
+            Logger.Info($"Keyboard: global {_globalEffect} at {_globalBrightness}%, step {step} " +
+                        $"(keyboard {keyboardSpeed}, logo {step}) - " +
+                        $"keyboard {(keyboardApplied ? "applied" : "refused")}, cover logo {logoState}.");
         }
         catch (Exception ex)
         {
@@ -1674,6 +1866,22 @@ public partial class NitrousDashboard : Window
         effect is KeyboardEffect.Static or KeyboardEffect.Breathing or KeyboardEffect.Neon
             ? effect
             : null;
+
+    /// <summary>
+    /// Maps a Global speed step (1-5) onto the keyboard's nine speeds. The OEM software's Global
+    /// slider has five positions and sends matched pairs: step 1 -> keyboard 1 / logo 1, step 5 ->
+    /// keyboard 9 / logo 5 (captured). Sending the same number to both does not work, because the
+    /// keyboard has nine steps and the logo five.
+    /// </summary>
+    private static int KeyboardSpeedFor(int step) =>
+        AcerKeyboard.MinSpeed + (step - 1) * 2;
+
+    /// <summary>
+    /// Maps a keyboard speed (1-9) onto the cover logo's five steps, for the paths that only have a
+    /// keyboard speed to start from.
+    /// </summary>
+    private static int LogoSpeedFor(int keyboardSpeed) =>
+        Math.Clamp(1 + (keyboardSpeed - AcerKeyboard.MinSpeed) / 2, 1, LogoMaxSpeed);
 
     /// <summary>
     /// The lighting write switches the backlight back on, but the auto-off is a separate countdown

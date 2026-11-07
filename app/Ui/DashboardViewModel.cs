@@ -77,6 +77,17 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _applyBtnColor = ThemeManager.AccentDeepHex;
     public string ApplyBtnColor { get => _applyBtnColor; set => SetProperty(ref _applyBtnColor, value); }
 
+    /// <summary>
+    /// Re-reads the colours that come from the accent. ApplyBtnColor is a captured string rather
+    /// than a DynamicResource, so without this the GPU page's APPLY button keeps the accent that
+    /// was in force when the window opened. The transient APPLIED!/ERROR colours are left alone;
+    /// the reset after them already reads the current accent.
+    /// </summary>
+    public void RefreshAccentColours()
+    {
+        if (ApplyBtnText == "APPLY") ApplyBtnColor = ThemeManager.AccentDeepHex;
+    }
+
     private int _gpuCoreOffset;
     public int GpuCoreOffset
     {
