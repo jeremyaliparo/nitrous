@@ -17,8 +17,8 @@
 <p align="center">
   <a href="assets/dashboard.png"><img src="assets/dashboard.png" alt="Dashboard" width="23%" /></a>&nbsp;
   <a href="assets/gpu.png"><img src="assets/gpu.png" alt="GPU" width="23%" /></a>&nbsp;
-  <a href="assets/keyboard.png"><img src="assets/keyboard.png" alt="Keyboard lighting" width="23%" /></a>&nbsp;
-  <a href="assets/settings.png"><img src="assets/settings.png" alt="Settings" width="23%" /></a>
+  <a href="assets/keyboard.png"><img src="assets/keyboard.png" alt="Lighting" width="23%" /></a>&nbsp;
+  <a href="assets/settings.png"><img src="assets/settings.png" alt="Setup" width="23%" /></a>
 </p>
 
 </div>
@@ -43,8 +43,8 @@ OEM control centers install heavy background service stacks, telemetry daemons, 
 | **Power & EC** | • **Firmware Profiles:** Quiet, Balanced, Performance, and Turbo applied directly through the EC so enforced GPU power limits follow.<br>• **CPU Tuning:** Per-profile CPU min/max limits and processor boost modes with automatic baseline backup and restore.<br>• **Battery Health:** Battery charge limiter and USB power delivery while the laptop is powered off.<br>• **AC/DC Memory:** Optional separate power and fan modes for AC and battery, applied when the charger changes. |
 | **GPU** | • **Clock Offsets:** Core and memory frequency offsets with live clocks, utilization, and thermal readouts.<br>• **Opt-In Ownership:** Clock writes are **off by default** so external tools (like MSI Afterburner) are never overwritten unexpectedly. When enabled, a background watchdog automatically repairs driver clock drift. |
 | **Display** | • **Dynamic Refresh Rate:** Switch to any refresh rate the panel advertises. `Auto` uses your chosen rate on AC and 60 Hz on battery.<br>• **LCD Overdrive:** Panel response overdrive where the display reports support for it. |
-| **Keyboard** | • **RGB & Backlight:** On RGB keyboards, four lighting zones with a one-click all-zones colour, effects, brightness and an idle auto-off timer. Single-colour keyboards keep brightness only. |
-| **System & App** | • **OEM Service Disabler:** One-click disable (and exact restore) of stock Acer background services.<br>• **Hardware Diagnostics:** Built-in redacted diagnostic bundler and read-only EC probe for comparing unsupported Nitro models. |
+| **Lighting** | • **Global & Area Presets:** Four per-zone colours or one effect across all zones, with brightness and speed, driven through the keyboard's own HID controller — no Acer service, driver or pipe.<br>• **Cover Logo:** The lid logo is driven too, with Static, Breathing and Neon effects and five speed steps.<br>• **Mode Flash:** The keyboard acknowledges a power-profile change in the mode's colour, as the OEM software does.<br>• **Fit to Hardware:** Single-colour keyboards get one Colour chip instead of four dead zones, and a model with no reachable controller gets no LIGHT tab at all. |
+| **System & App** | • **OEM Service Disabler:** One-click disable (and exact restore) of stock Acer background services.<br>• **Appearance:** Seven fixed accents, `Auto` (follow Windows) or any custom colour, contrast-checked and remembered across sessions.<br>• **Hardware Diagnostics:** Built-in redacted diagnostic bundler and read-only EC probe for comparing unsupported Nitro models. |
 
 ---
 
@@ -71,7 +71,7 @@ Nitrous is completely portable and requires no installer.
 3. Move `Nitrous.exe` to a permanent folder (e.g., `C:\Tools\Nitrous`) and launch it.
 
 > [!TIP]
-> Nitrous runs silently in your system tray. Click the tray icon or press your dashboard hotkey (**Ctrl + Home** by default, rebindable on the KB page) to summon the dashboard. Configure AC/battery automation rules under **Settings**.
+> Nitrous runs silently in your system tray. Click the tray icon or press your dashboard hotkey (**Ctrl + Home** by default, rebindable on the Setup page) to summon the dashboard. Configure AC/battery automation rules under **Setup**.
 
 ---
 
@@ -84,7 +84,7 @@ Designed for modern Acer Nitro laptops (2021+) that expose the Acer gaming WMI c
 - **Acer Nitro V 15** (`ANV15-41`<!--, `ANV15-52` — *Thanks [@Baymax0251](https://github.com/Baymax0251) for testing!* -->)
 
 > [!NOTE]
-> **Unlisted models work out of the box** if they follow the same Acer protocol—nothing is hardcoded to a model string. Nitrous inspects your SMBIOS tables, available WMI methods, and EC HID interfaces at startup, enabling every control your firmware supports and disabling or hiding what it doesn't. If a feature is greyed out on your machine, run **Settings → Diagnostics → EC PROBE** and open an issue.
+> **Unlisted models work out of the box** if they follow the same Acer protocol—nothing is hardcoded to a model string. Nitrous inspects your SMBIOS tables, available WMI methods, and EC HID interfaces at startup, enabling every control your firmware supports and disabling or hiding what it doesn't. If a feature is greyed out on your machine, run **Setup → Diagnostics → EC PROBE** and open an issue.
 
 ---
 
@@ -153,8 +153,10 @@ Nitrous is engineered so that every system change is clamped, isolated, or backe
 <summary><b>A control is greyed out / disabled</b></summary>
 
 Nitrous disables controls when your firmware does not respond to them rather than failing silently. Hover over any disabled control to see the exact reason:
-- **Keyboard Zones:** Requires a 4-zone RGB keyboard (single-color keyboards only support brightness).
-- **Keyboard Auto-Off:** Requires the embedded-controller interface. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
+- **Keyboard Zones:** Requires a 4-zone RGB keyboard; single-colour models get one Colour chip instead.
+- **LIGHT page:** A model with no reachable keyboard-lighting controller gets no tab at all. Its Fn keys may still change the backlight, but no user-mode interface exposes that.
+- **Cover Logo:** Confirmed once with a test colour on the first visit. If the lid's "N" did not light up, the effect controls are replaced by an explanation and nothing further is written to that device.
+- **Keyboard Auto-Off:** Requires the embedded-controller interface and now lives in **Setup → KEYBOARD**. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
 - **USB Charging While Off:** Requires an Acer WMI class that is only partially implemented on certain BIOS versions.
 
 **LCD Overdrive** is the exception: it is a panel property, so where the display reports no support the control is hidden entirely rather than greyed out, and the refresh list fills the row.
@@ -170,7 +172,7 @@ Nitrous disables controls when your firmware does not respond to them rather tha
 
 If you encounter a bug or unsupported hardware control, attach a diagnostic bundle to your GitHub issue:
 
-1. Open **Settings → Diagnostics** and click **Export Diagnostics**.
+1. Open **Setup → Diagnostics** and click **Export Diagnostics**.
 2. Nitrous saves a redacted ZIP to `%LOCALAPPDATA%\Nitrous\diagnostics` and highlights it in File Explorer.
 3. Attach `Nitrous-Diagnostics-*.zip` to your issue.
 
