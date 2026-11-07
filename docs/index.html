@@ -73,12 +73,12 @@
           "@type": "SoftwareApplication",
           "@id": "https://jeremyaliparo.github.io/nitrous/#app",
           "name": "Nitrous",
-          "description": "Portable, open-source hardware control for Acer Nitro laptops: fan curves, firmware power modes, GPU clock offsets, refresh rate, keyboard lighting and diagnostics.",
+          "description": "Portable, open-source hardware control for Acer Nitro laptops: fan curves, firmware power modes, GPU clock offsets, refresh rate, keyboard and lid lighting, and diagnostics.",
           "url": "https://jeremyaliparo.github.io/nitrous/",
           "downloadUrl": "https://github.com/jeremyaliparo/nitrous/releases/latest/download/Nitrous.exe",
           "applicationCategory": "UtilitiesApplication",
           "operatingSystem": "Windows 10, Windows 11",
-          "softwareVersion": "0.9.0",
+          "softwareVersion": "0.10.0",
           "license": "https://github.com/jeremyaliparo/nitrous/blob/master/LICENSE",
           "softwareHelp": "https://github.com/jeremyaliparo/nitrous#readme",
           "releaseNotes": "https://github.com/jeremyaliparo/nitrous/blob/master/CHANGELOG.md",
@@ -216,7 +216,7 @@
       <a class="brand" href="#top">
         <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 8h12l24 34V8h12v48H44L20 22v34H8z" fill="url(#nitroGrad)"/></svg>
         <span class="brand-name">Nitrous</span>
-        <span class="brand-tag">v<span data-gh-version>0.9.0</span></span>
+        <span class="brand-tag">v<span data-gh-version>0.10.0</span></span>
       </a>
 
       <nav class="nav" id="primary-nav" aria-label="Primary">
@@ -273,7 +273,7 @@
           <div class="hero-cta reveal delay-3">
             <a class="btn btn-primary btn-lg" href="https://github.com/jeremyaliparo/nitrous/releases/latest/download/Nitrous.exe">
               <svg class="icon" aria-hidden="true"><use href="#i-windows"/></svg>
-              Download Nitrous <span class="btn-version" data-gh-version>0.9.0</span>
+              Download Nitrous <span class="btn-version" data-gh-version>0.10.0</span>
             </a>
             <a class="btn btn-ghost btn-lg" href="https://github.com/jeremyaliparo/nitrous" target="_blank" rel="noopener">
               <svg class="icon" aria-hidden="true"><use href="#i-github"/></svg>
@@ -479,12 +479,14 @@
           <article class="feature reveal">
             <div class="feature-top">
               <span class="feature-icon"><svg class="icon" aria-hidden="true"><use href="#i-keyboard"/></svg></span>
-              <span class="feature-kicker">Keyboard</span>
+              <span class="feature-kicker">Lighting</span>
             </div>
-            <h3>Four zones. One click.</h3>
+            <h3>Four zones, and the lid.</h3>
             <p>
-              Per-zone RGB with a one-click all-zones colour, effects, brightness and an idle
-              auto-off timer. Single-colour keyboards keep brightness control.
+              Global and Area are two presets on one page: four per-zone colours or one effect
+              across all zones, brightness and speed, plus the lid's cover logo with its own
+              Static, Breathing and Neon effects. The keyboard acknowledges a power-mode change
+              in the mode's colour, and auto-off lives next to the hotkeys in Setup.
             </p>
             <div class="feature-viz viz-zones" aria-hidden="true">
               <i></i><i></i><i></i><i></i>
@@ -563,15 +565,15 @@
             <button class="screen-tab" type="button" id="tab-keyboard" role="tab" aria-selected="false" aria-controls="panel-keyboard" tabindex="-1">
               <span class="tab-index">03</span>
               <span class="tab-body">
-                <span class="tab-title">Keyboard</span>
-                <span class="tab-desc">Global hotkeys, per-zone colours, effects and an idle auto-off timer.</span>
+                <span class="tab-title">Lighting</span>
+                <span class="tab-desc">Global and Area presets, per-zone colours, effects and the lid's cover logo.</span>
               </span>
             </button>
             <button class="screen-tab" type="button" id="tab-settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1">
               <span class="tab-index">04</span>
               <span class="tab-body">
                 <span class="tab-title">Setup</span>
-                <span class="tab-desc">CPU limits, boost modes, battery charge limit, USB charging and AC/DC automation.</span>
+                <span class="tab-desc">CPU limits, boost modes, battery charge limit, USB charging, hotkeys and appearance.</span>
               </span>
             </button>
           </div>
@@ -596,9 +598,9 @@
             <div class="shot-panel" id="panel-keyboard" role="tabpanel" aria-labelledby="tab-keyboard" hidden>
               <figure class="shot">
                 <div class="app-frame app-frame-sm">
-                  <img src="assets/keyboard.png" width="375" height="660" alt="Nitrous keyboard tab: hotkey bindings including Ctrl + Home, Sticky Keys, four RGB lighting zones, effect, brightness and auto-off timer" loading="lazy" decoding="async">
+                  <img src="assets/keyboard.png" width="375" height="660" alt="Nitrous Lighting tab: Global and Area presets, with effect, colour, brightness and speed, and the power-mode change flash toggle" loading="lazy" decoding="async">
                 </div>
-                <figcaption>Keyboard · four-zone RGB</figcaption>
+                <figcaption>Lighting · Global preset</figcaption>
               </figure>
             </div>
             <div class="shot-panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
@@ -609,7 +611,7 @@
                 <figcaption>Setup · power and battery</figcaption>
               </figure>
             </div>
-            <p class="shot-hint"><span class="pulse-dot" aria-hidden="true"></span>Live app · v<span data-gh-version>0.9.0</span></p>
+            <p class="shot-hint"><span class="pulse-dot" aria-hidden="true"></span>Live app · v<span data-gh-version>0.10.0</span></p>
           </div>
         </div>
       </div>
@@ -700,7 +702,7 @@
             <p class="model-code">AN16S-61</p>
             <ul class="model-tags">
               <li>EC HID + WMI</li>
-              <li>4-zone RGB</li>
+              <li>4-zone RGB + logo</li>
               <li>115 W Turbo</li>
               <li>Custom curves</li>
             </ul>
@@ -730,7 +732,7 @@
             <p>
               If your Nitro follows the same Acer protocol, the controls your firmware exposes
               light up automatically. Greyed-out controls explain themselves on hover.
-              Run <strong>Settings → Diagnostics → EC PROBE</strong> and open an issue if
+              Run <strong>Setup → Diagnostics → EC PROBE</strong> and open an issue if
               something is missing.
             </p>
             <a class="text-link" href="https://github.com/jeremyaliparo/nitrous/issues" target="_blank" rel="noopener">
@@ -793,7 +795,7 @@
               <span class="step-num">3</span>
               <div class="step-body">
                 <h3>Run it from anywhere</h3>
-                <p>Move the <code>.exe</code> to a permanent folder and launch it. Nitrous lives in the tray — click the icon or press <kbd>Ctrl</kbd> + <kbd>Home</kbd> to summon the dashboard. Hotkeys are rebindable on the KB page.</p>
+                <p>Move the <code>.exe</code> to a permanent folder and launch it. Nitrous lives in the tray — click the icon or press <kbd>Ctrl</kbd> + <kbd>Home</kbd> to summon the dashboard. Hotkeys are rebindable on the Setup page.</p>
                 <p class="fineprint">Disabling Acer services is strictly opt-in. If you do, <strong>Setup → Acer Background Services → RESTORE</strong> brings back the exact previous state.</p>
               </div>
             </div>
@@ -803,10 +805,10 @@
             <div class="release-glow" aria-hidden="true"></div>
             <div class="release-head">
               <span class="eyebrow">Latest release</span>
-              <span class="release-badge">Early access</span>
+              <span class="release-badge">Stable</span>
             </div>
-            <p class="release-version">v<span data-gh-version>0.9.0</span></p>
-            <p class="release-date">Released <span data-gh-date>Nov 1, 2026</span></p>
+            <p class="release-version">v<span data-gh-version>0.10.0</span></p>
+            <p class="release-date">Released <span data-gh-date>Nov 8, 2026</span></p>
 
             <dl class="release-rows">
               <div><dt>Platform</dt><dd>Windows 10 / 11 x64</dd></div>
@@ -890,8 +892,10 @@
             <div class="faq-body">
               <p>Nitrous disables what your firmware doesn't answer instead of failing silently. Hover the control to see the exact reason.</p>
               <ul>
-                <li><strong>Keyboard zones</strong> need a 4-zone RGB keyboard; single-colour models keep brightness only.</li>
-                <li><strong>Keyboard auto-off</strong> uses a firmware timeout command, so models with no embedded-controller interface keep it as well.</li>
+                <li><strong>Keyboard zones</strong> need a 4-zone RGB keyboard; single-colour models get one Colour chip instead.</li>
+                <li><strong>The LIGHT tab</strong> is absent on models with no reachable lighting controller. The Fn keys may still work, but no user-mode interface exposes that.</li>
+                <li><strong>The cover logo</strong> is confirmed once with a test colour; if it didn't light up, the controls are replaced by an explanation and nothing more is written.</li>
+                <li><strong>Keyboard auto-off</strong> now lives in <strong>Setup → KEYBOARD</strong> and still uses a firmware timeout command, so it needs the embedded-controller interface.</li>
                 <li><strong>USB charging while off</strong> needs an Acer WMI class that some BIOS versions implement only partially.</li>
                 <li><strong>LCD overdrive</strong> is a panel property, so it is hidden rather than greyed where unsupported.</li>
               </ul>
@@ -913,7 +917,7 @@
                 <li><code>%LOCALAPPDATA%\Nitrous\diagnostics</code> — exported ZIP bundles.</li>
                 <li><code>HKCU\Software\Nitrous</code> — preferences plus CPU power and boost baselines.</li>
               </ul>
-              <p>Export a bundle from <strong>Settings → Diagnostics → Export Diagnostics</strong>. Nothing is uploaded automatically: usernames, paths, SIDs, emails and IP/MAC addresses are scrubbed, and serial numbers and system UUIDs are never collected.</p>
+              <p>Export a bundle from <strong>Setup → Diagnostics → Export Diagnostics</strong>. Nothing is uploaded automatically: usernames, paths, SIDs, emails and IP/MAC addresses are scrubbed, and serial numbers and system UUIDs are never collected.</p>
             </div>
           </details>
         </div>
@@ -949,7 +953,7 @@
               <svg class="icon" aria-hidden="true"><use href="#i-external"/></svg>
             </a>
           </div>
-          <p class="cta-foot">v<span data-gh-version>0.9.0</span> · MIT · Windows 10/11 x64 · .NET 10 Desktop Runtime</p>
+          <p class="cta-foot">v<span data-gh-version>0.10.0</span> · MIT · Windows 10/11 x64 · .NET 10 Desktop Runtime</p>
         </div>
       </div>
     </section>
@@ -974,7 +978,7 @@
           </div>
           <p class="footer-status">
             <span class="pulse-dot" aria-hidden="true"></span>
-            Actively maintained · v<span data-gh-version>0.9.0</span> · <span data-gh-date>Nov 1, 2026</span>
+            Actively maintained · v<span data-gh-version>0.10.0</span> · <span data-gh-date>Nov 8, 2026</span>
           </p>
         </div>
 
