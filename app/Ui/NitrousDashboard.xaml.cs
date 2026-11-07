@@ -147,16 +147,57 @@ public partial class NitrousDashboard : Window
 
     /// <summary>
     /// Switches to a page by name for <see cref="UiCapture"/>. Kept on the window rather than made
-    /// public API because it is only for offscreen rendering.
+    /// public API because it is only for offscreen rendering. A Lighting name may also carry
+    /// "area", "logo" or "dynamic" to open those tabs, so each half of the page can be rendered
+    /// without clicking through it. Any page name may end in "-bottom" to render its lower half.
     /// </summary>
-    internal void SelectPageForCapture(string page) =>
-        SetActiveNav(page?.ToLowerInvariant() switch
+    internal void SelectPageForCapture(string page)
+    {
+        var key = page?.ToLowerInvariant() ?? string.Empty;
+
+        var bottom = key.EndsWith("-bottom");
+        if (bottom) key = key[..^"-bottom".Length];
+
+        var index = key switch
         {
             "gpu" => 1,
             "kb" or "keyboard" => 2,
-            "setup" or "settings" => 3,
+            "setup" or "settings" or "setup-hotkeys" => 3,
             _ => 0
-        });
+        };
+
+        // "lighting-area", "lighting-logo", "lighting-area-dynamic" all open the same page.
+        if (key.StartsWith("lighting")) index = 2;
+
+        SetActiveNav(index);
+
+        if (key == "setup-hotkeys")
+        {
+            UpdateLayout();
+            TxtHkCycle.BringIntoView();
+        }
+
+        if (key.StartsWith("lighting"))
+        {
+            if (key.Contains("area")) LightingAreaTab.IsChecked = true;
+            if (key.Contains("logo")) AreaLogoTab.IsChecked = true;
+            if (key.Contains("dynamic")) KbDynamicTab.IsChecked = true;
+        }
+
+        if (bottom)
+        {
+            // The scroll extent only exists after a layout pass, and the settle timer runs after it.
+            UpdateLayout();
+            var scroller = index switch
+            {
+                1 => GpuPage,
+                2 => KeyboardPage,
+                3 => SettingsPage,
+                _ => DashPage
+            };
+            scroller.ScrollToEnd();
+        }
+    }
 
     private void SetActiveNav(int index)
     {        _activeNavIndex = index;
@@ -584,10 +625,24 @@ public partial class NitrousDashboard : Window
     };
 
     private int _keyboardBrightness = 100;
+    private int _keyboardSpeed = 4;
     private KeyboardEffect _keyboardEffect = KeyboardEffect.Static;
     private bool _keyboardAvailable;
     private bool _keyboardZoned = true;
     private bool _keyboardLoading = true;
+
+    // Global writes the same effect to both devices; the logo keeps its own values for Area.
+    private KeyboardEffect _globalEffect = KeyboardEffect.Static;
+    private KeyboardColor _globalColor = KeyboardColor.FromHex("#B388FF");
+    private int _globalBrightness = 100;
+    private int _globalSpeed = 4;
+
+    private KeyboardEffect _logoEffect = KeyboardEffect.Static;
+    private KeyboardColor _logoColor = KeyboardColor.FromHex("#B388FF");
+    private int _logoBrightness = 100;
+    private int _logoSpeed = 3;
+
+    private bool _blinkOnModeChange;
 
     // The lighting write switches the backlight back on, but the auto-off is a separate countdown
     // on the EC that only a write carrying it arms. Debounced so dragging the brightness slider
@@ -597,16 +652,59 @@ public partial class NitrousDashboard : Window
         Interval = TimeSpan.FromMilliseconds(600)
     };
 
+    // The labels NitroSense shows, mapped onto the controller's own mode bytes. Three of them are
+    // renamed by Acer: Ripple is Shifting (8), Snake is Meteor (10), Disco is Twinkling (11).
     private static readonly (string Name, KeyboardEffect Effect)[] KeyboardEffects =
     {
         ("Static", KeyboardEffect.Static),
         ("Breathing", KeyboardEffect.Breathing),
         ("Neon", KeyboardEffect.Neon),
         ("Wave", KeyboardEffect.Wave),
-        ("Shifting", KeyboardEffect.Shifting),
+        ("Ripple", KeyboardEffect.Shifting),
         ("Zoom", KeyboardEffect.Zoom),
-        ("Meteor", KeyboardEffect.Meteor),
-        ("Twinkling", KeyboardEffect.Twinkling)
+        ("Snake", KeyboardEffect.Meteor),
+        ("Disco", KeyboardEffect.Twinkling)
+    };
+
+    /// <summary>
+    /// The Dynamic panel's list. Static is not an animation and has its own panel, so it is not
+    /// offered here, which is also how the OEM software presents it.
+    /// </summary>
+    private static readonly (string Name, KeyboardEffect Effect)[] DynamicEffects =
+    {
+        ("Breathing", KeyboardEffect.Breathing),
+        ("Neon", KeyboardEffect.Neon),
+        ("Wave", KeyboardEffect.Wave),
+        ("Ripple", KeyboardEffect.Shifting),
+        ("Zoom", KeyboardEffect.Zoom),
+        ("Snake", KeyboardEffect.Meteor),
+        ("Disco", KeyboardEffect.Twinkling)
+    };
+
+    /// <summary>
+    /// The cover logo only implements three of them. Selecting anything else leaves it on its
+    /// previous effect rather than sending a mode the firmware would silently ignore.
+    /// </summary>
+    private static readonly (string Name, KeyboardEffect Effect)[] LogoEffects =
+    {
+        ("Static", KeyboardEffect.Static),
+        ("Breathing", KeyboardEffect.Breathing),
+        ("Neon", KeyboardEffect.Neon)
+    };
+
+    /// <summary>The logo exposes five speed steps where the keyboard exposes nine.</summary>
+    private const int LogoMaxSpeed = 5;
+
+    /// <summary>Animated effects use the speed byte; Static ignores it in the firmware.</summary>
+    private static bool IsAnimated(KeyboardEffect effect) => effect != KeyboardEffect.Static;
+
+    /// <summary>Older builds saved Acer's internal names. Keep them meaning the same effect.</summary>
+    private static string MigrateEffectName(string? saved) => saved switch
+    {
+        "Shifting" => "Ripple",
+        "Meteor" => "Snake",
+        "Twinkling" => "Disco",
+        _ => saved ?? "Static"
     };
 
     /// <summary>Backlight auto-off choices, in seconds (0 = never).</summary>
@@ -639,13 +737,53 @@ public partial class NitrousDashboard : Window
 
         _keyboardBrightness = Math.Clamp(SettingsManager.Get("KbBrightness", 100), 0, 100);
 
-        foreach (var (name, _) in KeyboardEffects)
+        foreach (var (name, _) in DynamicEffects)
             KeyboardEffectBox.Items.Add(name);
 
-        var saved = SettingsManager.Get("KbEffect", "Static");
-        var selected = Array.FindIndex(KeyboardEffects, e => e.Name == saved);
-        KeyboardEffectBox.SelectedIndex = selected >= 0 ? selected : 0;
-        _keyboardEffect = KeyboardEffects[KeyboardEffectBox.SelectedIndex].Effect;
+        foreach (var (name, _) in KeyboardEffects)
+            GlobalEffectBox.Items.Add(name);
+
+        foreach (var (name, _) in LogoEffects)
+            LogoEffectBox.Items.Add(name);
+
+        _keyboardEffect = LoadEffect(KeyboardEffectBox, DynamicEffects, "KbEffect");
+        _globalEffect = LoadEffect(GlobalEffectBox, KeyboardEffects, "KbGlobal_Effect");
+        _logoEffect = LoadEffect(LogoEffectBox, LogoEffects, "KbLogo_Effect");
+
+        _keyboardSpeed = Math.Clamp(
+            SettingsManager.Get("KbSpeed", 4), AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+        KbSpeed.Value = _keyboardSpeed;
+        KbSpeedText.Text = _keyboardSpeed.ToString();
+
+        _globalColor = KeyboardColor.FromHex(
+            SettingsManager.Get("KbGlobal_Color", _zoneColors[0].ToHex()));
+        _globalBrightness = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
+        _globalSpeed = Math.Clamp(
+            SettingsManager.Get("KbGlobal_Speed", 4), AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+        GlobalBrightness.Value = _globalBrightness;
+        GlobalBrightnessText.Text = $"{_globalBrightness}%";
+        GlobalSpeed.Value = _globalSpeed;
+        GlobalSpeedText.Text = _globalSpeed.ToString();
+
+        _logoColor = KeyboardColor.FromHex(
+            SettingsManager.Get("KbLogo_Color", _zoneColors[0].ToHex()));
+        _logoBrightness = Math.Clamp(SettingsManager.Get("KbLogo_Brightness", 100), 0, 100);
+        _logoSpeed = Math.Clamp(SettingsManager.Get("KbLogo_Speed", 3), 1, LogoMaxSpeed);
+        LogoBrightness.Value = _logoBrightness;
+        LogoBrightnessText.Text = $"{_logoBrightness}%";
+        LogoSpeed.Value = _logoSpeed;
+        LogoSpeedText.Text = _logoSpeed.ToString();
+
+        _blinkOnModeChange = SettingsManager.Get("KbBlinkOnMode", true);
+        TogBlinkOnMode.IsChecked = _blinkOnModeChange;
+
+        // Restore which half of the keyboard card was last in use, before the first apply below.
+        if (SettingsManager.Get("KbStyle", "Static") == "Dynamic")
+            KbDynamicTab.IsChecked = true;
+
+        PaintColourButton(GlobalColorBtn, _globalColor);
+        PaintColourButton(LogoColorBtn, _logoColor);
+        PaintColourButton(KbColorBtn, _zoneColors[0]);
 
         KeyboardBrightness.Value = _keyboardBrightness;
         KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
@@ -716,13 +854,57 @@ public partial class NitrousDashboard : Window
                 ? "Single-colour keyboard"
                 : string.Empty;
 
-        KeyboardEffectBox.IsEnabled = _keyboardAvailable;
-        KeyboardBrightness.IsEnabled = _keyboardAvailable;
-        UpdateZoneInteractivity();
+        UpdateLightingInteractivity();
+
+        // The tabs are a preset toggle: open the one that was last used, and apply it below.
+        var source = SettingsManager.Get("KbLightingSource", "Area");
+        if (source == "Area") LightingAreaTab.IsChecked = true;
 
         _keyboardLoading = false;
 
-        if (_keyboardAvailable) ApplyKeyboardLighting();
+        if (_keyboardAvailable)
+        {
+            if (source == "Global") ApplyGlobalLighting();
+            else ApplyAreaLighting(reportLogoFailure: false);
+        }
+    }
+
+    /// <summary>
+    /// Selects a saved effect by its display name, tolerating the names older builds saved.
+    /// </summary>
+    private static KeyboardEffect LoadEffect(
+        System.Windows.Controls.ComboBox box,
+        IReadOnlyList<(string Name, KeyboardEffect Effect)> table,
+        string settingKey)
+    {
+        var saved = MigrateEffectName(SettingsManager.Get(settingKey, "Static"));
+        var index = 0;
+        for (var i = 0; i < table.Count; i++)
+        {
+            if (table[i].Name != saved) continue;
+            index = i;
+            break;
+        }
+
+        box.SelectedIndex = index;
+        return table[index].Effect;
+    }
+
+    private bool IgnoreLightingChanges => _keyboardLoading;
+
+    /// <summary>
+    /// Paints a colour chip so it shows the colour it selects. The text flips to black on light
+    /// colours, because white on yellow is unreadable and the chip is the only feedback there is.
+    /// </summary>
+    private static void PaintColourButton(
+        System.Windows.Controls.Button button, KeyboardColor color, string? text = null)
+    {
+        button.Background = new SolidColorBrush(Color.FromRgb(color.R, color.G, color.B));
+        var luma = (0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B) / 255.0;
+        button.Foreground = luma > 0.55
+            ? System.Windows.Media.Brushes.Black
+            : System.Windows.Media.Brushes.White;
+        button.Content = text ?? color.ToHex();
     }
 
     private void UpdateZoneButtons()
@@ -772,19 +954,239 @@ public partial class NitrousDashboard : Window
         return brush;
     }
 
-    /// <summary>Zone colours only mean anything in Static; the controller ignores them otherwise.</summary>
+    /// <summary>Zone colours only mean anything in the keyboard's Static panel.</summary>
     private void UpdateZoneInteractivity()
     {
-        var staticMode = _keyboardEffect == KeyboardEffect.Static;
-        var enabled = _keyboardAvailable && _keyboardZoned && staticMode;
+        var enabled = _keyboardAvailable && _keyboardZoned && KbStaticTab.IsChecked == true;
 
         Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
         ZoneAllBtn.IsEnabled = enabled;
 
-        ZoneHint.Text = !_keyboardZoned
-            ? "This keyboard has a single colour, not four zones."
-            : "Zone colours apply to Static. Pick Static to use them.";
-        ZoneHint.Visibility = !_keyboardZoned || !staticMode ? Visibility.Visible : Visibility.Collapsed;
+        ZoneHint.Text = "This keyboard has a single colour, not four zones.";
+        ZoneHint.Visibility = !_keyboardZoned ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Enables only what can act. The speed row disappears for Static because the firmware ignores
+    /// it there, and the logo's colour greys to "Auto" for the two modes that cycle their own
+    /// palette rather than using the colour sent.
+    /// </summary>
+    private void UpdateLightingInteractivity()
+    {
+        var globalAnimated = IsAnimated(_globalEffect);
+        GlobalEffectBox.IsEnabled = _keyboardAvailable;
+        GlobalColorBtn.IsEnabled = _keyboardAvailable;
+        GlobalBrightness.IsEnabled = _keyboardAvailable;
+        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated;
+        GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
+
+        KeyboardEffectBox.IsEnabled = _keyboardAvailable;
+        KbColorBtn.IsEnabled = _keyboardAvailable;
+        KeyboardBrightness.IsEnabled = _keyboardAvailable;
+        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect);
+        KbSpeedRow.Visibility = IsAnimated(_keyboardEffect) ? Visibility.Visible : Visibility.Collapsed;
+
+        var logoHasColour = _logoEffect == KeyboardEffect.Static;
+        LogoEffectBox.IsEnabled = _keyboardAvailable;
+        LogoBrightness.IsEnabled = _keyboardAvailable;
+        LogoSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_logoEffect);
+        LogoSpeedRow.Visibility = IsAnimated(_logoEffect) ? Visibility.Visible : Visibility.Collapsed;
+        LogoColorBtn.IsEnabled = _keyboardAvailable && logoHasColour;
+        LogoColorBtn.ToolTip = logoHasColour
+            ? "Cover-logo colour"
+            : "Breathing and Neon cycle their own colours; the firmware ignores the one sent.";
+
+        if (logoHasColour) PaintColourButton(LogoColorBtn, _logoColor);
+        else PaintColourButton(LogoColorBtn, new KeyboardColor(60, 60, 60), "Auto");
+
+        UpdateZoneInteractivity();
+    }
+
+    /// <summary>
+    /// Global and Area are two presets shown one at a time. Switching between them applies the one
+    /// being opened, the way a preset toggle works: Global writes both devices, Area writes each
+    /// device from its own saved settings.
+    /// </summary>
+    private void LightingTab_Checked(object sender, RoutedEventArgs e)
+    {
+        if (GlobalPanel == null || AreaPanel == null) return;
+
+        var global = LightingGlobalTab.IsChecked == true;
+        GlobalPanel.Visibility = global ? Visibility.Visible : Visibility.Collapsed;
+        AreaPanel.Visibility = global ? Visibility.Collapsed : Visibility.Visible;
+
+        // Not during load: the first apply is done deliberately at the end of initialisation.
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        if (global) ApplyGlobalLighting();
+        else ApplyAreaLighting();
+    }
+
+    /// <summary>Applies both Area device configurations: keyboard and cover logo.</summary>
+    private void ApplyAreaLighting(bool reportLogoFailure = true)
+    {
+        ApplyKeyboardLighting();
+        ApplyLogoLighting(reportLogoFailure);
+    }
+
+    /// <summary>Area splits into the two devices the controller actually exposes.</summary>
+    private void AreaTab_Checked(object sender, RoutedEventArgs e)
+    {
+        if (AreaKeyboardPanel == null || AreaLogoPanel == null) return;
+
+        var keyboard = AreaKeyboardTab.IsChecked == true;
+        AreaKeyboardPanel.Visibility = keyboard ? Visibility.Visible : Visibility.Collapsed;
+        AreaLogoPanel.Visibility = keyboard ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Static and Dynamic are presets too: switching applies the selected one straight away, so it
+    /// does not need an unrelated edit to take effect.
+    /// </summary>
+    private void KbMode_Checked(object sender, RoutedEventArgs e)
+    {
+        if (KbStaticPanel == null || KbDynamicPanel == null) return;
+
+        var isStatic = KbStaticTab.IsChecked == true;
+        KbStaticPanel.Visibility = isStatic ? Visibility.Visible : Visibility.Collapsed;
+        KbDynamicPanel.Visibility = isStatic ? Visibility.Collapsed : Visibility.Visible;
+
+        // Saved, because the next launch re-applies the lighting from this choice: without it a
+        // Dynamic effect would come back as the Static zone colours.
+        if (!_keyboardLoading) SettingsManager.Save("KbStyle", isStatic ? "Static" : "Dynamic");
+
+        UpdateLightingInteractivity();
+
+        if (!IgnoreLightingChanges && _keyboardAvailable) ApplyKeyboardLighting();
+    }
+
+    private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0) return;
+
+        _globalEffect = KeyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbGlobal_Effect", KeyboardEffects[GlobalEffectBox.SelectedIndex].Name);
+        UpdateLightingInteractivity();
+        ApplyGlobalLighting();
+    }
+
+    private void GlobalBrightness_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _globalBrightness = (int)Math.Round(e.NewValue);
+        if (GlobalBrightnessText != null) GlobalBrightnessText.Text = $"{_globalBrightness}%";
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbGlobal_Brightness", _globalBrightness);
+        ApplyGlobalLighting();
+    }
+
+    private void GlobalSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _globalSpeed = (int)Math.Round(e.NewValue);
+        if (GlobalSpeedText != null) GlobalSpeedText.Text = _globalSpeed.ToString();
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbGlobal_Speed", _globalSpeed);
+        ApplyGlobalLighting();
+    }
+
+    private void GlobalColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_keyboardAvailable || PickColour(_globalColor) is not { } chosen) return;
+
+        _globalColor = chosen;
+        SettingsManager.Save("KbGlobal_Color", chosen.ToHex());
+        PaintColourButton(GlobalColorBtn, chosen);
+        ApplyGlobalLighting();
+    }
+
+    private void LogoEffect_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IgnoreLightingChanges || LogoEffectBox.SelectedIndex < 0) return;
+
+        _logoEffect = LogoEffects[LogoEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbLogo_Effect", LogoEffects[LogoEffectBox.SelectedIndex].Name);
+        UpdateLightingInteractivity();
+        ApplyLogoLighting();
+    }
+
+    private void LogoBrightness_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _logoBrightness = (int)Math.Round(e.NewValue);
+        if (LogoBrightnessText != null) LogoBrightnessText.Text = $"{_logoBrightness}%";
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbLogo_Brightness", _logoBrightness);
+        ApplyLogoLighting();
+    }
+
+    private void LogoSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _logoSpeed = (int)Math.Round(e.NewValue);
+        if (LogoSpeedText != null) LogoSpeedText.Text = _logoSpeed.ToString();
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbLogo_Speed", _logoSpeed);
+        ApplyLogoLighting();
+    }
+
+    private void LogoColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_keyboardAvailable || _logoEffect != KeyboardEffect.Static) return;
+        if (PickColour(_logoColor) is not { } chosen) return;
+
+        _logoColor = chosen;
+        SettingsManager.Save("KbLogo_Color", chosen.ToHex());
+        PaintColourButton(LogoColorBtn, chosen);
+        ApplyLogoLighting();
+    }
+
+    private void KbSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _keyboardSpeed = (int)Math.Round(e.NewValue);
+        if (KbSpeedText != null) KbSpeedText.Text = _keyboardSpeed.ToString();
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
+
+        SettingsManager.Save("KbSpeed", _keyboardSpeed);
+        ApplyKeyboardLighting();
+    }
+
+    private void KbColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_keyboardAvailable || PickColour(_zoneColors[0]) is not { } chosen) return;
+
+        // Dynamic sends one colour across all four zones, so the chip writes all four rather than
+        // leaving the keyboard showing a gradient the chosen effect cannot express.
+        for (var i = 0; i < _zoneColors.Length; i++)
+        {
+            _zoneColors[i] = chosen;
+            SettingsManager.Save($"KbZone{i + 1}", chosen.ToHex());
+        }
+
+        UpdateZoneButtons();
+        PaintColourButton(KbColorBtn, chosen);
+        ApplyKeyboardLighting();
+    }
+
+    private void BlinkOnMode_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (IgnoreLightingChanges) return;
+
+        _blinkOnModeChange = TogBlinkOnMode.IsChecked == true;
+        SettingsManager.Save("KbBlinkOnMode", _blinkOnModeChange);
+    }
+
+    private static KeyboardColor? PickColour(KeyboardColor current)
+    {
+        using var dialog = new System.Windows.Forms.ColorDialog
+        {
+            FullOpen = true,
+            Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B)
+        };
+
+        return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK
+            ? new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B)
+            : null;
     }
 
     private void Zone_Click(object sender, RoutedEventArgs e)
@@ -802,16 +1204,7 @@ public partial class NitrousDashboard : Window
         if (!allZones && (index < 0 || index >= _zoneColors.Length)) return;
 
         var current = _zoneColors[allZones ? 0 : index];
-
-        using var dialog = new System.Windows.Forms.ColorDialog
-        {
-            FullOpen = true,
-            Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B)
-        };
-
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-
-        var chosen = new KeyboardColor(dialog.Color.R, dialog.Color.G, dialog.Color.B);
+        if (PickColour(current) is not { } chosen) return;
 
         if (allZones)
         {
@@ -829,23 +1222,17 @@ public partial class NitrousDashboard : Window
 
         UpdateZoneButtons();
 
-        // Picking a zone colour means Static; the change handler applies it.
-        if (_keyboardEffect != KeyboardEffect.Static)
-        {
-            KeyboardEffectBox.SelectedIndex = 0;
-            return;
-        }
-
+        // The zone chips only exist in the keyboard's Static panel, so the write is the static one.
         ApplyKeyboardLighting();
     }
 
     private void KeyboardEffect_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (_keyboardLoading || KeyboardEffectBox.SelectedIndex < 0) return;
+        if (IgnoreLightingChanges || KeyboardEffectBox.SelectedIndex < 0) return;
 
-        _keyboardEffect = KeyboardEffects[KeyboardEffectBox.SelectedIndex].Effect;
-        SettingsManager.Save("KbEffect", KeyboardEffects[KeyboardEffectBox.SelectedIndex].Name);
-        UpdateZoneInteractivity();
+        _keyboardEffect = DynamicEffects[KeyboardEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbEffect", DynamicEffects[KeyboardEffectBox.SelectedIndex].Name);
+        UpdateLightingInteractivity();
         ApplyKeyboardLighting();
     }
 
@@ -853,7 +1240,7 @@ public partial class NitrousDashboard : Window
     {
         _keyboardBrightness = (int)Math.Round(e.NewValue);
         if (KeyboardBrightnessText != null) KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
-        if (_keyboardLoading || !_keyboardAvailable) return;
+        if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbBrightness", _keyboardBrightness);
         ApplyKeyboardLighting();
@@ -1187,15 +1574,20 @@ public partial class NitrousDashboard : Window
         }
     }
 
+    /// <summary>
+    /// Area → Keyboard. The Static panel writes one colour per zone; the Dynamic panel writes one
+    /// effect across all four, so only the first zone's colour is carried.
+    /// </summary>
     private void ApplyKeyboardLighting()
     {
         if (!_keyboardAvailable) return;
 
         try
         {
-            var applied = _keyboardEffect == KeyboardEffect.Static
-                ? AcerKeyboard.SetZoneColors(_zoneColors, _keyboardBrightness)
-                : AcerKeyboard.SetEffect(_keyboardEffect, _keyboardBrightness, 4, leftwards: false, _zoneColors[0]);
+            var applied = KbDynamicTab.IsChecked == true
+                ? AcerKeyboard.SetEffect(
+                    _keyboardEffect, _keyboardBrightness, _keyboardSpeed, leftwards: false, _zoneColors[0])
+                : AcerKeyboard.SetZoneColors(_zoneColors, _keyboardBrightness);
 
             KeyboardLightingStatus.Text = applied ? string.Empty : "The keyboard refused the change";
         }
@@ -1205,8 +1597,83 @@ public partial class NitrousDashboard : Window
             KeyboardLightingStatus.Text = "Lighting change failed";
         }
 
+        SettingsManager.Save("KbLightingSource", "Area");
         ScheduleAutoOffRearm();
     }
+
+    /// <summary>
+    /// Area → Cover logo. Static honours the colour; Breathing and Neon cycle their own palette and
+    /// ignore it, which is why the colour chip reads "Auto" for those two.
+    /// </summary>
+    private void ApplyLogoLighting(bool reportFailure = true)
+    {
+        if (!_keyboardAvailable) return;
+
+        try
+        {
+            var applied = AcerKeyboard.SetEffect(
+                _logoEffect, _logoBrightness, Math.Clamp(_logoSpeed, 1, LogoMaxSpeed),
+                leftwards: false, _logoColor, AcerKeyboard.LidDevice);
+
+            // A model without a lid simply refuses this; at launch that is not worth a message.
+            if (reportFailure)
+                KeyboardLightingStatus.Text = applied ? string.Empty : "The cover logo refused the change";
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: cover-logo change failed.", ex);
+            if (reportFailure) KeyboardLightingStatus.Text = "Cover-logo change failed";
+        }
+
+        SettingsManager.Save("KbLightingSource", "Area");
+    }
+
+    /// <summary>
+    /// Global. There is no "all devices" byte on this controller, so the same effect is written to
+    /// both device ids. A mode the logo does not implement (Wave, Ripple, Zoom, Snake, Disco) is
+    /// left out of the logo write entirely, which is what the OEM software does too.
+    /// </summary>
+    private void ApplyGlobalLighting()
+    {
+        if (!_keyboardAvailable) return;
+
+        try
+        {
+            var speed = Math.Clamp(_globalSpeed, AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+
+            var keyboardApplied = _globalEffect == KeyboardEffect.Static
+                ? AcerKeyboard.SetZoneColors(
+                    Enumerable.Repeat(_globalColor, AcerKeyboard.ZoneCount).ToArray(), _globalBrightness)
+                : AcerKeyboard.SetEffect(
+                    _globalEffect, _globalBrightness, speed, leftwards: false, _globalColor);
+
+            var logoApplied = true;
+            if (LogoEffectFor(_globalEffect) is { } logoEffect)
+            {
+                // The logo has five speed steps; 6-9 use its fastest rather than being refused.
+                logoApplied = AcerKeyboard.SetEffect(
+                    logoEffect, _globalBrightness, Math.Clamp(speed, 1, LogoMaxSpeed),
+                    leftwards: false, _globalColor, AcerKeyboard.LidDevice);
+            }
+
+            KeyboardLightingStatus.Text = keyboardApplied && logoApplied
+                ? string.Empty
+                : "A device refused the change";
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: global lighting change failed.", ex);
+            KeyboardLightingStatus.Text = "Lighting change failed";
+        }
+
+        SettingsManager.Save("KbLightingSource", "Global");
+        ScheduleAutoOffRearm();
+    }
+
+    private static KeyboardEffect? LogoEffectFor(KeyboardEffect effect) =>
+        effect is KeyboardEffect.Static or KeyboardEffect.Breathing or KeyboardEffect.Neon
+            ? effect
+            : null;
 
     /// <summary>
     /// The lighting write switches the backlight back on, but the auto-off is a separate countdown

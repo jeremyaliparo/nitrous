@@ -3,6 +3,102 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.10.0-test.9 - 2026-11-07
+
+### Lighting
+
+- **Static and Dynamic now apply the moment you switch between them**, like Global and Area do.
+  Before, the keyboard only changed once something inside the panel was edited.
+- `Static` is no longer offered in the Dynamic effect list. It is a static colour with no animation,
+  so it belongs in its own panel; the OEM software lists it the same way.
+## 0.10.0-test.8 - 2026-11-07
+
+### Lighting
+
+- Global and Area now behave as **two presets**: switching tabs applies the one you open, instead
+  of only changing which controls are visible. Global writes both devices; Area re-applies the
+  keyboard and the cover logo from their own settings.
+- The last-used preset is remembered, applied on launch, and its tab opens. Before, launch could
+  leave the tabs showing one preset while the other was on the hardware.
+## 0.10.0-test.7 - 2026-11-07
+
+### Lighting
+
+- **Global and Area now keep separate settings.** Changing one no longer alters the other, so each
+  tab remembers exactly what was set there.
+- Nitrous remembers which of the two was last used and re-applies that on launch. Before, it always
+  re-applied Area, which silently undid a Global setting on the next start.
+- The Global card says so, so the independence is visible rather than discovered.
+## 0.10.0-test.6 - 2026-11-07
+
+### Lighting
+
+- The mode-change flash now shows the correct colour for every mode - white for Quiet, orange for
+  Balanced, red for Performance, violet for Turbo - on the keyboard, the power/mode key and the
+  cover logo, all from the firmware's own blink.
+- The controller does not display the colour bytes. It looks them up in a fixed palette, and any
+  other colour falls back to orange. That is why earlier builds showed white for Quiet and orange
+  for the rest. The four values Acer sends were captured from its own packets and are now used.
+## 0.10.0-test.5 - 2026-11-07
+
+### Lighting
+
+- The mode-change flash is the controller's own acknowledgement again. It blinks the keyboard and
+  brings the power/mode key and the cover logo with it, which is the shape the OEM software has.
+  The software blink in 0.10.0-test.4 looked wrong and left the mode key out.
+- Its colour belongs to the firmware and cannot be set from user mode: the effect ignores the
+  colour bytes, and a green packet still flashes orange. The per-mode colours NitroSense shows are
+  state held by Acer's agent, which Nitrous does not run.
+## 0.10.0-test.4 - 2026-11-07
+
+### Lighting
+
+- The mode-change flash is a real blink again: two short pulses of the mode's colour on the
+  keyboard and on the cover logo, then the lighting that was there before is restored.
+- The controller's own operating-mode effect is not used for it. With every Acer service stopped it
+  flashes orange whatever colour is sent - a green packet still flashes orange - so it cannot
+  produce the per-mode colours. This was measured again with the services confirmed stopped.
+- The power/mode key is not part of the flash. Its colour is set only by the firmware's own
+  operating-mode routine, which has no settable colour from user mode; doing that would mean
+  running Acer's agent, which Nitrous exists to avoid.
+- The flash reads the lighting to restore from the saved settings, so it behaves the same whether
+  the mode change comes from the dashboard or the tray, and it re-arms the backlight auto-off
+  afterwards.
+## 0.10.0-test.3 - 2026-11-07
+
+### Lighting
+
+- **Mode-change flash is now on by default.** It shipped off, so a fresh install never showed it.
+- The flash now shows the mode's own colour: white for Quiet, orange for Balanced, red for
+  Performance, violet for Turbo.
+- The flash was a solid colour rather than a blink. Superseded by 0.10.0-test.4.
+## 0.10.0-test.2 - 2026-11-07
+
+### Lighting
+
+- The `KB` page is now `LIGHT`, and it drives the lid's cover logo as well as the keyboard. No Acer
+  service, driver or pipe is involved: both devices use the keyboard's own HID controller, the same
+  one the zone colours already used.
+- **Global** applies one effect to both devices at once. There is no "all devices" byte on this
+  controller, so it is the same packet written to the keyboard and then to the logo.
+- **Area** sets each device on its own. On the keyboard, **Static** keeps the four per-zone colours
+  and **Dynamic** sets one effect across all four with its own speed (1-9). On the cover logo,
+  `Static`, `Breathing` and `Neon` are offered; Breathing and Neon cycle their own palette, so the
+  colour picker reads `Auto` for them, and the logo has five speed steps rather than nine.
+- Selecting an effect the logo does not implement leaves it on its previous mode, which is what the
+  OEM software does.
+- **Mode-change flash** sends the controller's own operating-mode effect when the mode changes. It
+  is off by default.
+- Static has no speed control. Nothing animates, and every Static packet the OEM software sends
+  carries speed zero, so a speed slider there would be a control that does nothing.
+- Global is a broadcast rather than a third stored state: on success its values become the Area
+  values, so the next launch re-applies what was last set.
+
+### Setup
+
+- The global hotkey boxes and Sticky Keys moved there from the old KB page, ahead of reorganising
+  Setup by section. They behave exactly as before.
+
 ## 0.10.0-test.1 - 2026-11-06
 
 ### Appearance
@@ -55,7 +151,7 @@ controls depend on firmware that varies between models, and a few are still out 
   the mode is read back after every change so a refused one is never shown as active.
 - Models without that interface keep the WMI path.
 - That path is not a fallback in name only. On an ANV15-41, which has no embedded-controller
-  interface, `Performance` moves the enforced limit to 65 W — confirmed with `nvidia-smi`, not
+  interface, `Performance` moves the enforced limit to 65 W ΓÇö confirmed with `nvidia-smi`, not
   assumed from the register.
 - Turbo is offered whenever the channel Nitrous actually uses lists it, not only when the WMI
   register advertises it, so models that used to hide the button now show it. A failed read is
@@ -68,7 +164,7 @@ controls depend on firmware that varies between models, and a few are still out 
   up and drop again.
 - **Ramp down** in the curve editor: `Off`, `Gentle` (5 %/s), `Balanced` (10 %/s, default) and
   `Fast` (20 %/s). `Off` keeps the previous behaviour.
-- The ramp never applies at or above 90 °C: the fans go straight to the curve's speed.
+- The ramp never applies at or above 90 ┬░C: the fans go straight to the curve's speed.
 - The curve editor now uses the dashboard's colours instead of the old blue theme.
 
 ### Keyboard lighting
@@ -97,7 +193,7 @@ controls depend on firmware that varies between models, and a few are still out 
 - Where there is no embedded-controller interface, the same 30-second auto-off is a firmware timeout
   reachable over Acer's `APGeAction`. Nitrous sets that too and reads it back, so the feature now
   works on models that only expose it that way. That path is on/off at 30 seconds rather than a list,
-  and the backlight returns on the next key press after the timer has already switched it off —
+  and the backlight returns on the next key press after the timer has already switched it off ΓÇö
   the firmware's behaviour, not a Nitrous choice.
 
 ### Accessibility
@@ -117,9 +213,9 @@ controls depend on firmware that varies between models, and a few are still out 
 
 ### Other Nitro models
 
-- Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports — its
+- Nothing is keyed to a specific model. At startup Nitrous reads what the laptop reports ΓÇö its
   Acer SMBIOS tables, which Acer WMI methods exist, whether the embedded controller has a HID
-  interface and which modes it lists — and picks the mode channel from that. An unlisted Nitro
+  interface and which modes it lists ΓÇö and picks the mode channel from that. An unlisted Nitro
   that follows the same protocol works without a new build.
 - The only per-model data is a short list of firmware quirks that cannot be probed; a model that
   is not on it gets the plain protocol.
@@ -327,7 +423,7 @@ Nitrous no longer writes GPU clocks unless you explicitly allow it.
 
 ## 0.8.0 - 2026-10-23
 
-- Added a redacted diagnostics export from **Settings → Diagnostics**.
+- Added a redacted diagnostics export from **Settings ΓåÆ Diagnostics**.
 - Restored the power-profile OSD and hardened hardware, ACPI, and GPU state handling.
 - Built-in GPU profile defaults are stock `0/0`, and legacy automatic offsets are migrated
   to `0/0` on first run.

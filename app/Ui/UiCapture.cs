@@ -82,13 +82,13 @@ internal static class UiCapture
     /// captures placeholder zeros and a generic "NVIDIA GPU" header. The others only need a
     /// telemetry tick.
     /// </summary>
-    private static int DefaultSettleFor(string page) =>
-        page.ToLowerInvariant() switch
-        {
-            "gpu" => 10000,
-            "kb" or "keyboard" => 4000,
-            _ => 3500
-        };
+    private static int DefaultSettleFor(string page)
+    {
+        var key = page.ToLowerInvariant();
+        if (key.StartsWith("gpu")) return 10000;
+        if (key.StartsWith("lighting") || key is "kb" or "keyboard") return 4000;
+        return 3500;
+    }
 
     private static void Save(Window window, string path, double scale)
     {

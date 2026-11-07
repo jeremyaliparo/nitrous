@@ -13,10 +13,25 @@ public enum KeyboardEffect : byte
     Static = 2,
     Breathing = 4,
     Neon = 5,
+
+    /// <summary>
+    /// The controller's own operating-mode effect: it blinks the keyboard and drives the power/mode
+    /// key and cover logo with it. Its colour bytes are palette keys, not a colour — see
+    /// <see cref="AcerWmiManager"/>'s mode colours.
+    /// </summary>
+    OperatingMode = 6,
+
     Wave = 7,
+
+    /// <summary>Shown as "Ripple" in NitroSense.</summary>
     Shifting = 8,
+
     Zoom = 9,
+
+    /// <summary>Shown as "Snake" in NitroSense.</summary>
     Meteor = 10,
+
+    /// <summary>Shown as "Disco" in NitroSense.</summary>
     Twinkling = 11
 }
 
@@ -56,6 +71,12 @@ internal static class AcerKeyboard
 
     private const byte ReportId = 0xA4;
     private const byte KeyboardDevice = 0x21;
+
+    /// <summary>
+    /// The cover logo on the lid. Captured from OpenRGB (which Acer ships and drives), not guessed:
+    /// the id is 0x83 on this controller, and it only supports Static, Breathing and Neon.
+    /// </summary>
+    public const byte LidDevice = 0x83;
     private const byte AllZones = 0x0F;
     private const int PacketLength = 11;
 
@@ -104,19 +125,30 @@ internal static class AcerKeyboard
         return sent;
     }
 
-    /// <summary>Sets one effect across all four zones.</summary>
+    /// <summary>
+    /// Sets one effect across all four zones. <paramref name="device"/> is <see cref="KeyboardDevice"/>
+    /// for the keyboard or <see cref="LidDevice"/> for the cover logo; the logo understands only
+    /// Static, Breathing and Neon and silently ignores the others.
+    /// </summary>
     public static bool SetEffect(
-        KeyboardEffect effect, int brightness, int speed, bool leftwards, KeyboardColor color)
+        KeyboardEffect effect, int brightness, int speed, bool leftwards, KeyboardColor color,
+        byte device = KeyboardDevice)
     {
-        using var device = HidDevice.Open(VendorId, ProductId, UsagePage, Usage);
-        if (device == null) return false;
+        using var deviceHandle = HidDevice.Open(VendorId, ProductId, UsagePage, Usage);
+        if (deviceHandle == null) return false;
 
         var packet = new byte[PacketLength];
         packet[0] = ReportId;
-        packet[1] = KeyboardDevice;
+        packet[1] = device;
         packet[2] = (byte)effect;
         packet[3] = (byte)Math.Clamp(brightness, 0, 100);
-        packet[4] = (byte)Math.Clamp(speed, MinSpeed, MaxSpeed);
+
+        // Static carries speed 0 in every packet the OEM software sends, on both devices. The
+        // firmware ignores the field there, and sending 0 matches what was captured.
+        packet[4] = effect == KeyboardEffect.Static
+            ? (byte)0
+            : (byte)Math.Clamp(speed, MinSpeed, MaxSpeed);
+
         packet[5] = (byte)(leftwards ? 2 : 1);
         packet[6] = color.R;
         packet[7] = color.G;
@@ -124,7 +156,52 @@ internal static class AcerKeyboard
         packet[9] = AllZones;
         packet[10] = 0;
 
-        return device.SetFeature(packet);
+        return deviceHandle.SetFeature(packet);
+    }
+
+    /// <summary>
+    /// Maps a saved effect name onto the controller's mode byte. Older builds saved Acer's internal
+    /// names (Shifting, Meteor, Twinkling); they mean the same effects as Ripple, Snake and Disco.
+    /// </summary>
+    public static KeyboardEffect ParseEffect(string? name) => name switch
+    {
+        "Breathing" => KeyboardEffect.Breathing,
+        "Neon" => KeyboardEffect.Neon,
+        "Wave" => KeyboardEffect.Wave,
+        "Ripple" or "Shifting" => KeyboardEffect.Shifting,
+        "Zoom" => KeyboardEffect.Zoom,
+        "Snake" or "Meteor" => KeyboardEffect.Meteor,
+        "Disco" or "Twinkling" => KeyboardEffect.Twinkling,
+        _ => KeyboardEffect.Static
+    };
+
+    /// <summary>
+    /// The controller's own mode-change acknowledgement. It blinks the keyboard and, through the
+    /// firmware, the power/mode key and the cover logo with it.
+    ///
+    /// The colour bytes are palette keys, not a colour: FF FF FF flashes white, 00 AE C7 orange,
+    /// 2E 09 C7 red and C7 00 FF violet, and anything else falls back to orange. Those are the
+    /// values the OEM software sends, captured from its own packets.
+    /// </summary>
+    public static bool Blink(KeyboardColor modeColor)
+    {
+        using var deviceHandle = HidDevice.Open(VendorId, ProductId, UsagePage, Usage);
+        if (deviceHandle == null) return false;
+
+        var packet = new byte[PacketLength];
+        packet[0] = ReportId;
+        packet[1] = KeyboardDevice;
+        packet[2] = (byte)KeyboardEffect.OperatingMode;
+        packet[3] = 0;
+        packet[4] = 0;
+        packet[5] = 2;
+        packet[6] = modeColor.R;
+        packet[7] = modeColor.G;
+        packet[8] = modeColor.B;
+        packet[9] = AllZones;
+        packet[10] = 0;
+
+        return deviceHandle.SetFeature(packet);
     }
 
     /// <summary>A matched HID interface opened for feature reports.</summary>

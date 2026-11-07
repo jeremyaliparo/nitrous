@@ -209,6 +209,34 @@
 				</Setter.Value>
 			</Setter>
 		</Style>
+		<!-- A swatch that opens a colour picker. Keeps its colour on hover so it still reads as a
+		     colour rather than as a button. -->
+		<Style x:Key="ColorChipStyle" TargetType="Button">
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate TargetType="Button">
+						<Border x:Name="Chip" Background="{TemplateBinding Background}"
+						        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+						        CornerRadius="6" Padding="8,3">
+							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+						</Border>
+						<ControlTemplate.Triggers>
+							<Trigger Property="IsEnabled" Value="False">
+								<Setter Property="Opacity" Value="0.4"/>
+								<Setter Property="Cursor" Value="Arrow"/>
+							</Trigger>
+							<Trigger Property="IsMouseOver" Value="True">
+								<Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+							</Trigger>
+						</ControlTemplate.Triggers>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
 		<BooleanToVisibilityConverter x:Key="BoolToVis" />
 
 		<Style x:Key="GhostBtn" TargetType="Button">
@@ -950,6 +978,37 @@
 						</Grid>
 					</Border>
 
+					<TextBlock Text="KEYBOARD" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
+
+					<!-- Custom Hotkeys -->
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+								<Path Data="M20,5A2,2 0 0,1 22,7V17A2,2 0 0,1 20,19H4A2,2 0 0,1 2,17V7A2,2 0 0,1 4,5H20M4,7V17H20V7H4M6,9H10V11H6V9M12,9H14V11H12V9M15,9H18V11H15V9M6,13H9V15H6V13M10,13H18V15H10V13Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Global Hotkeys" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,0,0,10" TextWrapping="Wrap"/>
+							<Grid Margin="0,0,0,8">
+								<TextBlock Text="Cycle Power Mode" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<TextBox x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>
+							</Grid>
+							<Grid>
+								<TextBlock Text="Open Dashboard" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<TextBox x:Name="TxtHkDash" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_Dashboard"/>
+							</Grid>
+						</StackPanel>
+					</Border>
+
+					<!-- Sticky keys: a Windows accessibility setting, not firmware -->
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+						<Grid>
+							<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+								<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+								<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,58,0" TextWrapping="Wrap"/>
+							</StackPanel>
+							<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
+						</Grid>
+					</Border>
 					<TextBlock Text="APPEARANCE" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
 
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
@@ -1167,7 +1226,7 @@
 				</StackPanel>
 				</ScrollViewer>
 
-				<!-- 4. KEYBOARD PAGE -->
+				<!-- 4. LIGHTING PAGE -->
                 <ScrollViewer x:Name="KeyboardPage" Visibility="Collapsed" Margin="20,10,20,0"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
@@ -1187,75 +1246,166 @@
 						</StackPanel>
 					</Border>
 
-                    <!-- Custom Hotkeys Setup -->
-                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
-                        <StackPanel>
-                            <TextBlock Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,0,0,15" TextWrapping="Wrap"/>
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Cycle Power Mode" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" VerticalAlignment="Center"/>
-                                <TextBox x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>
-                            </Grid>
-                            <Grid>
-                                <TextBlock Text="Open Dashboard" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" VerticalAlignment="Center"/>
-                                <TextBox x:Name="TxtHkDash" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_Dashboard"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
- 
-                   <!-- Sticky keys: a Windows accessibility setting, not firmware -->
-                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
-                   	<Grid>
-                   		<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                   			<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
-                   			<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
-                   		</StackPanel>
-                   		<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
-                   	</Grid>
-                   </Border>
+					<!-- Lighting: Global writes both devices, Area writes one at a time -->
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+						<StackPanel>
+							<Grid Margin="0,0,0,10">
+								<TextBlock Text="LIGHTING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								<TextBlock x:Name="KeyboardLightingStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+							</Grid>
+							<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3">
+								<UniformGrid Rows="1" Height="32">
+									<RadioButton x:Name="LightingGlobalTab" TabIndex="0" GroupName="Lighting" Content="Global" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="LightingTab_Checked"/>
+									<RadioButton x:Name="LightingAreaTab" TabIndex="1" GroupName="Lighting" Content="Area" Style="{StaticResource ActionButtonStyle}" Checked="LightingTab_Checked"/>
+								</UniformGrid>
+							</Border>
+						</StackPanel>
+					</Border>
 
-                   <!-- Keyboard Lighting -->
-                   <Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
-                        <StackPanel>
-                            <Grid Margin="0,0,0,10">
-                                <TextBlock Text="KEYBOARD LIGHTING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="KeyboardLightingStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                            </Grid>
+					<!-- Global: one effect, written to the keyboard and then to the cover logo -->
+					<Border x:Name="GlobalPanel" Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+						<StackPanel>
+							<TextBlock Text="One effect for the keyboard and the cover logo." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
-                            <Grid Margin="0,0,0,12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Button x:Name="Zone1Btn" Grid.Column="0" Height="42" Margin="0,0,6,0" Tag="1" Click="Zone_Click" Content="Z1" ToolTip="Zone 1 colour" Style="{StaticResource ZoneSwatchStyle}"/>
-                                <Button x:Name="Zone2Btn" Grid.Column="1" Height="42" Margin="0,0,6,0" Tag="2" Click="Zone_Click" Content="Z2" ToolTip="Zone 2 colour" Style="{StaticResource ZoneSwatchStyle}"/>
-                                <Button x:Name="Zone3Btn" Grid.Column="2" Height="42" Margin="0,0,6,0" Tag="3" Click="Zone_Click" Content="Z3" ToolTip="Zone 3 colour" Style="{StaticResource ZoneSwatchStyle}"/>
-                                <Button x:Name="Zone4Btn" Grid.Column="3" Height="42" Margin="0,0,6,0" Tag="4" Click="Zone_Click" Content="Z4" ToolTip="Zone 4 colour" Style="{StaticResource ZoneSwatchStyle}"/>
-                                <Button x:Name="ZoneAllBtn" Grid.Column="4" Height="42" Tag="0" Click="Zone_Click" Content="ALL" ToolTip="Set all four zones to one colour." Style="{StaticResource ZoneSwatchStyle}"/>
-                            </Grid>
-                            <TextBlock x:Name="ZoneHint" Text="Zone colours apply to Static. Pick Static to use them." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,0,0,10" TextWrapping="Wrap" Visibility="Collapsed"/>
+							<Grid Margin="0,0,0,8">
+								<TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+								<ComboBox x:Name="GlobalEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="GlobalEffect_Changed"/>
+							</Grid>
 
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="KeyboardEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardEffect_Changed"/>
-                            </Grid>
+							<Grid Margin="0,0,0,8">
+								<TextBlock Text="Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+								<Button x:Name="GlobalColorBtn" Width="110" Height="26" HorizontalAlignment="Right" Style="{StaticResource ColorChipStyle}" Click="GlobalColor_Click" Content="#B388FF" ToolTip="Keyboard and cover-logo colour"/>
+							</Grid>
 
-                            <Grid Margin="0,0,0,2">
-                                <TextBlock Text="Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
-                            </Grid>
-                            <Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
+							<Grid Margin="0,0,0,2">
+								<TextBlock Text="Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+								<TextBlock x:Name="GlobalBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+							</Grid>
+							<Slider x:Name="GlobalBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="GlobalBrightness_Changed"/>
 
-                            <Grid Margin="0,10,0,0">
-                                <TextBlock Text="Auto-off" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-                                <ComboBox x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
-                            </Grid>
+							<StackPanel x:Name="GlobalSpeedRow">
+								<Grid Margin="0,10,0,2">
+									<TextBlock Text="Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<TextBlock x:Name="GlobalSpeedText" Text="4" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+								</Grid>
+								<Slider x:Name="GlobalSpeed" Minimum="1" Maximum="9" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="GlobalSpeed_Changed"/>
+							</StackPanel>
 
-                            <TextBlock Text="Static colours are per zone. An effect applies to all four." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
-                        </StackPanel>
-                   </Border>
+							<TextBlock Text="Global and Area are two presets: switching tabs applies the one you open. The cover logo has Static, Breathing and Neon only, so other effects move the keyboard alone; it also has five speeds, so 6-9 use its fastest." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
+						</StackPanel>
+					</Border>
+
+					<!-- Area: per device -->
+					<StackPanel x:Name="AreaPanel" Visibility="Collapsed">
+						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="3">
+							<UniformGrid Rows="1" Height="32">
+								<RadioButton x:Name="AreaKeyboardTab" TabIndex="0" GroupName="LightingArea" Content="Keyboard" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="AreaTab_Checked"/>
+								<RadioButton x:Name="AreaLogoTab" TabIndex="1" GroupName="LightingArea" Content="Cover logo" Style="{StaticResource ActionButtonStyle}" Checked="AreaTab_Checked"/>
+							</UniformGrid>
+						</Border>
+
+						<Border x:Name="AreaKeyboardPanel" Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+							<StackPanel>
+								<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3">
+									<UniformGrid Rows="1" Height="30">
+										<RadioButton x:Name="KbStaticTab" TabIndex="0" GroupName="LightingMode" Content="Static" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="KbMode_Checked"/>
+										<RadioButton x:Name="KbDynamicTab" TabIndex="1" GroupName="LightingMode" Content="Dynamic" Style="{StaticResource ActionButtonStyle}" Checked="KbMode_Checked"/>
+									</UniformGrid>
+								</Border>
+
+								<StackPanel x:Name="KbStaticPanel" Margin="0,12,0,0">
+									<Grid Margin="0,0,0,10">
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="*"/>
+										</Grid.ColumnDefinitions>
+										<Button x:Name="Zone1Btn" Grid.Column="0" Height="42" Margin="0,0,6,0" Tag="1" Click="Zone_Click" Content="Z1" ToolTip="Zone 1 colour" Style="{StaticResource ZoneSwatchStyle}"/>
+										<Button x:Name="Zone2Btn" Grid.Column="1" Height="42" Margin="0,0,6,0" Tag="2" Click="Zone_Click" Content="Z2" ToolTip="Zone 2 colour" Style="{StaticResource ZoneSwatchStyle}"/>
+										<Button x:Name="Zone3Btn" Grid.Column="2" Height="42" Margin="0,0,6,0" Tag="3" Click="Zone_Click" Content="Z3" ToolTip="Zone 3 colour" Style="{StaticResource ZoneSwatchStyle}"/>
+										<Button x:Name="Zone4Btn" Grid.Column="3" Height="42" Margin="0,0,6,0" Tag="4" Click="Zone_Click" Content="Z4" ToolTip="Zone 4 colour" Style="{StaticResource ZoneSwatchStyle}"/>
+										<Button x:Name="ZoneAllBtn" Grid.Column="4" Height="42" Tag="0" Click="Zone_Click" Content="ALL" ToolTip="Set all four zones to one colour." Style="{StaticResource ZoneSwatchStyle}"/>
+									</Grid>
+									<TextBlock x:Name="ZoneHint" Text="This keyboard has a single colour, not four zones." Foreground="{DynamicResource TextDimBrush}" FontSize="10" TextWrapping="Wrap" Visibility="Collapsed"/>
+									<TextBlock Text="Static has no speed: nothing animates, and the controller ignores the value." Foreground="{DynamicResource TextDimBrush}" FontSize="10" TextWrapping="Wrap"/>
+								</StackPanel>
+
+								<StackPanel x:Name="KbDynamicPanel" Visibility="Collapsed" Margin="0,12,0,0">
+									<Grid Margin="0,0,0,8">
+										<TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+										<ComboBox x:Name="KeyboardEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardEffect_Changed"/>
+									</Grid>
+
+									<Grid Margin="0,0,0,8">
+										<TextBlock Text="Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+										<Button x:Name="KbColorBtn" Width="110" Height="26" HorizontalAlignment="Right" Style="{StaticResource ColorChipStyle}" Click="KbColor_Click" Content="#B388FF" ToolTip="One colour for all four zones"/>
+									</Grid>
+
+									<StackPanel x:Name="KbSpeedRow">
+										<Grid Margin="0,2,0,2">
+											<TextBlock Text="Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+											<TextBlock x:Name="KbSpeedText" Text="4" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+										</Grid>
+										<Slider x:Name="KbSpeed" Minimum="1" Maximum="9" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KbSpeed_Changed"/>
+									</StackPanel>
+								</StackPanel>
+
+								<Grid Margin="0,12,0,2">
+									<TextBlock Text="Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+								</Grid>
+								<Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
+
+								<Grid Margin="0,10,0,0">
+									<TextBlock Text="Auto-off" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<ComboBox x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
+								</Grid>
+							</StackPanel>
+						</Border>
+
+						<Border x:Name="AreaLogoPanel" Visibility="Collapsed" Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+							<StackPanel>
+								<Grid Margin="0,0,0,8">
+									<TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<ComboBox x:Name="LogoEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="LogoEffect_Changed"/>
+								</Grid>
+
+								<Grid Margin="0,0,0,8">
+									<TextBlock Text="Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<Button x:Name="LogoColorBtn" Width="110" Height="26" HorizontalAlignment="Right" Style="{StaticResource ColorChipStyle}" Click="LogoColor_Click" Content="#B388FF" ToolTip="Cover-logo colour"/>
+								</Grid>
+
+								<Grid Margin="0,0,0,2">
+									<TextBlock Text="Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<TextBlock x:Name="LogoBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+								</Grid>
+								<Slider x:Name="LogoBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="LogoBrightness_Changed"/>
+
+								<StackPanel x:Name="LogoSpeedRow">
+									<Grid Margin="0,10,0,2">
+										<TextBlock Text="Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+										<TextBlock x:Name="LogoSpeedText" Text="3" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+									</Grid>
+									<Slider x:Name="LogoSpeed" Minimum="1" Maximum="5" Value="3" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="LogoSpeed_Changed"/>
+								</StackPanel>
+
+								<TextBlock Text="Breathing and Neon cycle their own colours, so the colour picker is not used for them." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
+							</StackPanel>
+						</Border>
+					</StackPanel>
+
+					<!-- Mode-change flash: the OEM acknowledgement blink, reproduced standalone -->
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+						<Grid>
+							<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+								<TextBlock Text="Mode-change flash" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12"/>
+								<TextBlock Text="Flashes the keyboard in the power mode's colour when the mode changes." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,58,0" TextWrapping="Wrap"/>
+							</StackPanel>
+							<CheckBox x:Name="TogBlinkOnMode" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="BlinkOnMode_Toggled" Unchecked="BlinkOnMode_Toggled"/>
+						</Grid>
+					</Border>
                 	</StackPanel>
                 </ScrollViewer>
 			</Grid>
@@ -1285,7 +1435,7 @@
 					<Button x:Name="NavKeyboardBtn" Tag="0,0,0,0" Style="{StaticResource NavButtonStyle}" Grid.Column="2" Click="NavKeyboardBtn_Click">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,4,0,0">
                             <Path x:Name="NavKeyboardIcon" Data="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M13,10H11V8H13M13,13H11V11H13M8,10H6V8H8M8,13H6V11H8M5,10H3V8H5M5,13H3V11H5M4,17H20V15H4M22,5H2A2,2 0 0,0 0,7V17A2,2 0 0,0 2,19H22A2,2 0 0,0 24,17V7A2,2 0 0,0 22,5Z" Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center"/>
-                            <TextBlock x:Name="NavKeyboardText" Text="KB" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="NavKeyboardText" Text="LIGHT" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,4,0,0" HorizontalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 					<!-- Settings Nav -->

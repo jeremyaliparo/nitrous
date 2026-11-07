@@ -126,8 +126,72 @@ public static class AcerWmiManager
             // WhisperMode when the mode is Quiet, which is what the NVIDIA App reads before it
             // offers its WhisperMode controls. It does not move the power cap: the EC owns that.
             WhisperMode.Apply(profile == PowerProfile.Quiet);
+
+            // The acknowledgement flash the OEM software plays on a mode change. Cosmetic only, so
+            // it is skipped when the mode did not actually move (the view model re-applies a mode
+            // on profile clicks and the tray re-applies on AC/DC changes).
+            if (_lastBlinkedMode != profile && SettingsManager.Get("KbBlinkOnMode", true))
+            {
+                _lastBlinkedMode = profile;
+
+                // Detached: the flash holds its worker for the visible duration, and the caller
+                // still has CPU and GPU profile work to do. It is cosmetic, so it must not delay
+                // that.
+                var flashed = profile;
+                _ = Task.Run(() => FlashForMode(flashed));
+            }
         });
     }
+
+    private static PowerProfile? _lastBlinkedMode;
+
+    private static readonly object FlashGate = new();
+
+    /// <summary>
+    /// The controller's own mode-change acknowledgment: it blinks the keyboard and, through the
+    /// firmware, brings the power/mode key and the cover logo with it. That is the shape the OEM
+    /// software has.
+    ///
+    /// Its colour comes from a fixed palette selected by the colour bytes, not from the bytes
+    /// themselves (see <see cref="ModeColor"/>). With the right values the blink is white, orange,
+    /// red and violet exactly as NitroSense shows it, including the mode key.
+    /// </summary>
+    private static void FlashForMode(PowerProfile profile)
+    {
+        if (!AcerKeyboard.IsAvailable()) return;
+
+        lock (FlashGate)
+        {
+            try
+            {
+                if (AcerKeyboard.Blink(ModeColor(profile)))
+                    Logger.Info($"Keyboard: mode-change flash for {profile} sent.");
+                else
+                    Logger.Warn($"Keyboard: the mode-change flash was refused for {profile}.");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Keyboard: the mode-change flash for {profile} failed.", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The values the OEM software sends for each mode's flash, captured from its own packets.
+    ///
+    /// They are not displayed literally: the controller looks them up in a fixed palette. Verified
+    /// on hardware — FF FF FF flashes white, 00 AE C7 orange, 2E 09 C7 red and C7 00 FF violet,
+    /// while any other colour (pure red, pure blue, green) falls back to orange. Sending our own
+    /// colour therefore cannot work; these four can.
+    /// </summary>
+    private static KeyboardColor ModeColor(PowerProfile profile) => profile switch
+    {
+        PowerProfile.Quiet => new KeyboardColor(0xFF, 0xFF, 0xFF),
+        PowerProfile.Balanced => new KeyboardColor(0x00, 0xAE, 0xC7),
+        PowerProfile.Performance => new KeyboardColor(0x2E, 0x09, 0xC7),
+        PowerProfile.Turbo => new KeyboardColor(0xC7, 0x00, 0xFF),
+        _ => new KeyboardColor(0xFF, 0xFF, 0xFF)
+    };
 
     /// <summary>
     /// The operating mode the EC's HID interface reports, or null when this model has none. Reading
