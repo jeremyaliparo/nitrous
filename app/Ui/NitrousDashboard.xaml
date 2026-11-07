@@ -1379,6 +1379,7 @@
 								</StackPanel>
 
 								<StackPanel x:Name="AreaLogoPanel" Visibility="Collapsed">
+									<StackPanel x:Name="LogoControlsPanel">
 									<Grid Margin="0,0,0,8">
 										<TextBlock Text="Effect" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
 										<ComboBox x:Name="LogoEffectBox" Width="150" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="LogoEffect_Changed"/>
@@ -1404,6 +1405,13 @@
 									</StackPanel>
 
 									<TextBlock Text="Breathing and Neon cycle their own colours, so the colour picker is not used for them." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,10,0,0" TextWrapping="Wrap"/>
+										<Button Content="TEST LID LOGO" Click="LogoCheck_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,5" Height="26" HorizontalAlignment="Right" Margin="0,10,0,0"/>
+									</StackPanel>
+									<StackPanel x:Name="LogoUnavailablePanel" Visibility="Collapsed">
+										<TextBlock Text="No lid logo was detected on this model." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+										<TextBlock Text="If the 'N' does light up, run the check again." Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+										<Button Content="CHECK AGAIN" Click="LogoCheck_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,5" Height="26" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+									</StackPanel>
 								</StackPanel>
 							</StackPanel>
 						</Border>

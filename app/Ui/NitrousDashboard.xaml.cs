@@ -153,6 +153,9 @@ public partial class NitrousDashboard : Window
     /// </summary>
     internal void SelectPageForCapture(string page)
     {
+        // Captures are headless; a modal capability question would block the render.
+        _captureMode = true;
+
         var key = page?.ToLowerInvariant() ?? string.Empty;
 
         // Renders the three-tab navigation a model without a lighting controller would get.
@@ -235,6 +238,11 @@ public partial class NitrousDashboard : Window
         // page's last snapshot.
         if (index == 1 && DataContext is DashboardViewModel vm)
             vm.RefreshGpuOffsets();
+
+        // First visit to Lighting on a model whose lid logo has never been confirmed: settle it
+        // before any more writes are sent to device 0x83.
+        if (index == 2 && !_keyboardLoading && !_captureMode && _keyboardAvailable && LogoAvailability < 0)
+            Dispatcher.BeginInvoke(new Action(RunLogoCheck), DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -748,6 +756,19 @@ public partial class NitrousDashboard : Window
 
     private bool _blinkOnModeChange;
 
+    // The lid logo cannot be discovered from the protocol: one question settles it, and the answer
+    // is remembered. -1 not answered yet, 0 absent, 1 present.
+    private bool _logoCheckBusy;
+    private bool _captureMode;
+
+    private static int LogoAvailability => SettingsManager.Get("KbLogoAvailable", -1);
+
+    /// <summary>
+    /// Only write to the lid once the user has confirmed it exists. Unknown is treated as "not
+    /// yet", so a model without a logo never receives a pointless write.
+    /// </summary>
+    private static bool LogoIsUsable => LogoAvailability == 1;
+
     // The lighting write switches the backlight back on, but the auto-off is a separate countdown
     // on the EC that only a write carrying it arms. Debounced so dragging the brightness slider
     // costs one EC exchange at the end rather than one per tick.
@@ -967,6 +988,7 @@ public partial class NitrousDashboard : Window
                 : string.Empty;
 
         UpdateLightingInteractivity();
+        UpdateLogoAvailability();
 
         // The tabs are a preset toggle: open the one that was last used, and apply it below.
         var source = SettingsManager.Get("KbLightingSource", "Area");
@@ -1272,6 +1294,53 @@ public partial class NitrousDashboard : Window
         SettingsManager.Save("KbLogo_Color", chosen.ToHex());
         PaintColourButton(LogoColorBtn, chosen);
         ApplyLogoLighting();
+    }
+
+    private void LogoCheck_Click(object sender, RoutedEventArgs e) => RunLogoCheck();
+
+    /// <summary>
+    /// The one question the protocol cannot answer: does this model have the lid logo? Nitrous
+    /// writes a conspicuous colour to the logo device and asks. The answer is remembered, and a
+    /// wrong answer can be revisited from the Cover logo panel at any time.
+    /// </summary>
+    private void RunLogoCheck()
+    {
+        if (!_keyboardAvailable || _logoCheckBusy || _captureMode) return;
+
+        _logoCheckBusy = true;
+        try
+        {
+            AcerKeyboard.SetEffect(
+                KeyboardEffect.Static, 100, 0, leftwards: false,
+                new KeyboardColor(255, 0, 0), AcerKeyboard.LidDevice);
+
+            var answer = MessageBox.Show(
+                "Did the 'N' logo on the lid light up red?\n\n" +
+                "Nitrous sent a test colour to the lid's controller. If you are not sure, choose Cancel " +
+                "and it will ask again the next time you open Lighting.",
+                "Lid logo",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
+
+            if (answer == MessageBoxResult.Yes) SettingsManager.Save("KbLogoAvailable", 1);
+            else if (answer == MessageBoxResult.No) SettingsManager.Save("KbLogoAvailable", 0);
+
+            UpdateLogoAvailability();
+
+            if (LogoIsUsable) ApplyLogoLighting();
+        }
+        finally
+        {
+            _logoCheckBusy = false;
+        }
+    }
+
+    /// <summary>Shows the logo controls only when the lid is known to have one.</summary>
+    private void UpdateLogoAvailability()
+    {
+        var usable = LogoAvailability != 0;
+        LogoControlsPanel.Visibility = usable ? Visibility.Visible : Visibility.Collapsed;
+        LogoUnavailablePanel.Visibility = usable ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void KbSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1791,7 +1860,7 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void ApplyLogoLighting(bool reportFailure = true)
     {
-        if (!_keyboardAvailable) return;
+        if (!_keyboardAvailable || !LogoIsUsable) return;
 
         try
         {
@@ -1836,7 +1905,7 @@ public partial class NitrousDashboard : Window
 
             var logoApplied = true;
             var logoState = "not supported";
-            if (LogoEffectFor(_globalEffect) is { } logoEffect)
+            if (LogoIsUsable && LogoEffectFor(_globalEffect) is { } logoEffect)
             {
                 logoApplied = AcerKeyboard.SetEffect(
                     logoEffect, _globalBrightness, step,

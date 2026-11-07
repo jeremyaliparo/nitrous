@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.10.0-test.27 - 2026-11-07
+
+### Lighting
+
+- **The lid logo is confirmed once instead of assumed.** The first time Lighting is opened, Nitrous
+  writes a test colour to the lid and asks whether the "N" lit up. The answer is remembered, so a
+  model without a logo shows a short explanation instead of effect controls that do nothing, and no
+  further writes are sent to that device.
+- Either answer can be revisited: **TEST LID LOGO** on the Cover logo panel, and **CHECK AGAIN**
+  where no logo was detected, so a wrong answer costs one click rather than a reinstall.
+- Until it is confirmed, Global writes reach only the keyboard.
 ## 0.10.0-test.26 - 2026-11-07
 
 ### Appearance
