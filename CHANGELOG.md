@@ -3,301 +3,95 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.10.0-test.28 - 2026-11-07
-
-### Diagnostics
-
-- **EC probe version 11** lists the keyboard controller vendors Acer ships - Chicony `04F2`, Sunrex
-  `05AF`, Darfon `0D62` - alongside Acer's own `1025` and `0CF2` interfaces. It separates "this model
-  has no lighting controller" from "this model's keyboard is a USB device Nitrous does not speak",
-  which is the question a missing LIGHT page raises.
-## 0.10.0-test.27 - 2026-11-07
+## 0.10.0 - 2026-11-08
 
 ### Lighting
 
-- **The lid logo is confirmed once instead of assumed.** The first time Lighting is opened, Nitrous
-  writes a test colour to the lid and asks whether the "N" lit up. The answer is remembered, so a
-  model without a logo shows a short explanation instead of effect controls that do nothing, and no
-  further writes are sent to that device.
-- Either answer can be revisited: **TEST LID LOGO** on the Cover logo panel, and **CHECK AGAIN**
-  where no logo was detected, so a wrong answer costs one click rather than a reinstall.
-- Until it is confirmed, Global writes reach only the keyboard.
-## 0.10.0-test.26 - 2026-11-07
+- The `KB` page is now `LIGHT`, and it drives the lid's cover logo as well as the keyboard. Both use
+  the keyboard's own HID controller: no Acer service, driver or pipe is involved.
+- **Global** and **Area** are two presets. Opening one applies it: Global writes both devices, Area
+  re-applies the keyboard and the logo from their own settings. They keep separate settings, and the
+  preset in use is remembered and applied on the next launch.
+- **Global speed has five steps, each a matched pair** captured from the OEM software: the keyboard
+  takes 1/3/5/7/9 while the cover logo takes 1/2/3/4/5. Sending the same number to both made the two
+  drift apart above 5, because the logo has five steps and the keyboard nine.
+- Colour applies to **Static** only. The animated effects run their own palette, so Global greys its
+  colour to `Auto` and the Dynamic panel does not offer one.
+- **Static** keeps the four per-zone colours; **Dynamic** sets one effect across all four with its
+  own speed (1-9). Switching between them applies the selected one immediately, and Dynamic no
+  longer lists Static, which is not an animation.
+- The Area tab is a single card: the Keyboard/Cover logo selector sits at the top under a `DEVICE`
+  label and a hairline, then the mode selector, then the settings. Brightness comes before Speed in
+  every view, and the segmented buttons carry icons.
+- A **single-colour keyboard** gets one Colour chip instead of four zone swatches that cannot work.
+- The cover logo supports `Static`, `Breathing` and `Neon`; Breathing and Neon cycle their own
+  palette (the colour reads `Auto`) and the logo has five speed steps. Selecting an effect it does
+  not implement leaves it on its previous mode, which is what the OEM software does.
+- **The lid logo is confirmed once.** On the first visit to Lighting, Nitrous writes a test colour to
+  the lid and asks whether the "N" lit up. The answer is remembered, nothing further is written if it
+  did not, and the check can be repeated with **TEST LID LOGO** or **CHECK AGAIN**.
+- **Power mode change flash**, on by default, reproduces the OEM acknowledgement: the keyboard blinks
+  in the mode's colour, and the firmware brings the power/mode key and the lid with it. The
+  controller looks the colour up in a fixed palette, so the values Acer sends are used - white,
+  orange, red and violet; anything else falls back to orange.
+- The keyboard and the cover logo animate on independent controllers, so their pulses are not
+  phase-locked. The Global card says so rather than promising a synchronisation the hardware does
+  not have.
+- Keyboard backlight auto-off moved to Setup, next to the hotkeys.
+- A model with no reachable keyboard-lighting controller gets **no LIGHT tab** instead of a page of
+  disabled controls. Its Fn keys may still change the backlight, but no user-mode interface exposes
+  that, so there is nothing a control could do.
 
 ### Appearance
 
-- **Custom colours added with "Add to Custom Colors" are remembered.** Windows keeps those slots
-  only while the dialog is open, so Nitrous stores them and puts them back. It applies to every
-  colour picker: accent, Global, keyboard zones and the cover logo.
-## 0.10.0-test.25 - 2026-11-07
-
-### Lighting
-
-- **On a model without the keyboard lighting controller, the LIGHT tab is not shown at all.** It
-  used to open a page of disabled controls explaining that colours were unreachable; a page that
-  cannot do anything is worse than no page. The remaining three tabs share the space evenly.
-## 0.10.0-test.24 - 2026-11-07
-
-### Lighting
-
-- Removed the Colour control from **Area -> Keyboard -> Dynamic**. The animated effects run their
-  own palette, so there was nothing to pick there; the keyboard's colour belongs to Static, where it
-  actually applies.
-## 0.10.0-test.23 - 2026-11-07
-
-### Updates
-
-- A tester is now told plainly what they are running: **"You're running a test version of Nitrous
-  (0.10.0-test.22). The release version 0.10.0 is available on GitHub. Update now?"** A normal
-  install keeps the prompt it has always had.
-- The rule is unchanged underneath: a release outranks a test build of the same version, so testers
-  are offered the release as soon as it exists.
-## 0.10.0-test.22 - 2026-11-07
-
-### Appearance
-
-- The custom accent swatch no longer clips at the right edge. The nine swatches now sit inside the
-  card with a small margin to spare.
-## 0.10.0-test.21 - 2026-11-07
-
-### Lighting
-
-- In Area -> Keyboard -> Dynamic, **Brightness now comes before Speed**, matching Global and Cover
-  logo. The Speed row moved out of the Dynamic block and below the shared brightness slider.
-
-### Appearance
-
-- **Accent Colour now accepts any colour.** A custom picker sits after the seven presets, so the
-  shipped palette is unchanged but is no longer the limit. The choice is stored as its hex and
-  restored on the next launch.
-## 0.10.0-test.20 - 2026-11-07
-
-### Lighting
-
-- The Global card's explanation is one line again; the detail about which effects the cover logo
-  supports moved to the effect box's tooltip.
-- A **single-colour keyboard** now gets one `Colour` chip instead of four disabled zone swatches.
-  Before, the zones were disabled and nothing replaced them, so its colour could not be changed at
-  all. The zone row is hidden rather than shown disabled.
-
-### Setup
-
-- **Keyboard backlight auto-off** moved from the LIGHT page to Setup -> KEYBOARD, next to the
-  hotkeys. Its refusals are reported on that card instead of in the lighting header.
-## 0.10.0-test.19 - 2026-11-07
-
-### Lighting
-
-- **Global's speed is five steps, like the OEM software, and each step is a matched pair:** the
-  keyboard takes 1/3/5/7/9 while the cover logo takes 1/2/3/4/5. Captured from NitroSense, whose
-  Global slider has five positions and sends exactly those pairs.
-- Sending the same number to both was the cause of the drift. The keyboard has nine speed steps and
-  the logo five, so above 5 the logo sat at its maximum while the keyboard kept climbing.
-## 0.10.0-test.18 - 2026-11-07
-
-### Lighting
-
-- Global's speed is **1-9** again. The keyboard uses the value directly; the cover logo has five
-  physical steps, so above 5 it runs at its fastest. Capping Global at 5 made the keyboard slower
-  than it should be for the sake of a match the hardware cannot give anyway.
-## 0.10.0-test.17 - 2026-11-07
-
-### Lighting
-
-- Global now says on its card that the keyboard and the cover logo animate independently, so their
-  pulses are not phase-locked. The two devices accept the same effect, speed and brightness, but
-  each controller runs its own clock; stopping both and starting them together does not align them,
-  and the protocol has no phase or sync field.
-## 0.10.0-test.16 - 2026-11-07
-
-### Lighting
-
-- **Global's speed is now 1-5, the range both devices share.** At 6-9 the keyboard ran faster than
-  the cover logo, which tops out at five, so the two visibly drifted apart - which is what "not
-  synced" was. Both devices now run the same rate. The keyboard's full 1-9 range remains under
-  Area -> Keyboard -> Dynamic.
-- Global's two writes are now logged with their results, so a refused write is diagnosable from the
-  log instead of only from the status line.
-## 0.10.0-test.15 - 2026-11-07
-
-### Lighting
-
-- **Global's colour control is now disabled and reads `Auto` unless the effect is Static.** The
-  animated effects run their own palette, so the chosen colour had no effect there.
-- The stored colour is kept, not discarded: selecting Static again restores it, and the hint on the
-  card says why the control is greyed.
-## 0.10.0-test.14 - 2026-11-07
-
-### Setup
-
-- Changing the accent now recolours the **APPLY** button on the GPU page's Clock Offsets straight
-  away. That button took its colour from a captured value rather than a theme resource, so it kept
-  the previous accent until the next press. The transient `APPLIED!`/`ERROR` colours are unchanged.
-## 0.10.0-test.13 - 2026-11-07
-
-### Lighting
-
-- The toggle is now called **Power mode change flash**, and its description says the power mode,
-  so it is clear what changes when it flashes.
-## 0.10.0-test.12 - 2026-11-07
-
-### Lighting
-
-- The segmented buttons on the LIGHT page now carry icons: a globe for Global, a grid for Area, a
-  keyboard and a laptop for the two devices, and a dot and a level meter for Static and Dynamic.
-- That also fixes text that sat right of centre. The button template always reserves an icon slot,
-  and these six had none, so the label was pushed sideways.
-## 0.10.0-test.11 - 2026-11-07
-
-### Lighting
-
-- The Area tab is a single card now. The Keyboard / Cover logo selector sits at the top of it, under
-  a `DEVICE` label and a hairline divider, instead of floating above the settings in its own card.
-- The keyboard's Static / Dynamic selector stays inside that card, so the device level and the mode
-  level read as one control surface: device first, mode second, settings below.
-- No controls were added, removed or renamed.
-## 0.10.0-test.10 - 2026-11-07
-
-### Lighting
-
-- The `LIGHT` page now uses one presentation at every level: a small section label followed by a
-  segmented track (Lighting, Device, Static/Dynamic), then a padded card for the settings. The
-  tracks were previously three different heights and two different container styles.
-- Card padding, row spacing, slider blocks and hint text are now shared across Global, Keyboard and
-  Cover logo, so the page reads as one control surface rather than three.
-- No controls were added, removed or renamed.
-## 0.10.0-test.9 - 2026-11-07
-
-### Lighting
-
-- **Static and Dynamic now apply the moment you switch between them**, like Global and Area do.
-  Before, the keyboard only changed once something inside the panel was edited.
-- `Static` is no longer offered in the Dynamic effect list. It is a static colour with no animation,
-  so it belongs in its own panel; the OEM software lists it the same way.
-## 0.10.0-test.8 - 2026-11-07
-
-### Lighting
-
-- Global and Area now behave as **two presets**: switching tabs applies the one you open, instead
-  of only changing which controls are visible. Global writes both devices; Area re-applies the
-  keyboard and the cover logo from their own settings.
-- The last-used preset is remembered, applied on launch, and its tab opens. Before, launch could
-  leave the tabs showing one preset while the other was on the hardware.
-## 0.10.0-test.7 - 2026-11-07
-
-### Lighting
-
-- **Global and Area now keep separate settings.** Changing one no longer alters the other, so each
-  tab remembers exactly what was set there.
-- Nitrous remembers which of the two was last used and re-applies that on launch. Before, it always
-  re-applied Area, which silently undid a Global setting on the next start.
-- The Global card says so, so the independence is visible rather than discovered.
-## 0.10.0-test.6 - 2026-11-07
-
-### Lighting
-
-- The mode-change flash now shows the correct colour for every mode - white for Quiet, orange for
-  Balanced, red for Performance, violet for Turbo - on the keyboard, the power/mode key and the
-  cover logo, all from the firmware's own blink.
-- The controller does not display the colour bytes. It looks them up in a fixed palette, and any
-  other colour falls back to orange. That is why earlier builds showed white for Quiet and orange
-  for the rest. The four values Acer sends were captured from its own packets and are now used.
-## 0.10.0-test.5 - 2026-11-07
-
-### Lighting
-
-- The mode-change flash is the controller's own acknowledgement again. It blinks the keyboard and
-  brings the power/mode key and the cover logo with it, which is the shape the OEM software has.
-  The software blink in 0.10.0-test.4 looked wrong and left the mode key out.
-- Its colour belongs to the firmware and cannot be set from user mode: the effect ignores the
-  colour bytes, and a green packet still flashes orange. The per-mode colours NitroSense shows are
-  state held by Acer's agent, which Nitrous does not run.
-## 0.10.0-test.4 - 2026-11-07
-
-### Lighting
-
-- The mode-change flash is a real blink again: two short pulses of the mode's colour on the
-  keyboard and on the cover logo, then the lighting that was there before is restored.
-- The controller's own operating-mode effect is not used for it. With every Acer service stopped it
-  flashes orange whatever colour is sent - a green packet still flashes orange - so it cannot
-  produce the per-mode colours. This was measured again with the services confirmed stopped.
-- The power/mode key is not part of the flash. Its colour is set only by the firmware's own
-  operating-mode routine, which has no settable colour from user mode; doing that would mean
-  running Acer's agent, which Nitrous exists to avoid.
-- The flash reads the lighting to restore from the saved settings, so it behaves the same whether
-  the mode change comes from the dashboard or the tray, and it re-arms the backlight auto-off
-  afterwards.
-## 0.10.0-test.3 - 2026-11-07
-
-### Lighting
-
-- **Mode-change flash is now on by default.** It shipped off, so a fresh install never showed it.
-- The flash now shows the mode's own colour: white for Quiet, orange for Balanced, red for
-  Performance, violet for Turbo.
-- The flash was a solid colour rather than a blink. Superseded by 0.10.0-test.4.
-## 0.10.0-test.2 - 2026-11-07
-
-### Lighting
-
-- The `KB` page is now `LIGHT`, and it drives the lid's cover logo as well as the keyboard. No Acer
-  service, driver or pipe is involved: both devices use the keyboard's own HID controller, the same
-  one the zone colours already used.
-- **Global** applies one effect to both devices at once. There is no "all devices" byte on this
-  controller, so it is the same packet written to the keyboard and then to the logo.
-- **Area** sets each device on its own. On the keyboard, **Static** keeps the four per-zone colours
-  and **Dynamic** sets one effect across all four with its own speed (1-9). On the cover logo,
-  `Static`, `Breathing` and `Neon` are offered; Breathing and Neon cycle their own palette, so the
-  colour picker reads `Auto` for them, and the logo has five speed steps rather than nine.
-- Selecting an effect the logo does not implement leaves it on its previous mode, which is what the
-  OEM software does.
-- **Mode-change flash** sends the controller's own operating-mode effect when the mode changes. It
-  is off by default.
-- Static has no speed control. Nothing animates, and every Static packet the OEM software sends
-  carries speed zero, so a speed slider there would be a control that does nothing.
-- Global is a broadcast rather than a third stored state: on success its values become the Area
-  values, so the next launch re-applies what was last set.
-
-### Setup
-
-- The global hotkey boxes and Sticky Keys moved there from the old KB page, ahead of reorganising
-  Setup by section. They behave exactly as before.
-
-## 0.10.0-test.1 - 2026-11-06
-
-### Appearance
-
-- Nitrous now takes its accent colour from one of seven fixed accents on the Setup page: violet as
-  before, or blue, cyan, green, amber, orange or pink. The choice is remembered.
-- `Auto` is offered as an eighth option and follows the Windows accent, including when it changes
-  while Nitrous is open. It is not the default: a fresh install stays violet, so the interface
-  matches the screenshots and the branding until you decide otherwise.
-- The chosen accent is checked for contrast before it is used, so a very dark or very pale Windows
-  accent cannot turn labels into unreadable text. Status colours are deliberately fixed: a
-  temperature crossing a threshold looks the same whatever accent you pick.
-- Every colour in the interface now comes from a single palette rather than ~270 literals spread
-  through the XAML, which is what makes the switch possible at all. Behaviour is unchanged: no
-  control, value, or hardware path was touched.
+- Nitrous takes its accent colour from seven fixed accents on the Setup page, plus `Auto` (follow
+  Windows) and a **custom picker for any colour**. The choice is remembered; a custom colour is
+  stored as its hex.
+- Custom colours added with **Add to Custom Colors** are remembered across sessions and shared by
+  every colour picker: accent, Global, keyboard zones and cover logo.
+- The accent is contrast-checked before use, and every colour in the interface comes from one
+  palette rather than ~270 literals. Status colours stay fixed, so a temperature crossing a
+  threshold looks the same whatever accent you pick.
+- The GPU page's **APPLY** button follows a live accent change instead of keeping the one it started
+  with.
 
 ### Hotkeys
 
-- `Ctrl + Home` now opens the dashboard out of the box, which is what the README has claimed since
-  the first release. It is seeded only on a machine that has never stored a dashboard binding, so a
-  hotkey you cleared yourself stays cleared.
-- Cycling the power profile is still unbound by default: changing a machine's power mode from a key
+- `Ctrl + Home` opens the dashboard out of the box, seeded only on a machine that has never stored a
+  dashboard binding, so a binding you cleared stays cleared.
+- Cycling the power profile stays unbound by default: changing a machine's power mode from a key
   press you forgot you set is a worse surprise than having no binding.
-- The two binding boxes on the KB page are taller, so the shortcut reads as a key rather than as a
-  text field that happens to contain one.
+- The binding boxes live on the Setup page and are taller, so a shortcut reads as a key rather than
+  as a text field that happens to contain one.
 
 ### Quiet mode
 
 - Quiet now also tells NVIDIA's driver that a client asked for WhisperMode, which is what the NVIDIA
-  App reads before it offers its WhisperMode FPS controls. Until now those controls were greyed out
-  under Nitrous and only worked while NitroSense was in Quiet.
-- This does not change the power cap or the fans. Those were already identical between the two and
-  were measured under load to confirm it: the same 80 W ceiling, and the same fan RPM within noise.
-- The POWER row now says `Whisper Mode: On` while it is requested, and the label disappears as soon
-  as another mode releases it. It reflects what Nitrous actually asked the driver for, so a refused
-  request is never shown as on.
+  App reads before it offers its WhisperMode controls. It does not change the power cap or the fans.
+- The POWER row says `Whisper Mode: On` while it is requested, and the label disappears as soon as
+  another mode releases it.
+
+### Setup
+
+- A new `KEYBOARD` section holds the global hotkeys, Sticky Keys and the keyboard backlight auto-off.
+
+### Updates
+
+- A test build is told plainly what it is when a release exists: "You're running a test version of
+  Nitrous (…). The release version … is available on GitHub." Stable installs keep the prompt they
+  have always had, and a release outranks a test build of the same version.
+
+### Diagnostics
+
+- EC probe version 11 lists Acer's own HID interfaces (`1025`, `0CF2`) and the keyboard controller
+  vendors Acer ships (`04F2`, `05AF`, `0D62`). That separates "this model has no lighting
+  controller" from "this model's keyboard is a USB device Nitrous does not speak".
+
+### Not in this release
+
+- **PL1/PL2 are not adjustable.** They need MSR `0x610`, which is ring0, and shipping a kernel driver
+  for one setting would change what Nitrous is. The EC table some models expose is a capability
+  record, not the applied limits. ThrottleStop remains the right tool for that.
 
 ## 0.9.0 - 2026-11-01
 

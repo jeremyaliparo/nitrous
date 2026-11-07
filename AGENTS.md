@@ -2,7 +2,7 @@
 
 ## Keep the notes current
 
-Findings belong in `C:\Users\Jeremy\Documents\Nitrous-TGP-Investigation\TGP-NOTES.md`, not in the
+Findings belong in `D:\Users\Jeremy\Software Engineering\personal\nitrosense-investigations\TGP-NOTES.md`, not in the
 conversation. When a session produces something worth keeping — a protocol detail, a measurement,
 a firmware quirk, a rejected hypothesis, or a UI constraint found by testing — append it before
 the session ends. Do not wait to be asked: a reboot loses the chat, and re-deriving a result costs
