@@ -142,10 +142,11 @@ internal sealed class AcerEcHid : IDisposable
         ushort VendorId, ushort ProductId, ushort UsagePage, ushort Usage, int FeatureLength);
 
     /// <summary>
-    /// Every Acer-vendor HID interface present on the machine. Read-only: it enumerates interfaces
-    /// and reads their caps, and never sends a feature report.
+    /// A HID interface that can matter for diagnostics: Acer's own interfaces plus the keyboard
+    /// controllers Acer ships. Read-only: it enumerates interfaces and reads their caps, and never
+    /// sends a feature report.
     /// </summary>
-    public static IReadOnlyList<HidSummary> ListAcerDevices()
+    public static IReadOnlyList<HidSummary> ListDiagnosticDevices()
     {
         var devices = new List<HidSummary>();
 
@@ -157,9 +158,10 @@ internal sealed class AcerEcHid : IDisposable
             var info = HidInterop.Describe(handle, path);
             if (info == null) continue;
 
-            // 0x1025 is Acer's embedded-controller interface, 0x0CF2 the keyboard/lid lighting
-            // controller. Anything else is not ours to interpret.
-            if (info.VendorId != 0x1025 && info.VendorId != 0x0CF2) continue;
+            // 0x1025 Acer EC, 0x0CF2 ENEK keyboard/lid lighting. 0x04F2, 0x05AF and 0x0D62 are
+            // Chicony, Sunrex and Darfon keyboards: present here they mean the keyboard is a USB
+            // device with its own controller, not the EC interface Nitrous drives.
+            if (info.VendorId is not (0x1025 or 0x0CF2 or 0x04F2 or 0x05AF or 0x0D62)) continue;
 
             devices.Add(new HidSummary(
                 info.VendorId, info.ProductId, info.UsagePage, info.Usage, info.FeatureLength));

@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.10.0-test.28 - 2026-11-07
+
+### Diagnostics
+
+- **EC probe version 11** lists the keyboard controller vendors Acer ships - Chicony `04F2`, Sunrex
+  `05AF`, Darfon `0D62` - alongside Acer's own `1025` and `0CF2` interfaces. It separates "this model
+  has no lighting controller" from "this model's keyboard is a USB device Nitrous does not speak",
+  which is the question a missing LIGHT page raises.
 ## 0.10.0-test.27 - 2026-11-07
 
 ### Lighting

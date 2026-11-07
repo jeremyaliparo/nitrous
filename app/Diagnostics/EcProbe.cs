@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 10,
+            ["probeVersion"] = 11,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -770,7 +770,7 @@ public static class EcProbe
 
         try
         {
-            foreach (var device in AcerEcHid.ListAcerDevices())
+            foreach (var device in AcerEcHid.ListDiagnosticDevices())
             {
                 devices.Add(new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                 {
