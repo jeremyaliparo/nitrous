@@ -167,9 +167,17 @@ public static class UpdateManager
                 return;
             }
 
+            // A tester is told plainly that they are on a test build, with the release named. A
+            // normal install keeps the prompt it has always had.
+            var prompt = currentIsPrerelease
+                ? $"You're running a test version of Nitrous ({CurrentVersion}).\n\n" +
+                  $"The release version {latestTag} is available on GitHub. Update now?"
+                : $"New version {latestTag} is available (installed {CurrentVersion}). Update now?";
+
             if (MessageBox.Show(
-                    $"New version {latestTag} is available (installed {CurrentVersion}). Update now?",
-                    "Update", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
+                    prompt,
+                    currentIsPrerelease ? "Test version" : "Update",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
                 return;
 
             await PerformUpdateAsync(downloadUrl, expectedHash, releaseUrl, exitCallback);
