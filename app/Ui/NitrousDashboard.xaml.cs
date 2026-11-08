@@ -943,6 +943,10 @@ public partial class NitrousDashboard : Window
         _syncSource = LightingSync.Normalize(
             SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
 
+        var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+        SoundSensitivity.Value = sensitivity;
+        SoundSensitivityText.Text = sensitivity.ToString();
+
         // Carry the old suspension flag over once, then keep only the new key.
         var suspended = SettingsManager.Get("KbSyncSuspended",
             SettingsManager.Get("KbScreenSyncSuspended", 0));
@@ -1211,6 +1215,9 @@ public partial class NitrousDashboard : Window
         var syncAvailable = _keyboardAvailable && _keyboardZoned;
         TogScreenSync.IsEnabled = syncAvailable;
         TogSoundSync.IsEnabled = syncAvailable;
+        SoundSensitivityRow.Visibility = _syncEnabled && _syncSource == LightingSync.SourceSound
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         TogScreenSync.ToolTip = !_keyboardAvailable
             ? "This model has no lighting controller."
             : !_keyboardZoned
@@ -1377,6 +1384,15 @@ public partial class NitrousDashboard : Window
                 ? "Sound sync — the tray follows the audio"
                 : "Screen sync — the tray follows the screen"
             : string.Empty;
+    }
+
+    private void SoundSensitivity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var value = (int)Math.Round(e.NewValue);
+        if (SoundSensitivityText != null) SoundSensitivityText.Text = value.ToString();
+        if (IgnoreLightingChanges) return;
+
+        SettingsManager.Save("KbSoundSensitivity", value);
     }
 
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)

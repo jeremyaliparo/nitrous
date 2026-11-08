@@ -23,7 +23,7 @@ internal static class LightingSync
     private const int ScreenRateMs = 125;
     private const int SoundRateMs = 40;
     private const int LogoEveryFrames = 4;
-    private const int SoundFloorPercent = 15;
+    private const int SoundFloorPercent = 0;
 
     private static readonly object Gate = new();
     private static Thread? _thread;
@@ -161,7 +161,8 @@ internal static class LightingSync
 
         var color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
         var zones = Enumerable.Repeat(color, ZoneCount).ToArray();
-        var level = 0f;
+        var baseline = 0f;
+        var pulse = 0f;
         var frame = 0;
 
         while (_running)
@@ -180,11 +181,25 @@ internal static class LightingSync
             }
 
             var peak = meter.Peak();
-            level = Math.Max(peak, level * 0.80f); // fast attack, slower release
+            var transient = Math.Max(0f, peak - baseline);
+            baseline += (peak - baseline) * 0.02f; // ~2 s at 25 Hz
+            pulse = Math.Max(transient, pulse * 0.75f); // ~0.15 s release
+
+            // A small absolute component keeps quiet, sustained music present; the transient
+            // dominates so beats are visible instead of the whole song sitting at full.
+            var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+            var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
+            var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
 
             var ceiling = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
             var shaped = SoundFloorPercent + level * (100 - SoundFloorPercent);
             var brightness = (int)Math.Round(shaped * ceiling / 100.0);
+
+            if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+            {
+                Logger.Info($"Sound sync: peak={peak:0.00} baseline={baseline:0.00} " +
+                            $"pulse={pulse:0.00} brightness={brightness}");
+            }
 
             WriteFrame(zones, Math.Clamp(brightness, 0, 100), color, frame % LogoEveryFrames == 0);
 
@@ -360,9 +375,7 @@ internal static class LightingSync
         public float Peak()
         {
             if (_meter == null || _meter.GetPeakValue(out var peak) != 0) return 0;
-
-            var shaped = MathF.Sqrt(Math.Clamp(peak, 0f, 1f)) * 1.5f;
-            return Math.Clamp(shaped, 0f, 1f);
+            return Math.Clamp(peak, 0f, 1f);
         }
 
         public void Dispose()

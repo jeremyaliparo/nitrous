@@ -1337,6 +1337,13 @@
 								</StackPanel>
 								<CheckBox x:Name="TogSoundSync" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="SoundSync_Toggled" Unchecked="SoundSync_Toggled"/>
 							</Grid>
+							<StackPanel x:Name="SoundSensitivityRow" Margin="0,8,0,0" Visibility="Collapsed">
+								<Grid Margin="0,0,0,2">
+									<TextBlock Text="Sound sensitivity" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<TextBlock x:Name="SoundSensitivityText" Text="4" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+								</Grid>
+								<Slider x:Name="SoundSensitivity" Minimum="1" Maximum="10" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="SoundSensitivity_Changed"/>
+							</StackPanel>
 							<TextBlock Text="Switching tabs applies that preset. Colour applies to Static only." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,10,0,0" TextWrapping="Wrap"/>
 						</StackPanel>
 					</Border>

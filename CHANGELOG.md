@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.5 - 2026-11-08
+
+### Lighting
+
+- **Sound sync now reacts to beats, not overall loudness.** The raw peak is compared with a slow
+  baseline and the transient drives the brightness, with a fast release. The previous square-root
+  gain pushed most music to full, which is why it looked static.
+- Silence turns the keyboard off completely. A **Sound sensitivity** slider (1-10) appears while
+  Sound sync is on.
+
 ## 0.11.0-test.4 - 2026-11-08
 
 ### Lighting
