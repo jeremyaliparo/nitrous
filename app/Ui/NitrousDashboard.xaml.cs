@@ -963,6 +963,10 @@ public partial class NitrousDashboard : Window
         SoundSensitivity.Value = sensitivity;
         SoundSensitivityText.Text = sensitivity.ToString();
 
+        var saturation = Math.Clamp(SettingsManager.Get("KbSyncSaturation", 100), 0, 200);
+        ScreenSaturation.Value = saturation;
+        ScreenSaturationText.Text = $"{saturation}%";
+
         var soundMode = SettingsManager.Get("KbSoundMode", LightingSync.SoundModeSpectrum) switch
         {
             var m when string.Equals(m, LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase)
@@ -1249,6 +1253,9 @@ public partial class NitrousDashboard : Window
         SoundSensitivityRow.Visibility = syncOn && _syncSource == LightingSync.SourceSound
             ? Visibility.Visible
             : Visibility.Collapsed;
+        ScreenSaturationRow.Visibility = syncOn && _syncSource == LightingSync.SourceScreen
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         SyncTargetRow.Visibility = syncOn ? Visibility.Visible : Visibility.Collapsed;
 
         // A model without a lid cannot follow it; fall back to the keyboard rather than writing
@@ -1450,6 +1457,15 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges) return;
 
         SettingsManager.Save("KbSoundSensitivity", value);
+    }
+
+    private void ScreenSaturation_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var value = (int)Math.Round(e.NewValue);
+        if (ScreenSaturationText != null) ScreenSaturationText.Text = $"{value}%";
+        if (IgnoreLightingChanges) return;
+
+        SettingsManager.Save("KbSyncSaturation", value);
     }
 
     private void SoundMode_Changed(object sender, SelectionChangedEventArgs e)

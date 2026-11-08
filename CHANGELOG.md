@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.11 - 2026-11-08
+
+### Lighting
+
+- Screen sync gains a **Screen saturation** slider (0–200%): 0 is grey, 100 leaves the captured
+  colours unchanged, 200 boosts them. It transforms the RGB values before they are written; the
+  keyboard LEDs have no hardware saturation control.
+
 ## 0.11.0-test.10 - 2026-11-08
 
 ### Lighting

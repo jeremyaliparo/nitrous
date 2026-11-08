@@ -197,13 +197,14 @@ internal static class LightingSync
                     SettingsManager.Get("KbScreenSyncRate", ScreenRateMs)),
                 80, 500);
             var brightness = BaseBrightness();
+            var saturation = Math.Clamp(SettingsManager.Get("KbSyncSaturation", 100), 0, 200) / 100f;
 
             if (capture.TryCapture(out var pixels))
             {
                 if (!_running) break;
 
-                ReadZones(pixels, zones);
-                WriteFrame(zones, brightness, Average(pixels),
+                ReadZones(pixels, zones, saturation);
+                WriteFrame(zones, brightness, Average(pixels, saturation),
                     frame % LogoEveryFrames == 0 && WritesLogo());
             }
 
@@ -370,7 +371,7 @@ internal static class LightingSync
 
 
     /// <summary>Four equal screen columns, left to right, as zone colours.</summary>
-    private static void ReadZones(byte[] bgra, KeyboardColor[] zones)
+    private static void ReadZones(byte[] bgra, KeyboardColor[] zones, float saturation)
     {
         var zoneWidth = Columns / ZoneCount;
 
@@ -392,12 +393,12 @@ internal static class LightingSync
                 }
             }
 
-            zones[zone] = new KeyboardColor(
-                (byte)(red / count), (byte)(green / count), (byte)(blue / count));
+            zones[zone] = Saturate(new KeyboardColor(
+                (byte)(red / count), (byte)(green / count), (byte)(blue / count)), saturation);
         }
     }
 
-    private static KeyboardColor Average(byte[] bgra)
+    private static KeyboardColor Average(byte[] bgra, float saturation)
     {
         long red = 0, green = 0, blue = 0;
         var count = bgra.Length / 4;
@@ -409,7 +410,22 @@ internal static class LightingSync
             red += bgra[i + 2];
         }
 
-        return new KeyboardColor((byte)(red / count), (byte)(green / count), (byte)(blue / count));
+        return Saturate(new KeyboardColor(
+            (byte)(red / count), (byte)(green / count), (byte)(blue / count)), saturation);
+    }
+
+    /// <summary>
+    /// Software saturation around luminance: 0 is grey, 1 unchanged, 2 twice as saturated. The LEDs
+    /// have no saturation control; this changes the RGB values sent to them.
+    /// </summary>
+    private static KeyboardColor Saturate(KeyboardColor color, float factor)
+    {
+        if (Math.Abs(factor - 1f) < 0.001f) return color;
+
+        var luma = 0.299f * color.R + 0.587f * color.G + 0.114f * color.B;
+        byte Mix(byte channel) => (byte)Math.Clamp(luma + (channel - luma) * factor, 0, 255);
+
+        return new KeyboardColor(Mix(color.R), Mix(color.G), Mix(color.B));
     }
 
     /// <summary>Puts the keyboard back on the preset that was in use before sync started.</summary>

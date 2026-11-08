@@ -1450,6 +1450,13 @@
 								</StackPanel>
 								<CheckBox x:Name="TogScreenSync" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="ScreenSync_Toggled" Unchecked="ScreenSync_Toggled"/>
 							</Grid>
+							<StackPanel x:Name="ScreenSaturationRow" Margin="0,8,0,0" Visibility="Collapsed">
+								<Grid Margin="0,0,0,2">
+									<TextBlock Text="Screen saturation" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+									<TextBlock x:Name="ScreenSaturationText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+								</Grid>
+								<Slider x:Name="ScreenSaturation" Minimum="0" Maximum="200" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="ScreenSaturation_Changed"/>
+							</StackPanel>
 							<Grid Margin="0,8,0,0">
 								<StackPanel VerticalAlignment="Center" Margin="0,0,58,0">
 									<TextBlock Text="Sound sync" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11"/>
