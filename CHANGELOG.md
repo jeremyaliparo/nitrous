@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.7 - 2026-11-08
+
+### Lighting
+
+- **Beat** joins Peak and Spectrum in the Sound mode list. It watches the bass band for onsets,
+  requires a 140 ms gap between hits, and fades a short flash, so it lands on kicks instead of
+  following every transient. The sensitivity slider sets its threshold.
+
 ## 0.11.0-test.6 - 2026-11-08
 
 ### Lighting

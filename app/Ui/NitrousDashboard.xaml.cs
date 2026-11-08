@@ -949,15 +949,21 @@ public partial class NitrousDashboard : Window
         SoundSensitivity.Value = sensitivity;
         SoundSensitivityText.Text = sensitivity.ToString();
 
-        var soundMode = string.Equals(
-            SettingsManager.Get("KbSoundMode", LightingSync.SoundModeSpectrum),
-            LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase)
-            ? LightingSync.SoundModePeak
-            : LightingSync.SoundModeSpectrum;
+        var soundMode = SettingsManager.Get("KbSoundMode", LightingSync.SoundModeSpectrum) switch
+        {
+            var m when string.Equals(m, LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase)
+                => LightingSync.SoundModePeak,
+            var m when string.Equals(m, LightingSync.SoundModeBeat, StringComparison.OrdinalIgnoreCase)
+                => LightingSync.SoundModeBeat,
+            _ => LightingSync.SoundModeSpectrum
+        };
 
         SoundModeBox.Items.Add("Peak");
         SoundModeBox.Items.Add("Spectrum");
-        SoundModeBox.SelectedIndex = soundMode == LightingSync.SoundModePeak ? 0 : 1;
+        SoundModeBox.Items.Add("Beat");
+        SoundModeBox.SelectedIndex = soundMode == LightingSync.SoundModePeak ? 0
+            : soundMode == LightingSync.SoundModeBeat ? 2
+            : 1;
 
         SyncTargetBox.Items.Add("Keyboard");
         SyncTargetBox.Items.Add("Keyboard + lid logo");
@@ -1421,9 +1427,12 @@ public partial class NitrousDashboard : Window
     {
         if (IgnoreLightingChanges || SoundModeBox.SelectedIndex < 0) return;
 
-        SettingsManager.Save("KbSoundMode", SoundModeBox.SelectedIndex == 0
-            ? LightingSync.SoundModePeak
-            : LightingSync.SoundModeSpectrum);
+        SettingsManager.Save("KbSoundMode", SoundModeBox.SelectedIndex switch
+        {
+            0 => LightingSync.SoundModePeak,
+            2 => LightingSync.SoundModeBeat,
+            _ => LightingSync.SoundModeSpectrum
+        });
     }
 
     private void SyncTarget_Changed(object sender, SelectionChangedEventArgs e)

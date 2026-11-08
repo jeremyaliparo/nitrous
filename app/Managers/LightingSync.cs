@@ -18,6 +18,7 @@ internal static class LightingSync
     public const string SourceSound = "Sound";
     public const string SoundModePeak = "Peak";
     public const string SoundModeSpectrum = "Spectrum";
+    public const string SoundModeBeat = "Beat";
     public const string TargetBoth = "Both";
     public const string TargetKeyboard = "Keyboard";
 
@@ -168,6 +169,9 @@ internal static class LightingSync
         var levels = new int[ZoneCount];
         var baseline = 0f;
         var pulse = 0f;
+        var bassBaseline = 0f;
+        var beatFlash = 0f;
+        var lastBeat = DateTime.MinValue;
         var frame = 0;
         var mode = "";
         AudioMeter? meter = null;
@@ -184,11 +188,12 @@ internal static class LightingSync
                     continue;
                 }
 
-                var desired = string.Equals(
-                    SettingsManager.Get("KbSoundMode", SoundModeSpectrum), SoundModePeak,
-                    StringComparison.OrdinalIgnoreCase)
-                    ? SoundModePeak
-                    : SoundModeSpectrum;
+                var desired = SettingsManager.Get("KbSoundMode", SoundModeSpectrum) switch
+                {
+                    var m when string.Equals(m, SoundModePeak, StringComparison.OrdinalIgnoreCase) => SoundModePeak,
+                    var m when string.Equals(m, SoundModeBeat, StringComparison.OrdinalIgnoreCase) => SoundModeBeat,
+                    _ => SoundModeSpectrum
+                };
 
                 if (!string.Equals(desired, mode, StringComparison.Ordinal))
                 {
@@ -199,6 +204,9 @@ internal static class LightingSync
                     mode = desired;
                     baseline = 0f;
                     pulse = 0f;
+                    bassBaseline = 0f;
+                    beatFlash = 0f;
+                    lastBeat = DateTime.MinValue;
                     Array.Clear(levels);
 
                     if (mode == SoundModePeak) meter = AudioMeter.TryCreate();
@@ -242,8 +250,32 @@ internal static class LightingSync
                     if (spectrum.Read(analyzer.Samples))
                         analyzer.Analyze(spectrum.SampleRate, sensitivity, ceiling, levels);
 
-                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                    if (mode == SoundModeBeat)
+                    {
+                        var bass = analyzer.Bass;
+                        var onset = Math.Max(0f, bass - bassBaseline);
+                        bassBaseline += (bass - bassBaseline) * 0.04f; // ~1 s at 25 Hz
+
+                        var threshold = 0.35f / sensitivity;
+                        if (onset > threshold &&
+                            DateTime.UtcNow - lastBeat > TimeSpan.FromMilliseconds(140))
+                        {
+                            lastBeat = DateTime.UtcNow;
+                            beatFlash = 1f;
+                        }
+
+                        beatFlash *= 0.80f; // ~0.15 s flash
+                        var brightness = (int)Math.Round(beatFlash * ceiling);
+                        for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+
+                        if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                            Logger.Info($"Sound sync (Beat): bass={bass:0.00} onset={onset:0.00} " +
+                                        $"flash={beatFlash:0.00} brightness={brightness}");
+                    }
+                    else if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                    {
                         Logger.Info($"Sound sync (Spectrum): {string.Join(",", levels)}");
+                    }
                 }
 
                 WriteZones(zones, levels, color, levels.Max(),
@@ -514,6 +546,9 @@ internal static class LightingSync
 
         public float[] Samples { get; } = new float[Size];
 
+        /// <summary>The raw bass band level (0-1), before smoothing or sensitivity, for beat onsets.</summary>
+        public float Bass { get; private set; }
+
         private readonly double[] _real = new double[Size];
         private readonly double[] _imaginary = new double[Size];
         private readonly double[] _window = new double[Size];
@@ -563,7 +598,10 @@ internal static class LightingSync
 
                 var rms = Math.Sqrt(sum / Math.Max(1, count)) / scale;
                 var db = 20 * Math.Log10(Math.Max(rms, 1e-7));
-                var level = Math.Clamp((db + 55) / 55, 0, 1) * (sensitivity / 4.0) * Bands[band].Gain;
+                var raw = Math.Clamp((db + 55) / 55, 0, 1) * Bands[band].Gain;
+                if (band == 0) Bass = (float)Math.Clamp(raw, 0, 1);
+
+                var level = raw * (sensitivity / 4.0);
                 _bands[band] = (float)Math.Max(Math.Min(level, 1), _bands[band] * 0.72);
                 levels[band] = (int)Math.Round(_bands[band] * ceiling);
             }
