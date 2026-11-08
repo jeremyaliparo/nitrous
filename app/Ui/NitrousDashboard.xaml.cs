@@ -1564,12 +1564,14 @@ public partial class NitrousDashboard : Window
         {
             AcerKeyboard.SetEffect(
                 KeyboardEffect.Static, 100, 0, leftwards: false,
-                new KeyboardColor(255, 0, 0), AcerKeyboard.LidDevice);
+                new KeyboardColor(0, 255, 0), AcerKeyboard.LidDevice);
 
             var answer = MessageBox.Show(
-                "Did the 'N' logo on the lid light up red?\n\n" +
-                "Nitrous sent a test colour to the lid's controller. If you are not sure, choose Cancel " +
-                "and it will ask again the next time you open Lighting.",
+                "Did the 'N' logo on the lid change to green (or another colour that is not the power " +
+                "mode's colour)?\n\n" +
+                "The power mode colours the logo white, orange, red or violet. If it stayed on the " +
+                "power mode's colour, choose No.\n\n" +
+                "Choose Cancel and it will ask again the next time you open Lighting.",
                 "Lid logo",
                 MessageBoxButton.YesNoCancel,
                 MessageBoxImage.Question);

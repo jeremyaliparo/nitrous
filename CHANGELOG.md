@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.9 - 2026-11-08
+
+### Lighting
+
+- The lid-logo check now writes **green**, not red: the power-mode palette already includes red
+  (Performance), so a red test on a Performance machine looked unchanged. The prompt asks for green
+  or another non-mode colour, and says to choose No when the logo only follows the power mode.
+- The unavailable panel explains that same case, so a mode-only lid logo is hidden instead of
+  offering controls that do nothing.
+
 ## 0.11.0-test.8 - 2026-11-08
 
 ### Lighting

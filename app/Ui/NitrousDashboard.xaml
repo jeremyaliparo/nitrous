@@ -1426,8 +1426,8 @@
 										<Button Content="TEST LID LOGO" Click="LogoCheck_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,5" Height="26" HorizontalAlignment="Right" Margin="0,10,0,0"/>
 									</StackPanel>
 									<StackPanel x:Name="LogoUnavailablePanel" Visibility="Collapsed">
-										<TextBlock Text="No lid logo was detected on this model." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" TextWrapping="Wrap"/>
-										<TextBlock Text="If the 'N' does light up, run the check again." Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
+										<TextBlock Text="No separate lid logo was detected on this model." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" TextWrapping="Wrap"/>
+										<TextBlock Text="On some models the 'N' only follows the power mode's colour and cannot be set independently. If it can change independently, run the check again." Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,2,0,0" TextWrapping="Wrap"/>
 										<Button Content="CHECK AGAIN" Click="LogoCheck_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,5" Height="26" HorizontalAlignment="Left" Margin="0,10,0,0"/>
 									</StackPanel>
 								</StackPanel>
