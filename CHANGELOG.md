@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.1 - 2026-11-08
+
+### Keyboard
+
+- **Backlight brightness** on models without a lighting controller: a five-step row in
+  **Setup → KEYBOARD** (`Off`, `25`, `50`, `75`, `100`). It uses the EC HID interface where the
+  model has one and `APGeAction` where it does not, snaps to the firmware's levels, and preserves
+  the auto-off timeout. Toggling auto-off no longer resets the brightness.
+- **EC probe version 12** records the keyboard type and both brightness paths, plus which one the
+  model uses, so coverage can be mapped from a diagnostic report without writing anything.
+
+### Dashboard
+
+- The **Whisper Mode** label now follows the request without waiting for a mode change, so it no
+  longer disappears while Quiet is still asking for it. Releasing it in another mode still hides
+  it.
+
 ## 0.10.0 - 2026-11-08
 
 ### Lighting
