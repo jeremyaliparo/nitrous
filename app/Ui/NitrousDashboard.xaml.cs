@@ -1118,6 +1118,10 @@ public partial class NitrousDashboard : Window
             if (source == "Global") ApplyGlobalLighting();
             else ApplyAreaLighting(reportLogoFailure: false);
         }
+
+        // The tab/mode controls may have been initialised after the first pass; apply the final
+        // sync gating once more so disabled colours and zone swatches match the loaded state.
+        UpdateLightingInteractivity();
     }
 
     /// <summary>
@@ -1211,16 +1215,31 @@ public partial class NitrousDashboard : Window
     /// <summary>Zone colours only mean anything in the keyboard's Static panel.</summary>
     private void UpdateZoneInteractivity()
     {
-        var enabled = _keyboardAvailable && _keyboardZoned && KbStaticTab.IsChecked == true;
+        var screenSync = _syncEnabled && _syncSource == LightingSync.SourceScreen;
+        var enabled = _keyboardAvailable && _keyboardZoned && KbStaticTab.IsChecked == true &&
+                      !screenSync;
 
         Zone1Btn.IsEnabled = Zone2Btn.IsEnabled = Zone3Btn.IsEnabled = Zone4Btn.IsEnabled = enabled;
         ZoneAllBtn.IsEnabled = enabled;
+
+        ZoneRow.Opacity = screenSync ? 0.4 : 1.0;
+        SingleColourRow.Opacity = screenSync ? 0.4 : 1.0;
 
         // A single-colour keyboard still has a colour; offering four disabled swatches left no way
         // to set it at all.
         ZoneRow.Visibility = _keyboardZoned ? Visibility.Visible : Visibility.Collapsed;
         SingleColourRow.Visibility = _keyboardZoned ? Visibility.Collapsed : Visibility.Visible;
-        KbSingleColorBtn.IsEnabled = _keyboardAvailable;
+        KbSingleColorBtn.IsEnabled = _keyboardAvailable && !screenSync;
+
+        var hint = screenSync
+            ? "Screen sync uses the screen's colours."
+            : null;
+        Zone1Btn.ToolTip = hint ?? "Zone 1 colour";
+        Zone2Btn.ToolTip = hint ?? "Zone 2 colour";
+        Zone3Btn.ToolTip = hint ?? "Zone 3 colour";
+        Zone4Btn.ToolTip = hint ?? "Zone 4 colour";
+        ZoneAllBtn.ToolTip = hint ?? "Set all four zones to one colour.";
+        KbSingleColorBtn.ToolTip = hint ?? "The keyboard's colour";
 
         ZoneHint.Text = "This keyboard has a single colour, so one colour applies to the whole keyboard.";
         ZoneHint.Visibility = !_keyboardZoned ? Visibility.Visible : Visibility.Collapsed;
@@ -1237,6 +1256,7 @@ public partial class NitrousDashboard : Window
         var globalHasColour = _globalEffect == KeyboardEffect.Static;
 
         var syncOn = _syncEnabled;
+        var screenSync = syncOn && _syncSource == LightingSync.SourceScreen;
 
         GlobalEffectBox.IsEnabled = _keyboardAvailable && !syncOn;
         GlobalBrightness.IsEnabled = _keyboardAvailable;
@@ -1281,34 +1301,46 @@ public partial class NitrousDashboard : Window
                 : null;
 
         // The animated effects run their own palette, so a chosen colour does nothing for either
-        // device. It is greyed to "Auto" rather than left looking usable. While a sync is on the
-        // colour is its base, so it stays editable even for an animated preset.
-        var globalColourEditable = globalHasColour || syncOn;
+        // device. It is greyed to "Auto" rather than left looking usable. Screen sync owns the
+        // colour entirely; Sound sync uses the preset colour as its base.
+        var globalColourEditable = globalHasColour && !screenSync;
         GlobalColorBtn.IsEnabled = _keyboardAvailable && globalColourEditable;
-        GlobalColorBtn.ToolTip = syncOn
-            ? "The sync uses this as its base colour."
-            : globalHasColour
-                ? "Keyboard and cover-logo colour"
-                : "Only Static uses a chosen colour; the animated effects run their own palette.";
+        GlobalColorBtn.ToolTip = screenSync
+            ? "Screen sync uses the screen's colours."
+            : syncOn
+                ? "Sound sync uses this as its base colour."
+                : globalHasColour
+                    ? "Keyboard and cover-logo colour"
+                    : "Only Static uses a chosen colour; the animated effects run their own palette.";
         if (globalColourEditable) PaintColourButton(GlobalColorBtn, _globalColor);
         else PaintColourButton(GlobalColorBtn, new KeyboardColor(60, 60, 60), "Auto");
 
-        KeyboardEffectBox.IsEnabled = _keyboardAvailable;
+        KbStaticTab.IsEnabled = !screenSync;
+        KbDynamicTab.IsEnabled = !screenSync;
+        ScreenSyncKeyboardHint.Visibility = screenSync ? Visibility.Visible : Visibility.Collapsed;
+
+        KeyboardEffectBox.IsEnabled = _keyboardAvailable && !screenSync;
         KeyboardBrightness.IsEnabled = _keyboardAvailable;
-        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect);
+        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect) && !screenSync;
         KbSpeedRow.Visibility = KbDynamicTab.IsChecked == true && IsAnimated(_keyboardEffect)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
         var logoHasColour = _logoEffect == KeyboardEffect.Static;
-        LogoEffectBox.IsEnabled = _keyboardAvailable;
-        LogoBrightness.IsEnabled = _keyboardAvailable;
-        LogoSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_logoEffect);
+        var logoOwnedBySync = syncOn && _syncTarget == LightingSync.TargetBoth;
+        LogoEffectBox.IsEnabled = _keyboardAvailable && !logoOwnedBySync;
+        LogoBrightness.IsEnabled = _keyboardAvailable && !logoOwnedBySync;
+        LogoSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_logoEffect) && !logoOwnedBySync;
         LogoSpeedRow.Visibility = IsAnimated(_logoEffect) ? Visibility.Visible : Visibility.Collapsed;
-        LogoColorBtn.IsEnabled = _keyboardAvailable && logoHasColour;
-        LogoColorBtn.ToolTip = logoHasColour
-            ? "Cover-logo colour"
-            : "Breathing and Neon cycle their own colours; the firmware ignores the one sent.";
+        LogoColorBtn.IsEnabled = _keyboardAvailable && logoHasColour && !logoOwnedBySync;
+        LogoColorBtn.ToolTip = logoOwnedBySync
+            ? "Sync is controlling the lid."
+            : logoHasColour
+                ? "Cover-logo colour"
+                : "Breathing and Neon cycle their own colours; the firmware ignores the one sent.";
+        LogoCheckBtn.IsEnabled = _keyboardAvailable && !logoOwnedBySync;
+        LogoCheckBtn.ToolTip = logoOwnedBySync ? "Sync is controlling the lid." : null;
+        LogoSyncHint.Visibility = logoOwnedBySync ? Visibility.Visible : Visibility.Collapsed;
 
         if (logoHasColour) PaintColourButton(LogoColorBtn, _logoColor);
         else PaintColourButton(LogoColorBtn, new KeyboardColor(60, 60, 60), "Auto");
@@ -1488,6 +1520,7 @@ public partial class NitrousDashboard : Window
             ? LightingSync.TargetKeyboard
             : LightingSync.TargetBoth;
         SettingsManager.Save("KbSyncTarget", _syncTarget);
+        UpdateLightingInteractivity();
     }
 
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)
@@ -1526,6 +1559,7 @@ public partial class NitrousDashboard : Window
 
     private void GlobalColor_Click(object sender, RoutedEventArgs e)
     {
+        if (_syncEnabled && _syncSource == LightingSync.SourceScreen) return;
         if (!_keyboardAvailable || (!_syncEnabled && _globalEffect != KeyboardEffect.Static)) return;
         if (PickColour(_globalColor) is not { } chosen) return;
 
@@ -1640,6 +1674,7 @@ public partial class NitrousDashboard : Window
 
     private void KbColor_Click(object sender, RoutedEventArgs e)
     {
+        if (_syncEnabled && _syncSource == LightingSync.SourceScreen) return;
         if (!_keyboardAvailable || PickColour(_zoneColors[0]) is not { } chosen) return;
 
         // Dynamic sends one colour across all four zones, so the chip writes all four rather than
@@ -1729,6 +1764,7 @@ public partial class NitrousDashboard : Window
 
     private void Zone_Click(object sender, RoutedEventArgs e)
     {
+        if (_syncEnabled && _syncSource == LightingSync.SourceScreen) return;
         if (!_keyboardAvailable || !_keyboardZoned ||
             sender is not System.Windows.Controls.Button { Tag: string tag } ||
             !int.TryParse(tag, out var zone))

@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.12 - 2026-11-08
+
+### Lighting
+
+- With **Screen sync** on, only brightness is adjustable: Global Colour greys to `Auto`, and the Area
+  Static/Dynamic selector, effect, speed, zone swatches and single-colour chip are disabled. A hint
+  says the screen owns the colours.
+- The **Cover logo** panel follows the Follow target. `Keyboard + lid logo` disables its controls and
+  TEST LID LOGO with a hint; `Keyboard` leaves the logo editable. Sound sync keeps the preset colours
+  as its base and leaves the colour editors usable.
+
 ## 0.11.0-test.11 - 2026-11-08
 
 ### Lighting
