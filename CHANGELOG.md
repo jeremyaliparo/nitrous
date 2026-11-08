@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.3 - 2026-11-08
+
+### Lighting
+
+- **Screen sync is remembered across the Global/Area tabs.** Opening Area suspends it and applies the
+  Area preset; returning to Global resumes the same switch state instead of turning it off.
+- The sync worker **pauses for 1.5 seconds during a power-mode flash**, so the controller's
+  acknowledgement is not overwritten by the next frame.
+
 ## 0.11.0-test.2 - 2026-11-08
 
 ### Lighting

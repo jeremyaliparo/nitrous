@@ -926,9 +926,17 @@ public partial class NitrousDashboard : Window
         _blinkOnModeChange = SettingsManager.Get("KbBlinkOnMode", true);
         TogBlinkOnMode.IsChecked = _blinkOnModeChange;
 
-        // The worker lives in the tray; this toggle only writes the request.
+        // The worker lives in the tray; this toggle only writes the request. Area suspends it
+        // without losing the preference: switching back to Global resumes the same switch state.
         _screenSync = SettingsManager.Get("KbScreenSync", 0) == 1;
         TogScreenSync.IsChecked = _screenSync;
+        if (_screenSync)
+        {
+            SettingsManager.Save("KbScreenSyncSuspended",
+                LightingAreaTab.IsChecked == true ? 1 : 0);
+            if (LightingGlobalTab.IsChecked == true)
+                SettingsManager.Save("KbLightingSource", "Global");
+        }
 
         // Restore which half of the keyboard card was last in use, before the first apply below.
         if (SettingsManager.Get("KbStyle", "Static") == "Dynamic")
@@ -1232,10 +1240,17 @@ public partial class NitrousDashboard : Window
         // Not during load: the first apply is done deliberately at the end of initialisation.
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
-        // Screen sync owns the LEDs while it runs. Opening Area turns it off and restores the
-        // saved preset; opening Global while it runs leaves the worker alone.
-        if (!global && _screenSync) TogScreenSync.IsChecked = false;
-        if (_screenSync) return;
+        // Screen sync owns the LEDs while Global is open. Opening Area suspends it but keeps the
+        // switch: the tray stops and the Area preset is applied. Returning to Global resumes it.
+        if (_screenSync)
+        {
+            SettingsManager.Save("KbScreenSyncSuspended", global ? 0 : 1);
+            if (global)
+            {
+                SettingsManager.Save("KbLightingSource", "Global");
+                return;
+            }
+        }
 
         if (global) ApplyGlobalLighting();
         else ApplyAreaLighting();
@@ -1285,6 +1300,8 @@ public partial class NitrousDashboard : Window
 
         _screenSync = TogScreenSync.IsChecked == true;
         SettingsManager.Save("KbScreenSync", _screenSync ? 1 : 0);
+        SettingsManager.Save("KbScreenSyncSuspended", 0);
+        if (_screenSync) SettingsManager.Save("KbLightingSource", "Global");
         UpdateLightingInteractivity();
 
         KeyboardLightingStatus.Text = _screenSync

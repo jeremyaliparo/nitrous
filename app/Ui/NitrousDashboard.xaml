@@ -1326,7 +1326,7 @@
 							<Grid Margin="0,12,0,0">
 								<StackPanel VerticalAlignment="Center" Margin="0,0,58,0">
 									<TextBlock Text="Screen sync" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11"/>
-									<TextBlock Text="Follows the screen's colours. Software effect; runs while Nitrous is in the tray." Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+									<TextBlock Text="Follows the screen's colours. Software effect; runs while Nitrous is in the tray. Area pauses it." Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
 								</StackPanel>
 								<CheckBox x:Name="TogScreenSync" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="ScreenSync_Toggled" Unchecked="ScreenSync_Toggled"/>
 							</Grid>

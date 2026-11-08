@@ -28,6 +28,15 @@ internal static class ScreenSync
 
     public static bool IsRunning => _running;
 
+    /// <summary>
+    /// Skips frames while the firmware plays an acknowledgement, so sync doesn't erase it. The
+    /// deadline lives in settings because the dashboard and tray are separate processes.
+    /// </summary>
+    public static void Pause(int milliseconds) =>
+        SettingsManager.Save(
+            "KbScreenSyncPauseUntil",
+            DateTime.UtcNow.AddMilliseconds(milliseconds).Ticks);
+
     public static void Start()
     {
         lock (Gate)
@@ -46,7 +55,7 @@ internal static class ScreenSync
         }
     }
 
-    public static void Stop()
+    public static void Stop(bool restorePreset = true)
     {
         Thread? thread;
         lock (Gate)
@@ -59,8 +68,8 @@ internal static class ScreenSync
 
         try { thread?.Join(1500); } catch { }
 
-        RestoreSavedPreset();
-        Logger.Info("Screen sync: stopped.");
+        if (restorePreset) RestoreSavedPreset();
+        Logger.Info(restorePreset ? "Screen sync: stopped." : "Screen sync: suspended for Area.");
     }
 
     private static void Loop()
@@ -75,6 +84,13 @@ internal static class ScreenSync
         {
             while (_running)
             {
+                var pausedUntil = SettingsManager.Get("KbScreenSyncPauseUntil", 0L);
+                if (DateTime.UtcNow.Ticks < pausedUntil)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
                 var rate = Math.Clamp(SettingsManager.Get("KbScreenSyncRate", DefaultRateMs), 80, 500);
                 var brightness = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
 

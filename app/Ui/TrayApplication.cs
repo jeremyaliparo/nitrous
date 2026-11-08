@@ -720,8 +720,11 @@ public class TrayApplication : ApplicationContext
                 {
                     try
                     {
-                        if (SettingsManager.Get("KbScreenSync", 0) == 1) ScreenSync.Start();
-                        else ScreenSync.Stop();
+                        var enabled = SettingsManager.Get("KbScreenSync", 0) == 1;
+                        var suspended = SettingsManager.Get("KbScreenSyncSuspended", 0) == 1;
+
+                        if (enabled && !suspended) ScreenSync.Start();
+                        else ScreenSync.Stop(restorePreset: !enabled);
                     }
                     catch (Exception ex)
                     {
