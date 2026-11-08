@@ -3,6 +3,13 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.15 - 2026-11-08
+
+### Lighting
+
+- **Pulse with sound** gains a **Silence floor** slider (0–10%): 0 is fully off between hits, 10
+  keeps a dim glow of the screen colours. It is a percentage of the brightness cap.
+
 ## 0.11.0-test.14 - 2026-11-08
 
 ### Lighting

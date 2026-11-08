@@ -965,6 +965,10 @@ public partial class NitrousDashboard : Window
         _screenPulse = SettingsManager.Get("KbScreenPulse", 0) == 1;
         TogScreenPulse.IsChecked = _screenPulse;
 
+        var floor = Math.Clamp(SettingsManager.Get("KbSyncFloor", 0), 0, 10);
+        ScreenFloor.Value = floor;
+        ScreenFloorText.Text = $"{floor}%";
+
         var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
         SoundSensitivity.Value = sensitivity;
         SoundSensitivityText.Text = sensitivity.ToString();
@@ -1325,6 +1329,9 @@ public partial class NitrousDashboard : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         ScreenPulseRow.Visibility = screenSync ? Visibility.Visible : Visibility.Collapsed;
+        ScreenFloorRow.Visibility = screenSync && _screenPulse
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         TogScreenPulse.IsEnabled = screenSync;
         SyncTargetRow.Visibility = syncOn ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1567,6 +1574,15 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges) return;
 
         SettingsManager.Save("KbSyncSaturation", value);
+    }
+
+    private void ScreenFloor_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var value = (int)Math.Round(e.NewValue);
+        if (ScreenFloorText != null) ScreenFloorText.Text = $"{value}%";
+        if (IgnoreLightingChanges) return;
+
+        SettingsManager.Save("KbSyncFloor", value);
     }
 
     private void SoundMode_Changed(object sender, SelectionChangedEventArgs e)

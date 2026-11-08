@@ -29,7 +29,6 @@ internal static class LightingSync
     private const int SoundRateMs = 40;
     private const int LogoEveryFrames = 4;
     private const int SoundFloorPercent = 0;
-    private const int HybridFloorPercent = 10;
 
     private static readonly object Gate = new();
     private static Thread? _thread;
@@ -246,10 +245,11 @@ internal static class LightingSync
                     pulse = Math.Max(transient, pulse * 0.75f);
 
                     var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+                    var floor = Math.Clamp(SettingsManager.Get("KbSyncFloor", 0), 0, 10);
                     var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
                     var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
                     brightness = (int)Math.Round(
-                        (HybridFloorPercent + level * (100 - HybridFloorPercent)) * cap / 100.0);
+                        (floor + level * (100 - floor)) * cap / 100.0);
 
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                         Logger.Info($"Screen sync (pulse): peak={peak:0.00} " +
