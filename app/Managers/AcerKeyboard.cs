@@ -97,15 +97,26 @@ internal static class AcerKeyboard
     /// </summary>
     public static bool SetZoneColors(IReadOnlyList<KeyboardColor> colors, int brightness)
     {
+        var levels = new int[ZoneCount];
+        for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+        return SetZoneColors(colors, levels);
+    }
+
+    /// <summary>
+    /// Sets one colour and one brightness per zone. The spectrum effect uses this to keep a single
+    /// colour but give each zone its own level.
+    /// </summary>
+    public static bool SetZoneColors(IReadOnlyList<KeyboardColor> colors, IReadOnlyList<int> brightness)
+    {
         using var device = HidDevice.Open(VendorId, ProductId, UsagePage, Usage);
         if (device == null) return false;
 
-        var level = (byte)Math.Clamp(brightness, 0, 100);
         var sent = false;
 
         for (var zone = 0; zone < ZoneCount; zone++)
         {
             var color = zone < colors.Count ? colors[zone] : KeyboardColor.White;
+            var level = (byte)Math.Clamp(zone < brightness.Count ? brightness[zone] : 0, 0, 100);
             var packet = new byte[PacketLength];
             packet[0] = ReportId;
             packet[1] = KeyboardDevice;

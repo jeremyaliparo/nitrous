@@ -759,6 +759,7 @@ public partial class NitrousDashboard : Window
     /// <summary>Software screen/audio sync, run by the tray. The dashboard only owns the switches.</summary>
     private bool _syncEnabled;
     private string _syncSource = LightingSync.SourceScreen;
+    private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
 
     private KeyboardEffect _logoEffect = KeyboardEffect.Static;
@@ -928,8 +929,7 @@ public partial class NitrousDashboard : Window
         _blinkOnModeChange = SettingsManager.Get("KbBlinkOnMode", true);
         TogBlinkOnMode.IsChecked = _blinkOnModeChange;
 
-        // The worker lives in the tray; these switches only write the request. Area suspends it
-        // without losing the preference: switching back to Global resumes the same source.
+        // The worker lives in the tray; these switches only write the request.
         var syncEnabled = SettingsManager.Get("KbSyncEnabled", -1);
         if (syncEnabled < 0)
         {
@@ -942,26 +942,33 @@ public partial class NitrousDashboard : Window
         _syncEnabled = syncEnabled == 1;
         _syncSource = LightingSync.Normalize(
             SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
+        _syncTarget = LightingSync.NormalizeTarget(
+            SettingsManager.Get("KbSyncTarget", LightingSync.TargetBoth));
 
         var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
         SoundSensitivity.Value = sensitivity;
         SoundSensitivityText.Text = sensitivity.ToString();
 
-        // Carry the old suspension flag over once, then keep only the new key.
-        var suspended = SettingsManager.Get("KbSyncSuspended",
-            SettingsManager.Get("KbScreenSyncSuspended", 0));
-        SettingsManager.Save("KbSyncSuspended", suspended);
+        var soundMode = string.Equals(
+            SettingsManager.Get("KbSoundMode", LightingSync.SoundModeSpectrum),
+            LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase)
+            ? LightingSync.SoundModePeak
+            : LightingSync.SoundModeSpectrum;
+
+        SoundModeBox.Items.Add("Peak");
+        SoundModeBox.Items.Add("Spectrum");
+        SoundModeBox.SelectedIndex = soundMode == LightingSync.SoundModePeak ? 0 : 1;
+
+        SyncTargetBox.Items.Add("Keyboard");
+        SyncTargetBox.Items.Add("Keyboard + lid logo");
+        SyncTargetBox.SelectedIndex = _syncTarget == LightingSync.TargetKeyboard ? 0 : 1;
 
         TogScreenSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceScreen;
         TogSoundSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceSound;
 
         if (_syncEnabled)
-        {
-            SettingsManager.Save("KbSyncSuspended",
-                LightingAreaTab.IsChecked == true ? 1 : 0);
-            if (LightingGlobalTab.IsChecked == true)
-                SettingsManager.Save("KbLightingSource", "Global");
-        }
+            SettingsManager.Save("KbLightingSource",
+                LightingGlobalTab.IsChecked == true ? "Global" : "Area");
 
         // Restore which half of the keyboard card was last in use, before the first apply below.
         if (SettingsManager.Get("KbStyle", "Static") == "Dynamic")
@@ -1215,9 +1222,26 @@ public partial class NitrousDashboard : Window
         var syncAvailable = _keyboardAvailable && _keyboardZoned;
         TogScreenSync.IsEnabled = syncAvailable;
         TogSoundSync.IsEnabled = syncAvailable;
-        SoundSensitivityRow.Visibility = _syncEnabled && _syncSource == LightingSync.SourceSound
+
+        SoundModeRow.Visibility = syncOn && _syncSource == LightingSync.SourceSound
             ? Visibility.Visible
             : Visibility.Collapsed;
+        SoundSensitivityRow.Visibility = syncOn && _syncSource == LightingSync.SourceSound
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        SyncTargetRow.Visibility = syncOn ? Visibility.Visible : Visibility.Collapsed;
+
+        // A model without a lid cannot follow it; fall back to the keyboard rather than writing
+        // logo packets that go nowhere.
+        if (!LogoIsUsable && _syncTarget == LightingSync.TargetBoth)
+        {
+            _syncTarget = LightingSync.TargetKeyboard;
+            SyncTargetBox.SelectedIndex = 0;
+            SettingsManager.Save("KbSyncTarget", _syncTarget);
+        }
+
+        SoundModeBox.IsEnabled = syncOn;
+        SyncTargetBox.IsEnabled = syncOn && LogoIsUsable;
         TogScreenSync.ToolTip = !_keyboardAvailable
             ? "This model has no lighting controller."
             : !_keyboardZoned
@@ -1279,14 +1303,12 @@ public partial class NitrousDashboard : Window
 
         // Lighting sync owns the LEDs while Global is open. Opening Area suspends it but keeps the
         // switches: the tray stops and the Area preset is applied. Returning to Global resumes it.
+        // Sync owns the LEDs while it runs. Switching tabs only records which preset will return
+        // when it is turned off; applying one now would be overwritten within a frame.
         if (_syncEnabled)
         {
-            SettingsManager.Save("KbSyncSuspended", global ? 0 : 1);
-            if (global)
-            {
-                SettingsManager.Save("KbLightingSource", "Global");
-                return;
-            }
+            SettingsManager.Save("KbLightingSource", global ? "Global" : "Area");
+            return;
         }
 
         if (global) ApplyGlobalLighting();
@@ -1356,8 +1378,8 @@ public partial class NitrousDashboard : Window
             if (on)
             {
                 SettingsManager.Save("KbSyncSource", source);
-                SettingsManager.Save("KbSyncSuspended", 0);
-                SettingsManager.Save("KbLightingSource", "Global");
+                SettingsManager.Save("KbLightingSource",
+                    LightingGlobalTab.IsChecked == true ? "Global" : "Area");
 
                 // A zero brightness would make either sync look broken; the slider is its cap.
                 if (_globalBrightness == 0)
@@ -1393,6 +1415,25 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges) return;
 
         SettingsManager.Save("KbSoundSensitivity", value);
+    }
+
+    private void SoundMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IgnoreLightingChanges || SoundModeBox.SelectedIndex < 0) return;
+
+        SettingsManager.Save("KbSoundMode", SoundModeBox.SelectedIndex == 0
+            ? LightingSync.SoundModePeak
+            : LightingSync.SoundModeSpectrum);
+    }
+
+    private void SyncTarget_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (IgnoreLightingChanges || SyncTargetBox.SelectedIndex < 0) return;
+
+        _syncTarget = SyncTargetBox.SelectedIndex == 0
+            ? LightingSync.TargetKeyboard
+            : LightingSync.TargetBoth;
+        SettingsManager.Save("KbSyncTarget", _syncTarget);
     }
 
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)

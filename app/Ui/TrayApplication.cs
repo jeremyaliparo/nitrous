@@ -724,13 +724,11 @@ public class TrayApplication : ApplicationContext
                         var enabled = enabledValue >= 0
                             ? enabledValue == 1
                             : SettingsManager.Get("KbScreenSync", 0) == 1;
-                        var suspended = SettingsManager.Get("KbSyncSuspended",
-                            SettingsManager.Get("KbScreenSyncSuspended", 0)) == 1;
 
-                        if (enabled && !suspended)
+                        if (enabled)
                             LightingSync.Start(SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
                         else
-                            LightingSync.Stop(restorePreset: !enabled);
+                            LightingSync.Stop(restorePreset: true);
                     }
                     catch (Exception ex)
                     {

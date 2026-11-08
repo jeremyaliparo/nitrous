@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.6 - 2026-11-08
+
+### Lighting
+
+- Sync is now one shared card under the Global/Area tabs, so it works from **Area → Keyboard**
+  as well. A **Follow** selector chooses `Keyboard` or `Keyboard + lid logo`.
+- Sound sync has **Peak** and **Spectrum** modes. Spectrum runs a 2048-point FFT on WASAPI loopback
+  and drives bass / low-mid / high-mid / treble into the four zones; Peak keeps the single
+  brightness pulse.
+- Switching Global/Area no longer suspends sync. The saved preset returns when it is turned off.
+
 ## 0.11.0-test.5 - 2026-11-08
 
 ### Lighting

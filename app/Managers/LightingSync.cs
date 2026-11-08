@@ -16,6 +16,10 @@ internal static class LightingSync
 {
     public const string SourceScreen = "Screen";
     public const string SourceSound = "Sound";
+    public const string SoundModePeak = "Peak";
+    public const string SoundModeSpectrum = "Spectrum";
+    public const string TargetBoth = "Both";
+    public const string TargetKeyboard = "Keyboard";
 
     private const int Columns = 64;
     private const int Rows = 36;
@@ -36,6 +40,9 @@ internal static class LightingSync
 
     public static string Normalize(string? source) =>
         string.Equals(source, SourceSound, StringComparison.OrdinalIgnoreCase) ? SourceSound : SourceScreen;
+
+    public static string NormalizeTarget(string? target) =>
+        string.Equals(target, TargetKeyboard, StringComparison.OrdinalIgnoreCase) ? TargetKeyboard : TargetBoth;
 
     public static void Start(string? source)
     {
@@ -100,6 +107,11 @@ internal static class LightingSync
     private static bool Paused() =>
         DateTime.UtcNow.Ticks < SettingsManager.Get("KbSyncPauseUntil", 0L);
 
+    /// <summary>Whether the lid follows the sync, or the keyboard alone.</summary>
+    private static bool WritesLogo() =>
+        !string.Equals(SettingsManager.Get("KbSyncTarget", TargetBoth), TargetKeyboard,
+            StringComparison.OrdinalIgnoreCase);
+
     private static void Loop()
     {
         try
@@ -140,7 +152,8 @@ internal static class LightingSync
                 if (!_running) break;
 
                 ReadZones(pixels, zones);
-                WriteFrame(zones, brightness, Average(pixels), frame % LogoEveryFrames == 0);
+                WriteFrame(zones, brightness, Average(pixels),
+                    frame % LogoEveryFrames == 0 && WritesLogo());
             }
 
             frame++;
@@ -150,67 +163,108 @@ internal static class LightingSync
 
     private static void SoundLoop()
     {
-        using var meter = AudioMeter.TryCreate();
-        if (meter == null)
-        {
-            Logger.Warn("Sound sync: no default audio output to meter.");
-            _running = false;
-            RestoreSavedPreset();
-            return;
-        }
-
         var color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
         var zones = Enumerable.Repeat(color, ZoneCount).ToArray();
+        var levels = new int[ZoneCount];
         var baseline = 0f;
         var pulse = 0f;
         var frame = 0;
+        var mode = "";
+        AudioMeter? meter = null;
+        SpectrumSource? spectrum = null;
+        var analyzer = new SpectrumAnalyzer();
 
-        while (_running)
+        try
         {
-            if (Paused())
+            while (_running)
             {
-                Thread.Sleep(50);
-                continue;
+                if (Paused())
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+
+                var desired = string.Equals(
+                    SettingsManager.Get("KbSoundMode", SoundModeSpectrum), SoundModePeak,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? SoundModePeak
+                    : SoundModeSpectrum;
+
+                if (!string.Equals(desired, mode, StringComparison.Ordinal))
+                {
+                    meter?.Dispose();
+                    meter = null;
+                    spectrum?.Dispose();
+                    spectrum = null;
+                    mode = desired;
+                    baseline = 0f;
+                    pulse = 0f;
+                    Array.Clear(levels);
+
+                    if (mode == SoundModePeak) meter = AudioMeter.TryCreate();
+                    else spectrum = SpectrumSource.TryCreate();
+
+                    if (meter == null && spectrum == null)
+                    {
+                        Logger.Warn($"Sound sync: no audio source for {mode}.");
+                        _running = false;
+                        RestoreSavedPreset();
+                        return;
+                    }
+                }
+
+                if (frame % 25 == 0)
+                {
+                    color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
+                    zones = Enumerable.Repeat(color, ZoneCount).ToArray();
+                }
+
+                var ceiling = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
+                var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+
+                if (mode == SoundModePeak && meter != null)
+                {
+                    var peak = meter.Peak();
+                    var transient = Math.Max(0f, peak - baseline);
+                    baseline += (peak - baseline) * 0.02f;
+                    pulse = Math.Max(transient, pulse * 0.75f);
+
+                    var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
+                    var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
+                    var brightness = (int)Math.Round(level * ceiling);
+                    for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+
+                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                        Logger.Info($"Sound sync (Peak): peak={peak:0.00} pulse={pulse:0.00} brightness={brightness}");
+                }
+                else if (spectrum != null)
+                {
+                    if (spectrum.Read(analyzer.Samples))
+                        analyzer.Analyze(spectrum.SampleRate, sensitivity, ceiling, levels);
+
+                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                        Logger.Info($"Sound sync (Spectrum): {string.Join(",", levels)}");
+                }
+
+                WriteZones(zones, levels, color, levels.Max(),
+                    frame % LogoEveryFrames == 0 && WritesLogo());
+
+                frame++;
+                Thread.Sleep(SoundRateMs);
             }
-
-            // Follow a colour change about once a second without a registry read every frame.
-            if (frame % 25 == 0)
-            {
-                color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
-                zones = Enumerable.Repeat(color, ZoneCount).ToArray();
-            }
-
-            var peak = meter.Peak();
-            var transient = Math.Max(0f, peak - baseline);
-            baseline += (peak - baseline) * 0.02f; // ~2 s at 25 Hz
-            pulse = Math.Max(transient, pulse * 0.75f); // ~0.15 s release
-
-            // A small absolute component keeps quiet, sustained music present; the transient
-            // dominates so beats are visible instead of the whole song sitting at full.
-            var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
-            var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
-            var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
-
-            var ceiling = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
-            var shaped = SoundFloorPercent + level * (100 - SoundFloorPercent);
-            var brightness = (int)Math.Round(shaped * ceiling / 100.0);
-
-            if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
-            {
-                Logger.Info($"Sound sync: peak={peak:0.00} baseline={baseline:0.00} " +
-                            $"pulse={pulse:0.00} brightness={brightness}");
-            }
-
-            WriteFrame(zones, Math.Clamp(brightness, 0, 100), color, frame % LogoEveryFrames == 0);
-
-            frame++;
-            Thread.Sleep(SoundRateMs);
+        }
+        finally
+        {
+            meter?.Dispose();
+            spectrum?.Dispose();
         }
     }
 
-    private static void WriteFrame(KeyboardColor[] zones, int brightness, KeyboardColor logo, bool writeLogo)
+    private static void WriteZones(
+        IReadOnlyList<KeyboardColor> zones, IReadOnlyList<int> levels,
+        KeyboardColor logo, int logoBrightness, bool writeLogo)
     {
-        if (!AcerKeyboard.SetZoneColors(zones, brightness) && !_writeWarned)
+        if (!AcerKeyboard.SetZoneColors(zones, levels) && !_writeWarned)
         {
             Logger.Warn("Lighting sync: the keyboard refused a frame.");
             _writeWarned = true;
@@ -219,9 +273,17 @@ internal static class LightingSync
         if (writeLogo && _logoAvailable)
         {
             _logoAvailable = AcerKeyboard.SetEffect(
-                KeyboardEffect.Static, brightness, 0, leftwards: false, logo, AcerKeyboard.LidDevice);
+                KeyboardEffect.Static, logoBrightness, 0, leftwards: false, logo, AcerKeyboard.LidDevice);
         }
     }
+
+    private static void WriteFrame(KeyboardColor[] zones, int brightness, KeyboardColor logo, bool writeLogo)
+    {
+        var levels = new int[ZoneCount];
+        for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+        WriteZones(zones, levels, logo, brightness, writeLogo);
+    }
+
 
     /// <summary>Four equal screen columns, left to right, as zone colours.</summary>
     private static void ReadZones(byte[] bgra, KeyboardColor[] zones)
@@ -442,6 +504,364 @@ internal static class LightingSync
     /// StretchBlt straight from the screen into a tiny 32-bit DIB. Scaling during the copy keeps a
     /// 1920x1080 desktop from being copied and then shrunk every frame.
     /// </summary>
+    /// <summary>
+    /// 2048-point FFT on the loopback samples, grouped into bass, low-mid, high-mid and treble.
+    /// Each band is dB-mapped, smoothed with a fast release, and written to its own zone.
+    /// </summary>
+    private sealed class SpectrumAnalyzer
+    {
+        public const int Size = 2048;
+
+        public float[] Samples { get; } = new float[Size];
+
+        private readonly double[] _real = new double[Size];
+        private readonly double[] _imaginary = new double[Size];
+        private readonly double[] _window = new double[Size];
+        private readonly float[] _bands = new float[ZoneCount];
+
+        private static readonly (double Low, double High, double Gain)[] Bands =
+        {
+            (20, 200, 0.9),
+            (200, 800, 1.0),
+            (800, 3000, 1.1),
+            (3000, 10000, 1.3)
+        };
+
+        public SpectrumAnalyzer()
+        {
+            for (var i = 0; i < Size; i++)
+                _window[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (Size - 1));
+        }
+
+        public void Analyze(int sampleRate, int sensitivity, int ceiling, int[] levels)
+        {
+            if (sampleRate <= 0 || levels.Length < Bands.Length) return;
+
+            for (var i = 0; i < Size; i++)
+            {
+                _real[i] = Samples[i] * _window[i];
+                _imaginary[i] = 0;
+            }
+
+            Fft(_real, _imaginary);
+
+            var scale = Size / 4.0; // a full-scale sine through the Hann window
+            for (var band = 0; band < Bands.Length; band++)
+            {
+                var low = Math.Max(1, (int)(Bands[band].Low * Size / sampleRate));
+                var high = Math.Min(Size / 2 - 1, (int)(Bands[band].High * Size / sampleRate));
+                if (high < low) high = low;
+
+                double sum = 0;
+                var count = 0;
+                for (var bin = low; bin <= high; bin++)
+                {
+                    var magnitude = Math.Sqrt(_real[bin] * _real[bin] + _imaginary[bin] * _imaginary[bin]);
+                    sum += magnitude * magnitude;
+                    count++;
+                }
+
+                var rms = Math.Sqrt(sum / Math.Max(1, count)) / scale;
+                var db = 20 * Math.Log10(Math.Max(rms, 1e-7));
+                var level = Math.Clamp((db + 55) / 55, 0, 1) * (sensitivity / 4.0) * Bands[band].Gain;
+                _bands[band] = (float)Math.Max(Math.Min(level, 1), _bands[band] * 0.72);
+                levels[band] = (int)Math.Round(_bands[band] * ceiling);
+            }
+        }
+
+        private static void Fft(double[] real, double[] imaginary)
+        {
+            var n = real.Length;
+            for (int i = 1, j = 0; i < n; i++)
+            {
+                var bit = n >> 1;
+                for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+                j ^= bit;
+
+                if (i >= j) continue;
+                (real[i], real[j]) = (real[j], real[i]);
+                (imaginary[i], imaginary[j]) = (imaginary[j], imaginary[i]);
+            }
+
+            for (var length = 2; length <= n; length <<= 1)
+            {
+                var angle = -2 * Math.PI / length;
+                var stepReal = Math.Cos(angle);
+                var stepImaginary = Math.Sin(angle);
+
+                for (var start = 0; start < n; start += length)
+                {
+                    double weightReal = 1, weightImaginary = 0;
+                    for (var offset = 0; offset < length / 2; offset++)
+                    {
+                        var even = start + offset;
+                        var odd = even + length / 2;
+                        var oddReal = real[odd] * weightReal - imaginary[odd] * weightImaginary;
+                        var oddImaginary = real[odd] * weightImaginary + imaginary[odd] * weightReal;
+
+                        real[odd] = real[even] - oddReal;
+                        imaginary[odd] = imaginary[even] - oddImaginary;
+                        real[even] += oddReal;
+                        imaginary[even] += oddImaginary;
+
+                        var nextReal = weightReal * stepReal - weightImaginary * stepImaginary;
+                        weightImaginary = weightReal * stepImaginary + weightImaginary * stepReal;
+                        weightReal = nextReal;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// WASAPI loopback on the default render endpoint, downmixed to mono and kept in a short ring
+    /// so the FFT always has the latest 2048 samples.
+    /// </summary>
+    private sealed class SpectrumSource : IDisposable
+    {
+        private const int Shared = 0;
+        private const uint Loopback = 0x00020000;
+        private const uint Silent = 0x0002;
+        private const int RingLength = SpectrumAnalyzer.Size * 2;
+
+        private IMMDeviceEnumerator2? _enumerator;
+        private IMMDevice2? _device;
+        private IAudioClient? _client;
+        private IAudioCaptureClient? _capture;
+        private IntPtr _format;
+        private int _channels;
+        private int _bits;
+        private readonly float[] _ring = new float[RingLength];
+        private int _write;
+        private int _count;
+        private float[] _packet = new float[4096];
+        private short[] _packet16 = new short[4096];
+
+        public int SampleRate { get; private set; }
+
+        public static SpectrumSource? TryCreate()
+        {
+            var source = new SpectrumSource();
+            try
+            {
+                source._enumerator = (IMMDeviceEnumerator2)new MMDeviceEnumerator2ComObject();
+                if (source._enumerator.GetDefaultAudioEndpoint(0, 0, out var device) != 0 || device == null)
+                    throw new InvalidOperationException("No default audio endpoint.");
+
+                source._device = device;
+                var iid = typeof(IAudioClient).GUID;
+                if (device.Activate(ref iid, 23, IntPtr.Zero, out var instance) != 0 ||
+                    instance is not IAudioClient client)
+                    throw new InvalidOperationException("No audio client.");
+
+                source._client = client;
+                if (client.GetMixFormat(out var format) != 0 || format == IntPtr.Zero)
+                    throw new InvalidOperationException("No mix format.");
+
+                source._format = format;
+                var wave = Marshal.PtrToStructure<WaveFormatEx>(format);
+                source._channels = Math.Max(1, (int)wave.Channels);
+                source.SampleRate = (int)wave.SamplesPerSec;
+                source._bits = wave.BitsPerSample;
+                if (source._bits is not (16 or 32) || source.SampleRate <= 0)
+                    throw new InvalidOperationException($"Unsupported sample format ({source._bits}-bit).");
+
+                if (client.Initialize(Shared, Loopback, 1_000_000, 0, format, IntPtr.Zero) != 0)
+                    throw new InvalidOperationException("Loopback initialise failed.");
+
+                var captureIid = typeof(IAudioCaptureClient).GUID;
+                if (client.GetService(ref captureIid, out var capturePointer) != 0 ||
+                    capturePointer == IntPtr.Zero)
+                    throw new InvalidOperationException("No capture client.");
+
+                source._capture = (IAudioCaptureClient)Marshal.GetObjectForIUnknown(capturePointer);
+                Marshal.Release(capturePointer);
+
+                if (client.Start() != 0)
+                    throw new InvalidOperationException("Loopback start failed.");
+
+                return source;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Spectrum sync: could not open WASAPI loopback ({ex.GetType().Name}).");
+                source.Dispose();
+                return null;
+            }
+        }
+
+        /// <summary>Drains the loopback packets and fills <paramref name="destination"/> with the latest mono samples.</summary>
+        public bool Read(float[] destination)
+        {
+            if (_capture == null) return false;
+
+            var appended = false;
+            while (_capture.GetNextPacketSize(out var frameCount) == 0 && frameCount > 0)
+            {
+                if (_capture.GetBuffer(out var data, out var count, out var flags, out _, out _) != 0)
+                    break;
+
+                try
+                {
+                    if ((flags & Silent) != 0 || data == IntPtr.Zero)
+                        AppendSilence(count);
+                    else
+                        Append(data, count);
+                    appended = true;
+                }
+                finally
+                {
+                    _capture.ReleaseBuffer(count);
+                }
+            }
+
+            var start = (_write - destination.Length + RingLength) % RingLength;
+            for (var i = 0; i < destination.Length; i++)
+                destination[i] = _count >= destination.Length ? _ring[(start + i) % RingLength] : 0f;
+
+            return appended;
+        }
+
+        private void Append(IntPtr data, uint frameCount)
+        {
+            var samples = (int)frameCount * _channels;
+            if (samples <= 0) return;
+
+            if (_packet.Length < samples) _packet = new float[samples];
+            if (_packet16.Length < samples) _packet16 = new short[samples];
+
+            if (_bits == 32) Marshal.Copy(data, _packet, 0, samples);
+            else
+            {
+                Marshal.Copy(data, _packet16, 0, samples);
+                for (var i = 0; i < samples; i++) _packet[i] = _packet16[i] / 32768f;
+            }
+
+            var frames = (int)frameCount;
+            for (var frame = 0; frame < frames; frame++)
+            {
+                var sum = 0f;
+                var offset = frame * _channels;
+                for (var channel = 0; channel < _channels; channel++)
+                    sum += _packet[offset + channel];
+                AppendSample(sum / _channels);
+            }
+        }
+
+        private void AppendSilence(uint frameCount)
+        {
+            for (var i = 0; i < frameCount; i++) AppendSample(0f);
+        }
+
+        private void AppendSample(float sample)
+        {
+            _ring[_write] = sample;
+            _write = (_write + 1) % RingLength;
+            if (_count < RingLength) _count++;
+        }
+
+        public void Dispose()
+        {
+            try { _client?.Stop(); } catch { }
+            Release(_capture);
+            Release(_client);
+            Release(_device);
+            Release(_enumerator);
+            _capture = null;
+            _client = null;
+            _device = null;
+            _enumerator = null;
+
+            if (_format != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(_format);
+                _format = IntPtr.Zero;
+            }
+        }
+
+        private static void Release(object? instance)
+        {
+            if (instance != null && Marshal.IsComObject(instance))
+            {
+                try { Marshal.ReleaseComObject(instance); } catch { }
+            }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 2)]
+        private struct WaveFormatEx
+        {
+            public ushort FormatTag;
+            public ushort Channels;
+            public uint SamplesPerSec;
+            public uint AvgBytesPerSec;
+            public ushort BlockAlign;
+            public ushort BitsPerSample;
+            public ushort ExtraSize;
+        }
+
+        [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+        private class MMDeviceEnumerator2ComObject
+        {
+        }
+
+        [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IMMDeviceEnumerator2
+        {
+            [PreserveSig] int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+            [PreserveSig] int GetDefaultAudioEndpoint(
+                int dataFlow, int role, [MarshalAs(UnmanagedType.Interface)] out IMMDevice2 endpoint);
+            [PreserveSig] int GetDevice(
+                [MarshalAs(UnmanagedType.LPWStr)] string id,
+                [MarshalAs(UnmanagedType.Interface)] out IMMDevice2 device);
+            [PreserveSig] int RegisterEndpointNotificationCallback(IntPtr client);
+            [PreserveSig] int UnregisterEndpointNotificationCallback(IntPtr client);
+        }
+
+        [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IMMDevice2
+        {
+            [PreserveSig] int Activate(
+                ref Guid iid, int clsCtx, IntPtr activationParams,
+                [MarshalAs(UnmanagedType.IUnknown)] out object instance);
+            [PreserveSig] int OpenPropertyStore(int access, out IntPtr properties);
+            [PreserveSig] int GetId([MarshalAs(UnmanagedType.LPWStr)] out string id);
+            [PreserveSig] int GetState(out int state);
+        }
+
+        [ComImport, Guid("1CB9AD4C-DBFA-4C32-B178-C2F568A703B2"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IAudioClient
+        {
+            [PreserveSig] int Initialize(
+                int shareMode, uint streamFlags, long bufferDuration, long periodicity,
+                IntPtr format, IntPtr sessionGuid);
+            [PreserveSig] int GetBufferSize(out uint bufferFrames);
+            [PreserveSig] int GetStreamLatency(out long latency);
+            [PreserveSig] int GetCurrentPadding(out uint padding);
+            [PreserveSig] int IsFormatSupported(int shareMode, IntPtr format, out IntPtr closest);
+            [PreserveSig] int GetMixFormat(out IntPtr format);
+            [PreserveSig] int GetDevicePeriod(out long defaultPeriod, out long minimumPeriod);
+            [PreserveSig] int Start();
+            [PreserveSig] int Stop();
+            [PreserveSig] int Reset();
+            [PreserveSig] int SetEventHandle(IntPtr handle);
+            [PreserveSig] int GetService(ref Guid iid, out IntPtr service);
+        }
+
+        [ComImport, Guid("C8ADBD64-E71E-48A0-A4DE-185C395CD317"),
+         InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IAudioCaptureClient
+        {
+            [PreserveSig] int GetBuffer(
+                out IntPtr data, out uint frameCount, out uint flags,
+                out ulong devicePosition, out ulong qpcPosition);
+            [PreserveSig] int ReleaseBuffer(uint frameCount);
+            [PreserveSig] int GetNextPacketSize(out uint frameCount);
+        }
+    }
+
     private sealed class ScreenCapture : IDisposable
     {
         private readonly int _width;
