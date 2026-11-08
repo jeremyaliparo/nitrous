@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 11,
+            ["probeVersion"] = 12,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -524,6 +524,7 @@ public static class EcProbe
         {
             var capabilities = AcerCapabilitiesProvider.Current;
             result["smbiosKeyboardColour"] = capabilities.Smbios.KeyboardColor;
+            result["smbiosKeyboardType"] = capabilities.Smbios.KeyboardType;
             result["ecHidPresent"] = capabilities.EcHid != null;
         }
         catch (Exception ex)
@@ -539,6 +540,44 @@ public static class EcProbe
         {
             errors.Add($"keyboardBacklight/eNek: {ex.Message}");
         }
+
+        // The two user-mode brightness paths, read-only: the EC HID interface keeps the brightness
+        // and timeout in one record, APGeAction keeps them in byte 4 and byte 5 of its answer.
+        (int Brightness, int TimeoutSeconds)? ecBacklight = null;
+        try
+        {
+            ecBacklight = AcerWmiManager.GetKeyboardBacklightTimeout();
+            result["ecHidBacklight"] = new Dictionary<string, object?>
+            {
+                ["responds"] = ecBacklight is not null,
+                ["brightness"] = ecBacklight?.Brightness,
+                ["timeoutSeconds"] = ecBacklight?.TimeoutSeconds
+            };
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"keyboardBacklight/ecHid: {ex.Message}");
+        }
+
+        (int Brightness, int TimeoutSeconds)? wmiBacklight = null;
+        try
+        {
+            wmiBacklight = AcerWmiManager.GetWmiKeyboardBacklight();
+            result["apgeBacklight"] = new Dictionary<string, object?>
+            {
+                ["responds"] = wmiBacklight is not null,
+                ["brightness"] = wmiBacklight?.Brightness,
+                ["timeoutSeconds"] = wmiBacklight?.TimeoutSeconds
+            };
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"keyboardBacklight/apge: {ex.Message}");
+        }
+
+        result["brightnessPath"] = ecBacklight is not null ? "EcHid"
+            : wmiBacklight is not null ? "Wmi"
+            : "None";
 
         WithGamingInstance(instance =>
         {
@@ -1087,6 +1126,17 @@ public static class EcProbe
             sb.AppendLine();
         }
 
+        if (report.GetValueOrDefault("keyboardBacklight") is Dictionary<string, object?> keyboard)
+        {
+            sb.AppendLine("Keyboard backlight");
+            sb.AppendLine($"  smbios type/colour : {keyboard.GetValueOrDefault("smbiosKeyboardType")} / " +
+                          $"{keyboard.GetValueOrDefault("smbiosKeyboardColour")}");
+            sb.AppendLine($"  EC HID             : {FormatBacklight(keyboard.GetValueOrDefault("ecHidBacklight"))}");
+            sb.AppendLine($"  APGeAction         : {FormatBacklight(keyboard.GetValueOrDefault("apgeBacklight"))}");
+            sb.AppendLine($"  brightness path    : {keyboard.GetValueOrDefault("brightnessPath")}");
+            sb.AppendLine();
+        }
+
         if (report.GetValueOrDefault("profiles") is Dictionary<string, object?> profiles)
         {
             var names = profiles.GetValueOrDefault("supportedProfilesNames") as string[]
@@ -1121,4 +1171,9 @@ public static class EcProbe
         null => "unavailable",
         _ => value.ToString() ?? "unavailable"
     };
+
+    private static string FormatBacklight(object? value) =>
+        value is Dictionary<string, object?> state && state.GetValueOrDefault("responds") is true
+            ? $"{state.GetValueOrDefault("brightness")}% / {state.GetValueOrDefault("timeoutSeconds")}s"
+            : "no answer";
 }

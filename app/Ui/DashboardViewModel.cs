@@ -503,6 +503,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 await AcerWmiManager.SetPowerModeAsync(mode);
 
+                // The request lives in settings; show it now rather than on the next sync tick.
+                WhisperModeActive = SettingsManager.Get("WhisperActive", 0) == 1;
+
                 if (ManageCpuPower)
                     await CpuPowerManager.ApplyProfileLimitsAsync(mode, isOnline);
 

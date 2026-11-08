@@ -325,24 +325,100 @@ public static class AcerWmiManager
 
     /// <summary>
     /// Enables or disables the 30-second keyboard backlight auto-off. The write carries the brightness
-    /// as well, so the value is built the way Acer's agent builds it, and the result is read back:
-    /// a write that the firmware ignores is reported as a failure rather than shown as applied.
+    /// as well, so the level in use is preserved instead of resetting the keyboard to full.
     /// </summary>
-    public static bool SetKeyboardAutoOff(bool enabled)
+    public static bool SetKeyboardAutoOff(bool enabled, int? brightness = null)
     {
         var hotkey = KeyboardAutoOffHotkey();
+        var level = NearestKeyboardBrightness(brightness ?? GetWmiKeyboardBacklight()?.Brightness ?? 100);
+        var seconds = enabled ? 30 : 0;
 
-        var value = (((ulong)KeyboardAutoOffBrightness << 24) | (uint)hotkey) << 8
-                    | (enabled ? KeyboardAutoOffEnable : KeyboardAutoOffDisable);
+        var value = ((ulong)level << 32) | ((ulong)hotkey << 8) | ((ulong)seconds << 40)
+                    | KeyboardAutoOffFlags;
 
         if (!TryWriteActionFunction(value)) return false;
 
         return GetKeyboardAutoOff() == enabled;
     }
 
-    private const int KeyboardAutoOffBrightness = 100;
-    private const ulong KeyboardAutoOffEnable = 0x1E0000080002;
-    private const ulong KeyboardAutoOffDisable = 0x00080002;
+    /// <summary>The firmware's keyboard brightness steps; 0 is off.</summary>
+    public static IReadOnlyList<int> KeyboardBrightnessLevels { get; } = [0, 25, 50, 75, 100];
+
+    /// <summary>The nearest level the firmware keeps; anything else is discarded or coerced.</summary>
+    public static int NearestKeyboardBrightness(int percent) =>
+        KeyboardBrightnessLevels.MinBy(level => Math.Abs(level - percent));
+
+    /// <summary>Where the backlight brightness can be set on this model.</summary>
+    public enum KeyboardBacklightPath
+    {
+        None,
+        EcHid,
+        Wmi
+    }
+
+    /// <summary>The first path that answers, in the order Nitrous prefers.</summary>
+    public static KeyboardBacklightPath GetKeyboardBacklightPath() =>
+        GetKeyboardBacklightTimeout() is not null ? KeyboardBacklightPath.EcHid
+        : GetWmiKeyboardBacklight() is not null ? KeyboardBacklightPath.Wmi
+        : KeyboardBacklightPath.None;    /// <summary>
+    /// The brightness and timeout <c>APGeAction</c> keeps (byte 4 and byte 5 of the answer), or null
+    /// when this model does not answer. Powers the WMI-only models (ANV15-41 and similar).
+    /// </summary>
+    public static (int Brightness, int TimeoutSeconds)? GetWmiKeyboardBacklight()
+    {
+        var hotkey = KeyboardAutoOffHotkey();
+        if (!TryReadActionFunction((uint)((hotkey << 8) | 0x80001), out var raw))
+            return null;
+
+        return ((int)((raw >> 32) & 0xFF), (int)((raw >> 40) & 0xFF));
+    }
+
+    /// <summary>
+    /// Sets the brightness through <c>APGeAction</c>, keeping the timeout it reports, and verifies the
+    /// level by reading it back.
+    /// </summary>
+    public static bool SetWmiKeyboardBrightness(int brightness)
+    {
+        var hotkey = KeyboardAutoOffHotkey();
+        var level = NearestKeyboardBrightness(brightness);
+        var timeout = GetWmiKeyboardBacklight()?.TimeoutSeconds ?? 0;
+
+        var value = ((ulong)level << 32) | ((ulong)hotkey << 8) | ((ulong)timeout << 40)
+                    | KeyboardAutoOffFlags;
+
+        if (!TryWriteActionFunction(value)) return false;
+
+        return GetWmiKeyboardBacklight() is { } after && after.Brightness == level;
+    }
+
+    /// <summary>
+    /// Sets the keyboard brightness on whichever path this model has: the EC HID interface first,
+    /// then <c>APGeAction</c>. The level is snapped to what the firmware keeps.
+    /// </summary>
+    public static bool SetKeyboardBrightness(int brightness)
+    {
+        var level = NearestKeyboardBrightness(brightness);
+
+        try
+        {
+            using var hid = AcerEcHid.Open();
+            if (hid != null)
+            {
+                // The write carries the timeout too, so keep the one the controller reports.
+                var timeout = hid.ReadBacklightTimeout()?.TimeoutSeconds ?? 0;
+                if (hid.WriteBacklightTimeout(level, timeout)) return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Keyboard: could not set the brightness over the EC HID.", ex);
+            AcerCapabilitiesProvider.Invalidate();
+        }
+
+        return SetWmiKeyboardBrightness(level);
+    }
+
+    private const ulong KeyboardAutoOffFlags = 0x00080002;
 
     /// <summary>
     /// The second byte of the command. Acer keeps it in the registry and both machines tested use

@@ -74,6 +74,9 @@ public sealed record AcerSmbios(
     /// <summary>1 single colour, 2 RGB; null when the record is absent.</summary>
     public ushort? KeyboardColor => Gaming(AcerGamingRecord.KeyboardColor);
 
+    /// <summary>1, 3 or 4: a keyboard driven by the embedded controller; null when absent.</summary>
+    public ushort? KeyboardType => Gaming(AcerGamingRecord.KeyboardType);
+
     /// <summary>A record's value; null when it is missing or reads 0xFF ("not present").</summary>
     public ushort? Gaming(AcerGamingRecord record) =>
         GamingRecords.Where(r => r.Id == (byte)record)

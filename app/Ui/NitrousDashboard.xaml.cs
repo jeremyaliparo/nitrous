@@ -121,6 +121,13 @@ public partial class NitrousDashboard : Window
         if (!IsVisible || WindowState == WindowState.Minimized || DataContext is not DashboardViewModel)
             return;
 
+        // The tray, a hotkey or another process may have asked for (or released) WhisperMode
+        // without changing the mode, fan or refresh. That request is a registry flag, so follow
+        // it every tick rather than only when one of the other values moves.
+        var whisperActive = SettingsManager.Get("WhisperActive", 0) == 1;
+        if (DataContext is DashboardViewModel whisperVm && whisperVm.WhisperModeActive != whisperActive)
+            whisperVm.WhisperModeActive = whisperActive;
+
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile fan)
             ? fan
@@ -844,6 +851,11 @@ public partial class NitrousDashboard : Window
     private bool _keyboardTimeoutAvailable;
     private bool _keyboardAutoOffViaWmi;
 
+    /// <summary>Brightness on models with no lighting controller: EC HID or APGeAction.</summary>
+    private bool _keyboardBrightnessAvailable;
+    private bool _keyboardBrightnessViaWmi;
+    private int _keyboardBrightnessLevel = 100;
+
     /// <summary>
     /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
     /// separate HID device; models without it keep the card visible but disabled.
@@ -978,6 +990,40 @@ public partial class NitrousDashboard : Window
             : timeoutRefused
                 ? "This keyboard controller does not store an auto-off."
                 : "Nitrous cannot reach this setting on this model; the OEM software may still offer it.";
+
+        // Brightness on a model with no lighting controller. The EC HID keeps it on the newer units;
+        // APGeAction keeps it on the WMI-only ones. ENEK models already have it on the LIGHT page.
+        var wmiBrightness = _keyboardTimeoutAvailable ? null : AcerWmiManager.GetWmiKeyboardBacklight();
+        _keyboardBrightnessViaWmi = wmiBrightness is not null;
+        _keyboardBrightnessAvailable = !_keyboardAvailable &&
+            (_keyboardTimeoutAvailable || _keyboardBrightnessViaWmi);
+
+        var savedBrightness = SettingsManager.Get("KbBrightLevel", 100);
+        if (_keyboardBrightnessViaWmi && wmiBrightness is { } wmiReported &&
+            AcerWmiManager.KeyboardBrightnessLevels.Contains(wmiReported.Brightness))
+        {
+            // The firmware's own level is the truth where it reports one of the steps.
+            savedBrightness = wmiReported.Brightness;
+        }
+
+        _keyboardBrightnessLevel = AcerWmiManager.NearestKeyboardBrightness(savedBrightness);
+
+        var brightnessLevels = AcerWmiManager.KeyboardBrightnessLevels;
+        foreach (var level in brightnessLevels)
+            KeyboardBrightnessBox.Items.Add(level == 0 ? "Off" : $"{level}%");
+
+        for (var i = 0; i < brightnessLevels.Count; i++)
+        {
+            if (brightnessLevels[i] != _keyboardBrightnessLevel) continue;
+
+            KeyboardBrightnessBox.SelectedIndex = i;
+            break;
+        }
+
+        KeyboardBrightnessCard.Visibility = _keyboardBrightnessAvailable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        KeyboardBrightnessBox.IsEnabled = _keyboardBrightnessAvailable;
 
         UpdateZoneButtons();
 
@@ -1499,6 +1545,22 @@ public partial class NitrousDashboard : Window
         ApplyKeyboardLighting();
     }
 
+    private void KeyboardBrightness_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_keyboardLoading || KeyboardBrightnessBox.SelectedIndex < 0) return;
+
+        var levels = AcerWmiManager.KeyboardBrightnessLevels;
+        var index = Math.Clamp(KeyboardBrightnessBox.SelectedIndex, 0, levels.Count - 1);
+        var level = levels[index];
+
+        _keyboardBrightnessLevel = level;
+        SettingsManager.Save("KbBrightLevel", level);
+
+        KeyboardBrightnessStatus.Text = AcerWmiManager.SetKeyboardBrightness(level)
+            ? string.Empty
+            : "Brightness refused";
+    }
+
     private async void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_keyboardLoading || KeyboardTimeoutBox.SelectedIndex < 0) return;
@@ -1513,7 +1575,8 @@ public partial class NitrousDashboard : Window
             // This model keeps the setting as a firmware timeout reachable over APGeAction, and it
             // only offers 30 seconds or never. SetKeyboardAutoOff reads the value back, so a write
             // the firmware ignores is reported rather than shown as applied.
-            KeyboardTimeoutStatus.Text = AcerWmiManager.SetKeyboardAutoOff(seconds != 0)
+            KeyboardTimeoutStatus.Text = AcerWmiManager.SetKeyboardAutoOff(
+                seconds != 0, _keyboardBrightnessAvailable ? _keyboardBrightnessLevel : null)
                 ? string.Empty
                 : "Auto-off refused";
 
@@ -1522,7 +1585,8 @@ public partial class NitrousDashboard : Window
 
         try
         {
-            if (!AcerWmiManager.SetKeyboardBacklightTimeout(seconds))
+            if (!AcerWmiManager.SetKeyboardBacklightTimeout(
+                    seconds, _keyboardBrightnessAvailable ? _keyboardBrightnessLevel : null))
             {
                 KeyboardTimeoutStatus.Text = "Auto-off refused";
                 return;
