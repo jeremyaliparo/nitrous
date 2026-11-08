@@ -756,8 +756,10 @@ public partial class NitrousDashboard : Window
     private int _globalBrightness = 100;
     private int _globalSpeed = 4;
 
-    /// <summary>Software screen-sync effect, run by the tray. The dashboard only owns the toggle.</summary>
-    private bool _screenSync;
+    /// <summary>Software screen/audio sync, run by the tray. The dashboard only owns the switches.</summary>
+    private bool _syncEnabled;
+    private string _syncSource = LightingSync.SourceScreen;
+    private bool _syncToggleUpdating;
 
     private KeyboardEffect _logoEffect = KeyboardEffect.Static;
     private KeyboardColor _logoColor = KeyboardColor.FromHex("#B388FF");
@@ -926,13 +928,32 @@ public partial class NitrousDashboard : Window
         _blinkOnModeChange = SettingsManager.Get("KbBlinkOnMode", true);
         TogBlinkOnMode.IsChecked = _blinkOnModeChange;
 
-        // The worker lives in the tray; this toggle only writes the request. Area suspends it
-        // without losing the preference: switching back to Global resumes the same switch state.
-        _screenSync = SettingsManager.Get("KbScreenSync", 0) == 1;
-        TogScreenSync.IsChecked = _screenSync;
-        if (_screenSync)
+        // The worker lives in the tray; these switches only write the request. Area suspends it
+        // without losing the preference: switching back to Global resumes the same source.
+        var syncEnabled = SettingsManager.Get("KbSyncEnabled", -1);
+        if (syncEnabled < 0)
         {
-            SettingsManager.Save("KbScreenSyncSuspended",
+            // Migration from the screen-only prototype.
+            syncEnabled = SettingsManager.Get("KbScreenSync", 0) == 1 ? 1 : 0;
+            SettingsManager.Save("KbSyncEnabled", syncEnabled);
+            if (syncEnabled == 1) SettingsManager.Save("KbSyncSource", LightingSync.SourceScreen);
+        }
+
+        _syncEnabled = syncEnabled == 1;
+        _syncSource = LightingSync.Normalize(
+            SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
+
+        // Carry the old suspension flag over once, then keep only the new key.
+        var suspended = SettingsManager.Get("KbSyncSuspended",
+            SettingsManager.Get("KbScreenSyncSuspended", 0));
+        SettingsManager.Save("KbSyncSuspended", suspended);
+
+        TogScreenSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceScreen;
+        TogSoundSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceSound;
+
+        if (_syncEnabled)
+        {
+            SettingsManager.Save("KbSyncSuspended",
                 LightingAreaTab.IsChecked == true ? 1 : 0);
             if (LightingGlobalTab.IsChecked == true)
                 SettingsManager.Save("KbLightingSource", "Global");
@@ -1180,21 +1201,30 @@ public partial class NitrousDashboard : Window
         var globalAnimated = IsAnimated(_globalEffect);
         var globalHasColour = _globalEffect == KeyboardEffect.Static;
 
-        GlobalEffectBox.IsEnabled = _keyboardAvailable && !_screenSync;
+        var syncOn = _syncEnabled;
+
+        GlobalEffectBox.IsEnabled = _keyboardAvailable && !syncOn;
         GlobalBrightness.IsEnabled = _keyboardAvailable;
-        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && !_screenSync;
+        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && !syncOn;
         GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
 
-        TogScreenSync.IsEnabled = _keyboardAvailable && _keyboardZoned;
+        var syncAvailable = _keyboardAvailable && _keyboardZoned;
+        TogScreenSync.IsEnabled = syncAvailable;
+        TogSoundSync.IsEnabled = syncAvailable;
         TogScreenSync.ToolTip = !_keyboardAvailable
             ? "This model has no lighting controller."
             : !_keyboardZoned
                 ? "Screen sync needs the four-zone lighting controller."
                 : null;
+        TogSoundSync.ToolTip = !_keyboardAvailable
+            ? "This model has no lighting controller."
+            : !_keyboardZoned
+                ? "Sound sync needs the four-zone lighting controller."
+                : null;
 
         // The animated effects run their own palette, so a chosen colour does nothing for either
         // device. It is greyed to "Auto" rather than left looking usable.
-        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour && !_screenSync;
+        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour && !syncOn;
         GlobalColorBtn.ToolTip = globalHasColour
             ? "Keyboard and cover-logo colour"
             : "Only Static uses a chosen colour; the animated effects run their own palette.";
@@ -1240,11 +1270,11 @@ public partial class NitrousDashboard : Window
         // Not during load: the first apply is done deliberately at the end of initialisation.
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
-        // Screen sync owns the LEDs while Global is open. Opening Area suspends it but keeps the
-        // switch: the tray stops and the Area preset is applied. Returning to Global resumes it.
-        if (_screenSync)
+        // Lighting sync owns the LEDs while Global is open. Opening Area suspends it but keeps the
+        // switches: the tray stops and the Area preset is applied. Returning to Global resumes it.
+        if (_syncEnabled)
         {
-            SettingsManager.Save("KbScreenSyncSuspended", global ? 0 : 1);
+            SettingsManager.Save("KbSyncSuspended", global ? 0 : 1);
             if (global)
             {
                 SettingsManager.Save("KbLightingSource", "Global");
@@ -1296,22 +1326,62 @@ public partial class NitrousDashboard : Window
 
     private void ScreenSync_Toggled(object sender, RoutedEventArgs e)
     {
-        if (IgnoreLightingChanges) return;
+        if (!IgnoreLightingChanges && !_syncToggleUpdating)
+            SetSyncToggle(LightingSync.SourceScreen, TogScreenSync.IsChecked == true);
+    }
 
-        _screenSync = TogScreenSync.IsChecked == true;
-        SettingsManager.Save("KbScreenSync", _screenSync ? 1 : 0);
-        SettingsManager.Save("KbScreenSyncSuspended", 0);
-        if (_screenSync) SettingsManager.Save("KbLightingSource", "Global");
+    private void SoundSync_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!IgnoreLightingChanges && !_syncToggleUpdating)
+            SetSyncToggle(LightingSync.SourceSound, TogSoundSync.IsChecked == true);
+    }
+
+    /// <summary>The two switches are one source: turning one on turns the other off.</summary>
+    private void SetSyncToggle(string source, bool on)
+    {
+        _syncToggleUpdating = true;
+        try
+        {
+            _syncEnabled = on;
+            if (on) _syncSource = source;
+
+            SettingsManager.Save("KbSyncEnabled", on ? 1 : 0);
+            if (on)
+            {
+                SettingsManager.Save("KbSyncSource", source);
+                SettingsManager.Save("KbSyncSuspended", 0);
+                SettingsManager.Save("KbLightingSource", "Global");
+
+                // A zero brightness would make either sync look broken; the slider is its cap.
+                if (_globalBrightness == 0)
+                {
+                    _globalBrightness = 100;
+                    GlobalBrightness.Value = 100;
+                    GlobalBrightnessText.Text = "100%";
+                    SettingsManager.Save("KbGlobal_Brightness", 100);
+                }
+            }
+
+            TogScreenSync.IsChecked = on && source == LightingSync.SourceScreen;
+            TogSoundSync.IsChecked = on && source == LightingSync.SourceSound;
+        }
+        finally
+        {
+            _syncToggleUpdating = false;
+        }
+
         UpdateLightingInteractivity();
 
-        KeyboardLightingStatus.Text = _screenSync
-            ? "Screen sync — the tray follows the screen"
+        KeyboardLightingStatus.Text = on
+            ? source == LightingSync.SourceSound
+                ? "Sound sync — the tray follows the audio"
+                : "Screen sync — the tray follows the screen"
             : string.Empty;
     }
 
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0 || _screenSync) return;
+        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0 || _syncEnabled) return;
 
         _globalEffect = KeyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
         SettingsManager.Save("KbGlobal_Effect", KeyboardEffects[GlobalEffectBox.SelectedIndex].Name);
@@ -1326,7 +1396,7 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbGlobal_Brightness", _globalBrightness);
-        if (_screenSync) return;
+        if (_syncEnabled) return;
 
         ApplyGlobalLighting();
     }
@@ -1338,14 +1408,14 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbGlobal_Speed", _globalSpeed);
-        if (_screenSync) return;
+        if (_syncEnabled) return;
 
         ApplyGlobalLighting();
     }
 
     private void GlobalColor_Click(object sender, RoutedEventArgs e)
     {
-        if (_screenSync || !_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
+        if (_syncEnabled || !_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
         if (PickColour(_globalColor) is not { } chosen) return;
 
         _globalColor = chosen;

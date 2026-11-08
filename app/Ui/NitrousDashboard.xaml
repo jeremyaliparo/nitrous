@@ -1330,6 +1330,13 @@
 								</StackPanel>
 								<CheckBox x:Name="TogScreenSync" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="ScreenSync_Toggled" Unchecked="ScreenSync_Toggled"/>
 							</Grid>
+							<Grid Margin="0,8,0,0">
+								<StackPanel VerticalAlignment="Center" Margin="0,0,58,0">
+									<TextBlock Text="Sound sync" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11"/>
+									<TextBlock Text="Pulses with the system audio. Software effect; runs while Nitrous is in the tray. Area pauses it." Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
+								</StackPanel>
+								<CheckBox x:Name="TogSoundSync" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="SoundSync_Toggled" Unchecked="SoundSync_Toggled"/>
+							</Grid>
 							<TextBlock Text="Switching tabs applies that preset. Colour applies to Static only." Foreground="{DynamicResource TextDimBrush}" FontSize="10" Margin="0,10,0,0" TextWrapping="Wrap"/>
 						</StackPanel>
 					</Border>

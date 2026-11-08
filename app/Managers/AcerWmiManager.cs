@@ -161,7 +161,7 @@ public static class AcerWmiManager
         if (!AcerKeyboard.IsAvailable()) return;
 
         // Keep the software sync off the LEDs while the controller plays the acknowledgement.
-        ScreenSync.Pause(1500);
+        LightingSync.Pause(1500);
 
         lock (FlashGate)
         {

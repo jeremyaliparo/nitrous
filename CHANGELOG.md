@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.4 - 2026-11-08
+
+### Lighting
+
+- **Sound sync** on the LIGHT page under Global: the keyboard and cover logo pulse with the default
+  audio output (system audio, not the microphone). It is a software effect like screen sync, runs in
+  the tray, and the two sources are mutually exclusive.
+- Both syncs now share one tray worker, restore path and power-mode pause. Turning either on raises a
+  zero brightness to 100 so the effect is visible.
+- Settings are unified as `KbSyncEnabled`/`KbSyncSource`; the screen-only prototype keys migrate on
+  first launch.
+
 ## 0.11.0-test.3 - 2026-11-08
 
 ### Lighting

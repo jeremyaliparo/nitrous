@@ -708,9 +708,9 @@ public class TrayApplication : ApplicationContext
             catch (OperationCanceledException) { }
         });
 
-        // Screen sync: a software effect that rewrites the four zones from the screen. It lives
-        // here, not in the dashboard, because the dashboard may be closed. The dashboard only
-        // writes KbScreenSync.
+        // Lighting sync: a software effect that rewrites the zones from the screen or the audio
+        // meter. It lives here, not in the dashboard, because the dashboard may be closed. The
+        // dashboard only writes KbSyncEnabled/KbSyncSource.
         Task.Run(async () =>
         {
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
@@ -720,15 +720,21 @@ public class TrayApplication : ApplicationContext
                 {
                     try
                     {
-                        var enabled = SettingsManager.Get("KbScreenSync", 0) == 1;
-                        var suspended = SettingsManager.Get("KbScreenSyncSuspended", 0) == 1;
+                        var enabledValue = SettingsManager.Get("KbSyncEnabled", -1);
+                        var enabled = enabledValue >= 0
+                            ? enabledValue == 1
+                            : SettingsManager.Get("KbScreenSync", 0) == 1;
+                        var suspended = SettingsManager.Get("KbSyncSuspended",
+                            SettingsManager.Get("KbScreenSyncSuspended", 0)) == 1;
 
-                        if (enabled && !suspended) ScreenSync.Start();
-                        else ScreenSync.Stop(restorePreset: !enabled);
+                        if (enabled && !suspended)
+                            LightingSync.Start(SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
+                        else
+                            LightingSync.Stop(restorePreset: !enabled);
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn("Screen sync: supervisor tick failed.", ex);
+                        Logger.Warn("Lighting sync: supervisor tick failed.", ex);
                     }
 
                     await timer.WaitForNextTickAsync(_engineCts.Token);
@@ -737,7 +743,7 @@ public class TrayApplication : ApplicationContext
             catch (OperationCanceledException) { }
             finally
             {
-                ScreenSync.Stop();
+                LightingSync.Stop();
             }
         });
 
@@ -794,7 +800,7 @@ public class TrayApplication : ApplicationContext
 
         _shuttingDown = true;
         _engineCts.Cancel();
-        ScreenSync.Stop();
+        LightingSync.Stop();
         _nitroHook.Dispose();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
 
