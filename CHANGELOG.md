@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.14 - 2026-11-08
+
+### Lighting
+
+- Screen sync gains **Pulse with sound**: the screen still supplies the four zone colours, while the
+  system-audio envelope scales their brightness at 25 Hz. Silence falls to a 10% glow, and the shared
+  Sound sensitivity sets the pulse strength. The screen is recaptured every third pulse frame, so
+  colours update at ~8 fps without slowing the beat.
+
 ## 0.11.0-test.13 - 2026-11-08
 
 ### Lighting

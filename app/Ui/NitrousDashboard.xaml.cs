@@ -761,6 +761,7 @@ public partial class NitrousDashboard : Window
     private string _syncSource = LightingSync.SourceScreen;
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
+    private bool _screenPulse;
     private bool _globalEffectsFiltered;
     private bool _updatingGlobalEffects;
 
@@ -960,6 +961,9 @@ public partial class NitrousDashboard : Window
             SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen));
         _syncTarget = LightingSync.NormalizeTarget(
             SettingsManager.Get("KbSyncTarget", LightingSync.TargetBoth));
+
+        _screenPulse = SettingsManager.Get("KbScreenPulse", 0) == 1;
+        TogScreenPulse.IsChecked = _screenPulse;
 
         var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
         SoundSensitivity.Value = sensitivity;
@@ -1312,12 +1316,16 @@ public partial class NitrousDashboard : Window
         SoundModeRow.Visibility = syncOn && _syncSource == LightingSync.SourceSound
             ? Visibility.Visible
             : Visibility.Collapsed;
-        SoundSensitivityRow.Visibility = syncOn && _syncSource == LightingSync.SourceSound
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        SoundSensitivityRow.Visibility =
+            (syncOn && _syncSource == LightingSync.SourceSound) ||
+            (screenSync && _screenPulse)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         ScreenSaturationRow.Visibility = syncOn && _syncSource == LightingSync.SourceScreen
             ? Visibility.Visible
             : Visibility.Collapsed;
+        ScreenPulseRow.Visibility = screenSync ? Visibility.Visible : Visibility.Collapsed;
+        TogScreenPulse.IsEnabled = screenSync;
         SyncTargetRow.Visibility = syncOn ? Visibility.Visible : Visibility.Collapsed;
 
         // A model without a lid cannot follow it; fall back to the keyboard rather than writing
@@ -1472,6 +1480,15 @@ public partial class NitrousDashboard : Window
     {
         if (!IgnoreLightingChanges && !_syncToggleUpdating)
             SetSyncToggle(LightingSync.SourceScreen, TogScreenSync.IsChecked == true);
+    }
+
+    private void ScreenPulse_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (IgnoreLightingChanges) return;
+
+        _screenPulse = TogScreenPulse.IsChecked == true;
+        SettingsManager.Save("KbScreenPulse", _screenPulse ? 1 : 0);
+        UpdateLightingInteractivity();
     }
 
     private void SoundSync_Toggled(object sender, RoutedEventArgs e)

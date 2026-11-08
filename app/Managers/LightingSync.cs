@@ -29,6 +29,7 @@ internal static class LightingSync
     private const int SoundRateMs = 40;
     private const int LogoEveryFrames = 4;
     private const int SoundFloorPercent = 0;
+    private const int HybridFloorPercent = 10;
 
     private static readonly object Gate = new();
     private static Thread? _thread;
@@ -182,34 +183,89 @@ internal static class LightingSync
     {
         using var capture = new ScreenCapture(Columns, Rows);
         var zones = new KeyboardColor[ZoneCount];
+        var logo = KeyboardColor.White;
+        var baseline = 0f;
+        var pulse = 0f;
         var frame = 0;
+        AudioMeter? meter = null;
+        var meterWarned = false;
 
-        while (_running)
+        try
         {
-            if (Paused())
+            while (_running)
             {
-                Thread.Sleep(50);
-                continue;
-            }
+                if (Paused())
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
 
-            var rate = Math.Clamp(
-                SettingsManager.Get("KbSyncRate",
-                    SettingsManager.Get("KbScreenSyncRate", ScreenRateMs)),
-                80, 500);
-            var brightness = BaseBrightness();
-            var saturation = Math.Clamp(SettingsManager.Get("KbSyncSaturation", 100), 0, 200) / 100f;
+                var wanted = SettingsManager.Get("KbScreenPulse", 0) == 1;
+                if (wanted && meter == null && !meterWarned)
+                {
+                    meter = AudioMeter.TryCreate();
+                    if (meter == null)
+                    {
+                        Logger.Warn("Screen sync: no audio output for the pulse.");
+                        meterWarned = true;
+                    }
+                }
+                else if (!wanted && meter != null)
+                {
+                    meter.Dispose();
+                    meter = null;
+                    meterWarned = false;
+                    baseline = 0f;
+                    pulse = 0f;
+                }
 
-            if (capture.TryCapture(out var pixels))
-            {
-                if (!_running) break;
+                var pulseOn = wanted && meter != null;
+                var rate = pulseOn
+                    ? SoundRateMs
+                    : Math.Clamp(SettingsManager.Get("KbSyncRate",
+                        SettingsManager.Get("KbScreenSyncRate", ScreenRateMs)), 80, 500);
+                var saturation = Math.Clamp(
+                    SettingsManager.Get("KbSyncSaturation", 100), 0, 200) / 100f;
+                var cap = BaseBrightness();
 
-                ReadZones(pixels, zones, saturation);
-                WriteFrame(zones, brightness, Average(pixels, saturation),
+                // At 25 Hz the pulse is smooth; the screen only needs a new frame every third one.
+                if (frame % (pulseOn ? 3 : 1) == 0 && capture.TryCapture(out var pixels))
+                {
+                    if (!_running) break;
+
+                    ReadZones(pixels, zones, saturation);
+                    logo = Average(pixels, saturation);
+                }
+
+                var brightness = cap;
+                if (pulseOn && meter != null)
+                {
+                    var peak = meter.Peak();
+                    var transient = Math.Max(0f, peak - baseline);
+                    baseline += (peak - baseline) * 0.02f; // ~2 s at 25 Hz
+                    pulse = Math.Max(transient, pulse * 0.75f);
+
+                    var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+                    var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
+                    var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
+                    brightness = (int)Math.Round(
+                        (HybridFloorPercent + level * (100 - HybridFloorPercent)) * cap / 100.0);
+
+                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                        Logger.Info($"Screen sync (pulse): peak={peak:0.00} " +
+                                    $"pulse={pulse:0.00} brightness={brightness}");
+                }
+
+                WriteFrame(zones, Math.Clamp(brightness, 0, 100), logo,
                     frame % LogoEveryFrames == 0 && WritesLogo());
-            }
 
-            frame++;
-            Thread.Sleep(rate);
+                frame++;
+                Thread.Sleep(rate);
+            }
+        }
+        finally
+        {
+            meter?.Dispose();
         }
     }
 
