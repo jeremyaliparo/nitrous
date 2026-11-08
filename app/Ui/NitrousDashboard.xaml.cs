@@ -1260,12 +1260,16 @@ public partial class NitrousDashboard : Window
                 : null;
 
         // The animated effects run their own palette, so a chosen colour does nothing for either
-        // device. It is greyed to "Auto" rather than left looking usable.
-        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour && !syncOn;
-        GlobalColorBtn.ToolTip = globalHasColour
-            ? "Keyboard and cover-logo colour"
-            : "Only Static uses a chosen colour; the animated effects run their own palette.";
-        if (globalHasColour) PaintColourButton(GlobalColorBtn, _globalColor);
+        // device. It is greyed to "Auto" rather than left looking usable. While a sync is on the
+        // colour is its base, so it stays editable even for an animated preset.
+        var globalColourEditable = globalHasColour || syncOn;
+        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalColourEditable;
+        GlobalColorBtn.ToolTip = syncOn
+            ? "The sync uses this as its base colour."
+            : globalHasColour
+                ? "Keyboard and cover-logo colour"
+                : "Only Static uses a chosen colour; the animated effects run their own palette.";
+        if (globalColourEditable) PaintColourButton(GlobalColorBtn, _globalColor);
         else PaintColourButton(GlobalColorBtn, new KeyboardColor(60, 60, 60), "Auto");
 
         KeyboardEffectBox.IsEnabled = _keyboardAvailable;
@@ -1387,8 +1391,19 @@ public partial class NitrousDashboard : Window
                 SettingsManager.Save("KbLightingSource",
                     LightingGlobalTab.IsChecked == true ? "Global" : "Area");
 
-                // A zero brightness would make either sync look broken; the slider is its cap.
-                if (_globalBrightness == 0)
+                // A zero brightness would make either sync look broken; the active preset's slider
+                // is the effect's cap.
+                if (LightingAreaTab.IsChecked == true)
+                {
+                    if (_keyboardBrightness == 0)
+                    {
+                        _keyboardBrightness = 100;
+                        KeyboardBrightness.Value = 100;
+                        KeyboardBrightnessText.Text = "100%";
+                        SettingsManager.Save("KbBrightness", 100);
+                    }
+                }
+                else if (_globalBrightness == 0)
                 {
                     _globalBrightness = 100;
                     GlobalBrightness.Value = 100;
@@ -1481,13 +1496,15 @@ public partial class NitrousDashboard : Window
 
     private void GlobalColor_Click(object sender, RoutedEventArgs e)
     {
-        if (_syncEnabled || !_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
+        if (!_keyboardAvailable || (!_syncEnabled && _globalEffect != KeyboardEffect.Static)) return;
         if (PickColour(_globalColor) is not { } chosen) return;
 
         _globalColor = chosen;
         SettingsManager.Save("KbGlobal_Color", chosen.ToHex());
         PaintColourButton(GlobalColorBtn, chosen);
-        ApplyGlobalLighting();
+
+        // While sync runs it reads the colour live; a firmware write would be overwritten.
+        if (!_syncEnabled) ApplyGlobalLighting();
     }
 
     private void LogoEffect_Changed(object sender, SelectionChangedEventArgs e)
@@ -1601,7 +1618,7 @@ public partial class NitrousDashboard : Window
         }
 
         UpdateZoneButtons();
-        ApplyKeyboardLighting();
+        if (!_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void BlinkOnMode_Toggled(object sender, RoutedEventArgs e)
@@ -1711,7 +1728,7 @@ public partial class NitrousDashboard : Window
         UpdateZoneButtons();
 
         // The zone chips only exist in the keyboard's Static panel, so the write is the static one.
-        ApplyKeyboardLighting();
+        if (!_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void KeyboardEffect_Changed(object sender, SelectionChangedEventArgs e)

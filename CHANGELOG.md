@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.8 - 2026-11-08
+
+### Lighting
+
+- Sync now uses the **active preset's static colours** as its base: Global's one colour, or Area's
+  four zone colours. Editing a colour while sync is on takes effect on the next refresh instead of
+  being ignored, and switching Global/Area switches the base.
+- Brightness follows the active preset's slider (Area or Global), not always Global.
+- The Global colour chip stays editable while sync is on, even for an animated preset. The shared
+  card now says the preset's colours are the base and that turning sync off is only needed to edit
+  the effects.
+
 ## 0.11.0-test.7 - 2026-11-08
 
 ### Lighting

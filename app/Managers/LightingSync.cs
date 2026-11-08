@@ -113,6 +113,56 @@ internal static class LightingSync
         !string.Equals(SettingsManager.Get("KbSyncTarget", TargetBoth), TargetKeyboard,
             StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The static colours of the preset in use. Area Static gives each zone its own colour; Global,
+    /// an Area animation or anything else gives one colour for all four. Read live so a colour edit
+    /// while sync is on takes effect without stopping it.
+    /// </summary>
+    private static KeyboardColor[] BaseColors()
+    {
+        var colors = new KeyboardColor[ZoneCount];
+        var area = string.Equals(SettingsManager.Get("KbLightingSource", "Global"), "Area",
+                       StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(SettingsManager.Get("KbStyle", "Static"), "Static",
+                       StringComparison.OrdinalIgnoreCase);
+
+        if (area)
+        {
+            for (var i = 0; i < ZoneCount; i++)
+                colors[i] = KeyboardColor.FromHex(SettingsManager.Get($"KbZone{i + 1}", "#B388FF"));
+            return colors;
+        }
+
+        var color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
+        for (var i = 0; i < ZoneCount; i++) colors[i] = color;
+        return colors;
+    }
+
+    private static KeyboardColor AverageColor(IReadOnlyList<KeyboardColor> colors)
+    {
+        if (colors.Count == 0) return KeyboardColor.White;
+
+        long red = 0, green = 0, blue = 0;
+        foreach (var color in colors)
+        {
+            red += color.R;
+            green += color.G;
+            blue += color.B;
+        }
+
+        return new KeyboardColor(
+            (byte)(red / colors.Count), (byte)(green / colors.Count), (byte)(blue / colors.Count));
+    }
+
+    /// <summary>The brightness cap of the preset in use: Area's slider or Global's.</summary>
+    private static int BaseBrightness()
+    {
+        var area = string.Equals(SettingsManager.Get("KbLightingSource", "Global"), "Area",
+            StringComparison.OrdinalIgnoreCase);
+        return Math.Clamp(
+            SettingsManager.Get(area ? "KbBrightness" : "KbGlobal_Brightness", 100), 0, 100);
+    }
+
     private static void Loop()
     {
         try
@@ -146,7 +196,7 @@ internal static class LightingSync
                 SettingsManager.Get("KbSyncRate",
                     SettingsManager.Get("KbScreenSyncRate", ScreenRateMs)),
                 80, 500);
-            var brightness = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
+            var brightness = BaseBrightness();
 
             if (capture.TryCapture(out var pixels))
             {
@@ -164,8 +214,7 @@ internal static class LightingSync
 
     private static void SoundLoop()
     {
-        var color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
-        var zones = Enumerable.Repeat(color, ZoneCount).ToArray();
+        var zones = BaseColors();
         var levels = new int[ZoneCount];
         var baseline = 0f;
         var pulse = 0f;
@@ -222,13 +271,16 @@ internal static class LightingSync
                 }
 
                 if (frame % 25 == 0)
-                {
-                    color = KeyboardColor.FromHex(SettingsManager.Get("KbGlobal_Color", "#B388FF"));
-                    zones = Enumerable.Repeat(color, ZoneCount).ToArray();
-                }
+                    zones = BaseColors();
 
-                var ceiling = Math.Clamp(SettingsManager.Get("KbGlobal_Brightness", 100), 0, 100);
+                var ceiling = BaseBrightness();
                 var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+
+                if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                {
+                    Logger.Info($"Sound sync ({mode}) base=" +
+                                $"{string.Join(",", zones.Select(z => z.ToHex()))} cap={ceiling}");
+                }
 
                 if (mode == SoundModePeak && meter != null)
                 {
@@ -278,7 +330,7 @@ internal static class LightingSync
                     }
                 }
 
-                WriteZones(zones, levels, color, levels.Max(),
+                WriteZones(zones, levels, AverageColor(zones), levels.Max(),
                     frame % LogoEveryFrames == 0 && WritesLogo());
 
                 frame++;
