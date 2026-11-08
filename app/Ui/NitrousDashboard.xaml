@@ -1473,6 +1473,7 @@
 									<TextBlock x:Name="ScreenFloorText" Text="0%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
 								</Grid>
 								<Slider x:Name="ScreenFloor" Minimum="0" Maximum="10" Value="0" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="ScreenFloor_Changed"/>
+								<TextBlock Text="Brightness between hits: 0% is off, 10% keeps a dim glow." Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,2,0,0" TextWrapping="Wrap"/>
 							</StackPanel>
 							<Grid Margin="0,8,0,0">
 								<StackPanel VerticalAlignment="Center" Margin="0,0,58,0">

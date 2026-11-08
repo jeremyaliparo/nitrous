@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.16 - 2026-11-08
+
+### Lighting
+
+- The **Silence floor** row explains itself: “Brightness between hits: 0% is off, 10% keeps a dim
+  glow.”
+
+### Docs
+
+- The README and site use the **TOTAL LIGHTNING CONTROL** phrase and describe the screen/audio sync,
+  Spectrum/Beat and saturation features.
+
 ## 0.11.0-test.15 - 2026-11-08
 
 ### Lighting
