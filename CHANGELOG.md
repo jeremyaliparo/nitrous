@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.10 - 2026-11-08
+
+### Lighting
+
+- An old **Yes** from the ambiguous red lid-logo test is invalidated once, so the green test runs
+  again. Until a logo is explicitly confirmed, the Follow selector stays on **Keyboard** and the lid
+  option is disabled.
+- Keep the mode flash on if the power-mode key's colour is wanted; that key is firmware-driven and
+  is not a separately addressable cover logo.
+
 ## 0.11.0-test.9 - 2026-11-08
 
 ### Lighting

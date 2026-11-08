@@ -776,6 +776,9 @@ public partial class NitrousDashboard : Window
 
     private static int LogoAvailability => SettingsManager.Get("KbLogoAvailable", -1);
 
+    /// <summary>Bumped when the test colour changes, so an old ambiguous answer is asked again.</summary>
+    private const int LogoCheckRevision = 2;
+
     /// <summary>
     /// Only write to the lid once the user has confirmed it exists. Unknown is treated as "not
     /// yet", so a model without a logo never receives a pointless write.
@@ -868,6 +871,17 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void InitializeKeyboardLighting()
     {
+        // The old red test was ambiguous with the Performance mode. A Yes from it is cleared once;
+        // the green test (revision 2) asks again, and anything but an explicit Yes falls back to
+        // Keyboard for the sync target.
+        if (SettingsManager.Get("KbLogoCheckRevision", 1) < LogoCheckRevision)
+        {
+            SettingsManager.Save("KbLogoCheckRevision", LogoCheckRevision);
+            // Absent means "not answered", which is what the green test needs to run again.
+            if (SettingsManager.Get("KbLogoAvailable", -1) == 1)
+                SettingsManager.Delete("KbLogoAvailable");
+        }
+
         _keyboardAvailable = AcerKeyboard.IsAvailable();
 
         // A model with no lighting controller gets no LIGHT tab at all. A page that can only say it
@@ -1578,6 +1592,7 @@ public partial class NitrousDashboard : Window
 
             if (answer == MessageBoxResult.Yes) SettingsManager.Save("KbLogoAvailable", 1);
             else if (answer == MessageBoxResult.No) SettingsManager.Save("KbLogoAvailable", 0);
+            SettingsManager.Save("KbLogoCheckRevision", LogoCheckRevision);
 
             UpdateLogoAvailability();
 
