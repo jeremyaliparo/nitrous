@@ -761,6 +761,8 @@ public partial class NitrousDashboard : Window
     private string _syncSource = LightingSync.SourceScreen;
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
+    private bool _globalEffectsFiltered;
+    private bool _updatingGlobalEffects;
 
     private KeyboardEffect _logoEffect = KeyboardEffect.Static;
     private KeyboardColor _logoColor = KeyboardColor.FromHex("#B388FF");
@@ -1246,19 +1248,59 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
+    /// Sound sync needs a static base: its Effect list is reduced to Static while it runs, and the
+    /// full list returns afterwards. Screen sync leaves the list full but disabled.
+    /// </summary>
+    private void UpdateGlobalEffectOptions(bool soundSync)
+    {
+        if (_globalEffectsFiltered == soundSync) return;
+
+        _globalEffectsFiltered = soundSync;
+        _updatingGlobalEffects = true;
+        try
+        {
+            GlobalEffectBox.Items.Clear();
+
+            if (soundSync)
+            {
+                GlobalEffectBox.Items.Add("Static");
+                _globalEffect = KeyboardEffect.Static;
+                SettingsManager.Save("KbGlobal_Effect", "Static");
+                GlobalEffectBox.SelectedIndex = 0;
+                return;
+            }
+
+            foreach (var (name, _) in KeyboardEffects)
+                GlobalEffectBox.Items.Add(name);
+
+            var index = Array.FindIndex(KeyboardEffects, item => item.Effect == _globalEffect);
+            GlobalEffectBox.SelectedIndex = index >= 0 ? index : 0;
+        }
+        finally
+        {
+            _updatingGlobalEffects = false;
+        }
+    }
+
+    /// <summary>
     /// Enables only what can act. The speed row disappears for Static because the firmware ignores
     /// it there, and the logo's colour greys to "Auto" for the two modes that cycle their own
     /// palette rather than using the colour sent.
     /// </summary>
     private void UpdateLightingInteractivity()
     {
+        var syncOn = _syncEnabled;
+        var screenSync = syncOn && _syncSource == LightingSync.SourceScreen;
+        var soundSync = syncOn && _syncSource == LightingSync.SourceSound;
+
+        // Sound sync needs a static base, so its Effect list is just Static; Screen sync owns the
+        // colours and disables the list.
+        UpdateGlobalEffectOptions(soundSync);
+
         var globalAnimated = IsAnimated(_globalEffect);
         var globalHasColour = _globalEffect == KeyboardEffect.Static;
 
-        var syncOn = _syncEnabled;
-        var screenSync = syncOn && _syncSource == LightingSync.SourceScreen;
-
-        GlobalEffectBox.IsEnabled = _keyboardAvailable && !syncOn;
+        GlobalEffectBox.IsEnabled = _keyboardAvailable && !screenSync;
         GlobalBrightness.IsEnabled = _keyboardAvailable;
         GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && !syncOn;
         GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
@@ -1315,13 +1357,23 @@ public partial class NitrousDashboard : Window
         if (globalColourEditable) PaintColourButton(GlobalColorBtn, _globalColor);
         else PaintColourButton(GlobalColorBtn, new KeyboardColor(60, 60, 60), "Auto");
 
-        KbStaticTab.IsEnabled = !screenSync;
-        KbDynamicTab.IsEnabled = !screenSync;
-        ScreenSyncKeyboardHint.Visibility = screenSync ? Visibility.Visible : Visibility.Collapsed;
+        if (soundSync && KbStaticTab.IsChecked != true)
+            KbStaticTab.IsChecked = true;
+        if (soundSync) SettingsManager.Save("KbStyle", "Static");
 
-        KeyboardEffectBox.IsEnabled = _keyboardAvailable && !screenSync;
+        KbStaticTab.IsEnabled = !screenSync;
+        KbDynamicTab.IsEnabled = !screenSync && !soundSync;
+        ScreenSyncKeyboardHint.Text = screenSync
+            ? "Screen sync controls the colours; brightness is the cap."
+            : "Sound sync uses the static zone colours; brightness is the cap.";
+        ScreenSyncKeyboardHint.Visibility = screenSync || soundSync
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        KeyboardEffectBox.IsEnabled = _keyboardAvailable && !screenSync && !soundSync;
         KeyboardBrightness.IsEnabled = _keyboardAvailable;
-        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect) && !screenSync;
+        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect) && !screenSync &&
+                            !soundSync;
         KbSpeedRow.Visibility = KbDynamicTab.IsChecked == true && IsAnimated(_keyboardEffect)
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -1413,7 +1465,7 @@ public partial class NitrousDashboard : Window
 
         UpdateLightingInteractivity();
 
-        if (!IgnoreLightingChanges && _keyboardAvailable) ApplyKeyboardLighting();
+        if (!IgnoreLightingChanges && _keyboardAvailable && !_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void ScreenSync_Toggled(object sender, RoutedEventArgs e)
@@ -1525,7 +1577,9 @@ public partial class NitrousDashboard : Window
 
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0 || _syncEnabled) return;
+        if (IgnoreLightingChanges || _updatingGlobalEffects || GlobalEffectBox.SelectedIndex < 0 ||
+            _syncEnabled)
+            return;
 
         _globalEffect = KeyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
         SettingsManager.Save("KbGlobal_Effect", KeyboardEffects[GlobalEffectBox.SelectedIndex].Name);
@@ -1669,7 +1723,7 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbSpeed", _keyboardSpeed);
-        ApplyKeyboardLighting();
+        if (!_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void KbColor_Click(object sender, RoutedEventArgs e)
@@ -1807,7 +1861,7 @@ public partial class NitrousDashboard : Window
         _keyboardEffect = DynamicEffects[KeyboardEffectBox.SelectedIndex].Effect;
         SettingsManager.Save("KbEffect", DynamicEffects[KeyboardEffectBox.SelectedIndex].Name);
         UpdateLightingInteractivity();
-        ApplyKeyboardLighting();
+        if (!_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void KeyboardBrightness_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1817,7 +1871,7 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbBrightness", _keyboardBrightness);
-        ApplyKeyboardLighting();
+        if (!_syncEnabled) ApplyKeyboardLighting();
     }
 
     private void KeyboardBrightness_Changed(object sender, SelectionChangedEventArgs e)

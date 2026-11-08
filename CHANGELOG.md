@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.13 - 2026-11-08
+
+### Lighting
+
+- **Sound sync now forces Static** instead of disabling the effect: the Global Effect list contains
+  only `Static`, so its colour stays editable as the sync base. Area keeps the four zone swatches
+  editable and disables only `Dynamic`. Brightness acts as the cap, and the sync card says so.
+- **Screen sync stays brightness-only**: its colour and zone editors remain disabled because the
+  screen supplies the colours.
+
 ## 0.11.0-test.12 - 2026-11-08
 
 ### Lighting
