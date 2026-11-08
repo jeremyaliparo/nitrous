@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.2 - 2026-11-08
+
+### Lighting
+
+- **Prototype screen sync.** A new **Screen sync** switch on the LIGHT page under Global makes the
+  four keyboard zones follow the screen's colours, with the cover logo following the average. It is
+  a software effect: the tray writes the zones continuously, so it keeps running when the dashboard
+  is closed, and turning it off restores the saved Global or Area preset. Protected content and true
+  fullscreen can block the capture, and it is not a firmware effect.
+
 ## 0.11.0-test.1 - 2026-11-08
 
 ### Keyboard

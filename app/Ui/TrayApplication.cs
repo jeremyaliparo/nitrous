@@ -708,6 +708,36 @@ public class TrayApplication : ApplicationContext
             catch (OperationCanceledException) { }
         });
 
+        // Screen sync: a software effect that rewrites the four zones from the screen. It lives
+        // here, not in the dashboard, because the dashboard may be closed. The dashboard only
+        // writes KbScreenSync.
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    try
+                    {
+                        if (SettingsManager.Get("KbScreenSync", 0) == 1) ScreenSync.Start();
+                        else ScreenSync.Stop();
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn("Screen sync: supervisor tick failed.", ex);
+                    }
+
+                    await timer.WaitForNextTickAsync(_engineCts.Token);
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                ScreenSync.Stop();
+            }
+        });
+
         // GPU OC watchdog. This repairs the offsets after a driver reset, sleep/resume, or
         // another tool clearing P0 — the "randomly resets to 0" report.
         Task.Run(async () =>
@@ -761,6 +791,7 @@ public class TrayApplication : ApplicationContext
 
         _shuttingDown = true;
         _engineCts.Cancel();
+        ScreenSync.Stop();
         _nitroHook.Dispose();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
 

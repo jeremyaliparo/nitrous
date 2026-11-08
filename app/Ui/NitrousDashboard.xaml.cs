@@ -756,6 +756,9 @@ public partial class NitrousDashboard : Window
     private int _globalBrightness = 100;
     private int _globalSpeed = 4;
 
+    /// <summary>Software screen-sync effect, run by the tray. The dashboard only owns the toggle.</summary>
+    private bool _screenSync;
+
     private KeyboardEffect _logoEffect = KeyboardEffect.Static;
     private KeyboardColor _logoColor = KeyboardColor.FromHex("#B388FF");
     private int _logoBrightness = 100;
@@ -922,6 +925,10 @@ public partial class NitrousDashboard : Window
 
         _blinkOnModeChange = SettingsManager.Get("KbBlinkOnMode", true);
         TogBlinkOnMode.IsChecked = _blinkOnModeChange;
+
+        // The worker lives in the tray; this toggle only writes the request.
+        _screenSync = SettingsManager.Get("KbScreenSync", 0) == 1;
+        TogScreenSync.IsChecked = _screenSync;
 
         // Restore which half of the keyboard card was last in use, before the first apply below.
         if (SettingsManager.Get("KbStyle", "Static") == "Dynamic")
@@ -1165,14 +1172,21 @@ public partial class NitrousDashboard : Window
         var globalAnimated = IsAnimated(_globalEffect);
         var globalHasColour = _globalEffect == KeyboardEffect.Static;
 
-        GlobalEffectBox.IsEnabled = _keyboardAvailable;
+        GlobalEffectBox.IsEnabled = _keyboardAvailable && !_screenSync;
         GlobalBrightness.IsEnabled = _keyboardAvailable;
-        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated;
+        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && !_screenSync;
         GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
+
+        TogScreenSync.IsEnabled = _keyboardAvailable && _keyboardZoned;
+        TogScreenSync.ToolTip = !_keyboardAvailable
+            ? "This model has no lighting controller."
+            : !_keyboardZoned
+                ? "Screen sync needs the four-zone lighting controller."
+                : null;
 
         // The animated effects run their own palette, so a chosen colour does nothing for either
         // device. It is greyed to "Auto" rather than left looking usable.
-        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour;
+        GlobalColorBtn.IsEnabled = _keyboardAvailable && globalHasColour && !_screenSync;
         GlobalColorBtn.ToolTip = globalHasColour
             ? "Keyboard and cover-logo colour"
             : "Only Static uses a chosen colour; the animated effects run their own palette.";
@@ -1218,6 +1232,11 @@ public partial class NitrousDashboard : Window
         // Not during load: the first apply is done deliberately at the end of initialisation.
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
+        // Screen sync owns the LEDs while it runs. Opening Area turns it off and restores the
+        // saved preset; opening Global while it runs leaves the worker alone.
+        if (!global && _screenSync) TogScreenSync.IsChecked = false;
+        if (_screenSync) return;
+
         if (global) ApplyGlobalLighting();
         else ApplyAreaLighting();
     }
@@ -1260,9 +1279,22 @@ public partial class NitrousDashboard : Window
         if (!IgnoreLightingChanges && _keyboardAvailable) ApplyKeyboardLighting();
     }
 
+    private void ScreenSync_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (IgnoreLightingChanges) return;
+
+        _screenSync = TogScreenSync.IsChecked == true;
+        SettingsManager.Save("KbScreenSync", _screenSync ? 1 : 0);
+        UpdateLightingInteractivity();
+
+        KeyboardLightingStatus.Text = _screenSync
+            ? "Screen sync — the tray follows the screen"
+            : string.Empty;
+    }
+
     private void GlobalEffect_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0) return;
+        if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0 || _screenSync) return;
 
         _globalEffect = KeyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
         SettingsManager.Save("KbGlobal_Effect", KeyboardEffects[GlobalEffectBox.SelectedIndex].Name);
@@ -1277,6 +1309,8 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbGlobal_Brightness", _globalBrightness);
+        if (_screenSync) return;
+
         ApplyGlobalLighting();
     }
 
@@ -1287,12 +1321,14 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbGlobal_Speed", _globalSpeed);
+        if (_screenSync) return;
+
         ApplyGlobalLighting();
     }
 
     private void GlobalColor_Click(object sender, RoutedEventArgs e)
     {
-        if (!_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
+        if (_screenSync || !_keyboardAvailable || _globalEffect != KeyboardEffect.Static) return;
         if (PickColour(_globalColor) is not { } chosen) return;
 
         _globalColor = chosen;
