@@ -1542,7 +1542,7 @@
 								<TextBlock Text="SYNC" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 								<TextBlock Text="Software effect" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 							</Grid>
-							<TextBlock Text="Follow the screen or the system audio. Screen sync uses the screen's colours and can pulse with the system audio; Sound sync uses the active preset's static colours. Brightness is the cap. Runs while Nitrous is in the tray; turn it off to edit the effects." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+							<TextBlock Text="Follow the screen or the system audio. Screen sync uses the screen's colours and can pulse with the system audio; Sound sync runs the active preset's effect and drives its brightness, while the lid stays static. Brightness is the cap. Runs while Nitrous is in the tray." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 							<Grid Margin="0,12,0,0">
 								<StackPanel VerticalAlignment="Center" Margin="0,0,58,0">
 									<TextBlock Text="Screen sync" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="11"/>

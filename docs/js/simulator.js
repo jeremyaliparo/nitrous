@@ -519,11 +519,21 @@
       };
     }
     if (state.soundSync) {
+      if (state.lighting === "area") {
+        return {
+          effect: state.areaStyle === "Static" ? "Static" : state.areaEffect,
+          colours: state.zones.map(hexToRgb),
+          cap: syncCap,
+          speed: state.areaSpeed,
+        };
+      }
+
+      const rgb = hexToRgb(state.global.color);
       return {
-        effect: "Static",
-        colours: state.zones.map(hexToRgb),
+        effect: EFFECTS.has(state.global.effect) ? state.global.effect : "Static",
+        colours: [rgb, rgb, rgb, rgb],
         cap: syncCap,
-        speed: 3,
+        speed: state.global.speed,
       };
     }
     if (state.lighting === "global") {
@@ -565,6 +575,11 @@
     return null;
   }
 
+  function audioBrightness() {
+    if (!state.soundSync) return 1;
+    return Math.max(audioAlpha(0), audioAlpha(1), audioAlpha(2), audioAlpha(3));
+  }
+
   function paint(t, dt) {
     const now = performance.now();
     const bands = Audio.read();
@@ -594,13 +609,17 @@
       let alpha;
 
       const audio = audioAlpha(key.zone);
+      const animated = cfg.effect !== "Static";
 
-      if (audio !== null) {
+      if (audio !== null && !(state.soundSync && animated)) {
         alpha = audio;
       } else {
+        // With an effect during sound sync the firmware keeps the animation running and the
+        // audio scales its brightness, so the movement survives.
         const eased = effectAt(cfg.effect, key.x, key.y, t, cfg.speed, colour);
         colour = eased.rgb;
         alpha = eased.a;
+        if (state.soundSync && animated) alpha *= audioBrightness();
       }
 
       alpha *= cap;
@@ -652,7 +671,16 @@
     let rgb;
     let alpha;
 
-    if (syncOn && state.follow === "both") {
+    if (state.soundSync && state.follow === "both") {
+      // Sound sync writes the lid once as a Static frame: it cannot follow the beat, because the
+      // cover logo stutters whenever its brightness is rewritten per frame.
+      const avg = cfg.colours.reduce(
+        (acc, c) => [acc[0] + c[0], acc[1] + c[1], acc[2] + c[2]],
+        [0, 0, 0]
+      );
+      rgb = avg.map((c) => Math.round(c / cfg.colours.length));
+      alpha = cfg.cap / 100;
+    } else if (syncOn && state.follow === "both") {
       const avg = cfg.colours.reduce(
         (acc, c) => [acc[0] + c[0], acc[1] + c[1], acc[2] + c[2]],
         [0, 0, 0]
@@ -779,7 +807,7 @@
       button.classList.toggle("active", button.dataset.device === state.device);
     });
 
-    const forcedStatic = state.screenSync || state.soundSync;
+    const forcedStatic = state.screenSync;
     const effectiveStyle = forcedStatic ? "Static" : state.areaStyle;
 
     $$("#areaMode button").forEach((button) => {
@@ -806,7 +834,8 @@
     $("#globalColor").disabled = coloursLocked;
     $("#globalSwatches").classList.toggle("is-locked", coloursLocked);
 
-    const logoLocked = forcedStatic && state.follow === "both";
+    const logoLocked =
+      (state.screenSync || state.soundSync) && state.follow === "both";
     $("#logoArea").classList.toggle("is-locked", logoLocked);
     $$("#logoArea select, #logoArea input").forEach((input) => {
       input.disabled = logoLocked;
@@ -932,10 +961,6 @@
 
     if (state.screenSync) {
       state.soundSync = false;
-    }
-
-    if (state.soundSync) {
-      state.areaStyle = "Static";
     }
 
     syncControls();

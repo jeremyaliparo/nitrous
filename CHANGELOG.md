@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.26 - 2026-11-09
+
+### Lighting
+
+- **Sound sync can run the active preset's effect**: Global's effect, or Area Dynamic's, is
+  animated by the firmware while the audio envelope drives its brightness. The effect and speed
+  stay editable while sync is on.
+- The **lid is written once as Static**, because the cover logo stutters when its brightness or
+  speed is rewritten per frame; the keyboard does not. The same applies to Static sound sync,
+  which no longer rewrites the lid every few frames.
+
 ## 0.11.0-test.25 - 2026-11-09
 
 ### Keyboard

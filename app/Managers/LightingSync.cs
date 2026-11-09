@@ -183,6 +183,36 @@ internal static class LightingSync
             SettingsManager.Get(area ? "KbBrightness" : "KbGlobal_Brightness", 100), 0, 100);
     }
 
+    private static bool AreaDynamic() =>
+        string.Equals(SettingsManager.Get("KbLightingSource", "Global"), "Area",
+            StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(SettingsManager.Get("KbStyle", "Static"), "Dynamic",
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The effect sound sync should run: Global's effect, or Area Dynamic's.</summary>
+    private static KeyboardEffect BaseEffect()
+    {
+        if (AreaDynamic())
+            return AcerKeyboard.ParseEffect(SettingsManager.Get("KbEffect", "Breathing"));
+
+        var area = string.Equals(SettingsManager.Get("KbLightingSource", "Global"), "Area",
+            StringComparison.OrdinalIgnoreCase);
+        return area
+            ? KeyboardEffect.Static
+            : AcerKeyboard.ParseEffect(SettingsManager.Get("KbGlobal_Effect", "Static"));
+    }
+
+    /// <summary>The effect's speed byte; Global stores five steps, Area stores 1-9.</summary>
+    private static int BaseSpeed()
+    {
+        if (AreaDynamic())
+            return Math.Clamp(SettingsManager.Get("KbSpeed", 4),
+                AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
+
+        var step = Math.Clamp(SettingsManager.Get("KbGlobal_Speed", 3), 1, 5);
+        return AcerKeyboard.MinSpeed + (step - 1) * 2;
+    }
+
     private static void Loop()
     {
         try
@@ -299,6 +329,7 @@ internal static class LightingSync
         var pulse = 0f;
         var frame = 0;
         var mode = "";
+        var logoWritten = false;
         AudioMeter? meter = null;
         SpectrumSource? spectrum = null;
         var analyzer = new SpectrumAnalyzer();
@@ -340,6 +371,7 @@ internal static class LightingSync
                     pulse = 0f;
                     Array.Clear(levels);
                     envelope.Reset();
+                    logoWritten = false;
 
                     spectrum = SpectrumSource.TryCreate();
                     if (spectrum == null && mode == SoundModePeak)
@@ -439,8 +471,25 @@ internal static class LightingSync
                 }
                 else
                 {
-                    WriteZones(zones, levels, AverageColor(zones), levels.Max(),
-                        frame % LogoEveryFrames == 0 && WritesLogo());
+                    // The lid is a separate, slower device: setting it once avoids the stutter
+                    // heard when its brightness or speed is rewritten per frame.
+                    if (!logoWritten && WritesLogo() && _logoAvailable)
+                    {
+                        _logoAvailable = AcerKeyboard.SetEffect(
+                            KeyboardEffect.Static, BaseBrightness(), 0, leftwards: false,
+                            AverageColor(zones), AcerKeyboard.LidDevice);
+                        logoWritten = true;
+                    }
+
+                    var effect = BaseEffect();
+                    if (effect == KeyboardEffect.Static)
+                    {
+                        WriteZones(zones, levels, AverageColor(zones), levels.Max(), false);
+                    }
+                    else
+                    {
+                        WriteEffect(effect, levels.Max(), BaseSpeed(), AverageColor(zones));
+                    }
                 }
 
                 frame++;
@@ -451,6 +500,17 @@ internal static class LightingSync
         {
             meter?.Dispose();
             spectrum?.Dispose();
+        }
+    }
+
+    private static void WriteEffect(
+        KeyboardEffect effect, int brightness, int speed, KeyboardColor color)
+    {
+        if (!AcerKeyboard.SetEffect(effect, brightness, speed, leftwards: false, color) &&
+            !_writeWarned)
+        {
+            Logger.Warn("Lighting sync: the keyboard refused an effect frame.");
+            _writeWarned = true;
         }
     }
 
