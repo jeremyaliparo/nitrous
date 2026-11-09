@@ -172,6 +172,21 @@ public class TrayApplication : ApplicationContext
             RunOnUi(() => EnsureOsd()?.Prewarm());
         });
 
+        // Apply the saved lighting preset once at startup. The dashboard no longer writes it on
+        // open, so a brightness change made with the Fn keys is not undone just by showing the
+        // window. Sync-enabled sessions are left to the worker.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (SettingsManager.Get("KbSyncEnabled", -1) != 1)
+                    LightingSync.ReapplySavedPreset();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Lighting: startup restore failed.", ex);
+            }
+        });
 
         StartBackgroundEngine();
     }

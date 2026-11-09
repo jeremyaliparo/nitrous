@@ -340,6 +340,10 @@ public partial class NitrousDashboard : Window
         if (index == 1 && DataContext is DashboardViewModel vm)
             vm.RefreshGpuOffsets();
 
+        // The LIGHT page is where the Fn hint belongs; read the EC only when it is shown.
+        if (index == 2)
+            SyncFnBrightnessHint();
+
         // First visit to Lighting on a model whose lid logo has never been confirmed: settle it
         // before any more writes are sent to device 0x83.
         if (index == 2 && !_keyboardLoading && !_captureMode && _keyboardAvailable && LogoAvailability < 0)
@@ -561,7 +565,11 @@ public partial class NitrousDashboard : Window
 
         UpdateGpuTelemetryScope();
 
-        if (Visibility == Visibility.Visible) RefreshDashboardState();
+        if (Visibility == Visibility.Visible)
+        {
+            RefreshDashboardState();
+            SyncFnBrightnessHint();
+        }
     }
 
     public void RefreshDashboardState()
@@ -773,6 +781,78 @@ public partial class NitrousDashboard : Window
         Logger.Info($"Dashboard: recovered the window from ({rect.Left},{rect.Top}) to ({Left:0},{Top:0}).");
     }
 
+    private void Window_Activated(object sender, EventArgs e) => SyncFnBrightnessHint();
+
+    /// <summary>
+    /// Reads the EC backlight level once, on LIGHT open or window activation, and explains a
+    /// difference from the saved preset. This is deliberately not polled: each call opens the HID
+    /// and performs three exchanges, which is too much to do continuously.
+    /// </summary>
+    private void SyncFnBrightnessHint()
+    {
+        if (KeyboardPage.Visibility != Visibility.Visible) return;
+
+        if (!_keyboardAvailable || _syncEnabled)
+        {
+            HideFnBrightnessHints();
+            return;
+        }
+
+        if (_fnBrightnessReading) return;
+        if ((DateTime.UtcNow - _lastFnBrightnessReadUtc).TotalMilliseconds < 1500) return;
+
+        _fnBrightnessReading = true;
+        _lastFnBrightnessReadUtc = DateTime.UtcNow;
+
+        _ = Task.Run(() =>
+        {
+            var level = AcerWmiManager.GetKeyboardBacklightTimeout()?.Brightness;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _fnBrightnessReading = false;
+                    ApplyFnBrightnessHint(level);
+                }));
+            }
+            catch (InvalidOperationException)
+            {
+                _fnBrightnessReading = false;
+            }
+            catch (TaskCanceledException)
+            {
+                _fnBrightnessReading = false;
+            }
+        });
+    }
+
+    private void ApplyFnBrightnessHint(int? level)
+    {
+        if (!_keyboardAvailable || _syncEnabled || level is not int value)
+        {
+            HideFnBrightnessHints();
+            return;
+        }
+
+        var text = $"Fn keys are at {value}%. Moving this slider applies the saved preset.";
+        GlobalFnBrightnessHint.Text = text;
+        GlobalFnBrightnessHint.Visibility = value != _globalBrightness
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        AreaFnBrightnessHint.Text = text;
+        AreaFnBrightnessHint.Visibility = value != _keyboardBrightness
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void HideFnBrightnessHints()
+    {
+        if (GlobalFnBrightnessHint != null) GlobalFnBrightnessHint.Visibility = Visibility.Collapsed;
+        if (AreaFnBrightnessHint != null) AreaFnBrightnessHint.Visibility = Visibility.Collapsed;
+    }
+
     private void Window_Deactivated(object sender, EventArgs e)
     {
         if (Topmost || _isDialogOpen) return;
@@ -857,6 +937,8 @@ public partial class NitrousDashboard : Window
     /// <summary>Software screen/audio sync, run by the tray. The dashboard only owns the switches.</summary>
     private bool _syncEnabled;
     private string _syncSource = LightingSync.SourceScreen;
+    private bool _fnBrightnessReading;
+    private DateTime _lastFnBrightnessReadUtc = DateTime.MinValue;
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
     private bool _screenPulse;
@@ -1257,11 +1339,9 @@ public partial class NitrousDashboard : Window
 
         _keyboardLoading = false;
 
-        if (_keyboardAvailable)
-        {
-            if (source == "Global") ApplyGlobalLighting();
-            else ApplyAreaLighting(reportLogoFailure: false);
-        }
+        // The tray applies the saved preset once at startup. Opening the dashboard must not
+        // rewrite the hardware brightness: the user may have changed it with the Fn keys since,
+        // and showing a window should not undo that. The controls apply on user changes below.
 
         // The tab/mode controls may have been initialised after the first pass; apply the final
         // sync gating once more so disabled colours and zone swatches match the loaded state.
@@ -1582,6 +1662,7 @@ public partial class NitrousDashboard : Window
     /// <summary>Applies both Area device configurations: keyboard and cover logo.</summary>
     private void ApplyAreaLighting(bool reportLogoFailure = true)
     {
+        HideFnBrightnessHints();
         ApplyKeyboardLighting();
         ApplyLogoLighting(reportLogoFailure);
     }
@@ -1758,6 +1839,7 @@ public partial class NitrousDashboard : Window
     {
         _globalBrightness = (int)Math.Round(e.NewValue);
         if (GlobalBrightnessText != null) GlobalBrightnessText.Text = $"{_globalBrightness}%";
+        if (!IgnoreLightingChanges) HideFnBrightnessHints();
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbGlobal_Brightness", _globalBrightness);
@@ -2035,6 +2117,7 @@ public partial class NitrousDashboard : Window
     {
         _keyboardBrightness = (int)Math.Round(e.NewValue);
         if (KeyboardBrightnessText != null) KeyboardBrightnessText.Text = $"{_keyboardBrightness}%";
+        if (!IgnoreLightingChanges) HideFnBrightnessHints();
         if (IgnoreLightingChanges || !_keyboardAvailable) return;
 
         SettingsManager.Save("KbBrightness", _keyboardBrightness);
@@ -2503,6 +2586,8 @@ public partial class NitrousDashboard : Window
     private void ApplyGlobalLighting()
     {
         if (!_keyboardAvailable) return;
+
+        HideFnBrightnessHints();
 
         try
         {

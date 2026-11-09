@@ -8,7 +8,7 @@
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
         RenderOptions.ClearTypeHint="Enabled"
-        Deactivated="Window_Deactivated">
+        Deactivated="Window_Deactivated" Activated="Window_Activated">
 	<Window.Resources>
 		<BitmapImage x:Key="CachedAppLogo" UriSource="pack://application:,,,/assets/logo.png" CacheOption="OnLoad" />
 		<Style x:Key="ActionButtonStyle" TargetType="RadioButton">
@@ -1409,6 +1409,7 @@
 								<TextBlock x:Name="GlobalBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
 							</Grid>
 							<Slider x:Name="GlobalBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="GlobalBrightness_Changed"/>
+							<TextBlock x:Name="GlobalFnBrightnessHint" Margin="0,4,0,0" FontSize="9.5" Foreground="{DynamicResource TextDimBrush}" TextWrapping="Wrap" Visibility="Collapsed"/>
 
 							<StackPanel x:Name="GlobalSpeedRow" Margin="0,10,0,0">
 								<Grid Margin="0,0,0,2">
@@ -1484,6 +1485,7 @@
 										<TextBlock x:Name="KeyboardBrightnessText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
 									</Grid>
 									<Slider x:Name="KeyboardBrightness" Minimum="0" Maximum="100" Value="100" TickFrequency="5" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="KeyboardBrightness_Changed"/>
+									<TextBlock x:Name="AreaFnBrightnessHint" Margin="0,4,0,0" FontSize="9.5" Foreground="{DynamicResource TextDimBrush}" TextWrapping="Wrap" Visibility="Collapsed"/>
 										<StackPanel x:Name="KbSpeedRow" Margin="0,10,0,0">
 											<Grid Margin="0,0,0,2">
 												<TextBlock Text="Speed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
