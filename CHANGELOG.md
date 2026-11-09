@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.27 - 2026-11-09
+
+### Lighting
+
+- **Fixed: sound sync reverted to the Global preset when the dashboard was reopened.** Opening the
+  dashboard recorded whichever tab the window started on (Global) over the saved Area preset, so
+  the next sync frame switched the keyboard back to the Global effect. The saved tab is now left
+  alone on open and only the user's tab change records a new source.
+
 ## 0.11.0-test.26 - 2026-11-09
 
 ### Lighting

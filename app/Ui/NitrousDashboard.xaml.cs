@@ -1179,9 +1179,9 @@ public partial class NitrousDashboard : Window
         TogScreenSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceScreen;
         TogSoundSync.IsChecked = _syncEnabled && _syncSource == LightingSync.SourceSound;
 
-        if (_syncEnabled)
-            SettingsManager.Save("KbLightingSource",
-                LightingGlobalTab.IsChecked == true ? "Global" : "Area");
+        // The source is restored below from the saved tab. Opening the dashboard must not record
+        // the tab it happens to start on: doing so overwrote a saved Area preset with Global, so
+        // the next sync frame switched the keyboard back to the Global effect.
 
         // Restore which half of the keyboard card was last in use, before the first apply below.
         if (SettingsManager.Get("KbStyle", "Static") == "Dynamic")
