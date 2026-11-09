@@ -24,6 +24,13 @@ dotnet publish app/Nitrous.csproj -c Release -r win-x64 --self-contained false `
 Never tag or publish a release unless asked. The version comes from the csproj; do not override it
 with `-p:Version` on the command line or the binary will disagree with the tree.
 
+**Publish once, after the commit.** The informational version embeds HEAD (`0.11.0-test.N+<sha>`),
+so a build made before committing names the previous commit and does not match the tree it came
+from. Order for every test build: bump the version and changelog, `dotnet build`, commit, then
+publish into the next free `publishN`. Do not keep a pre-commit copy; the build already proves it
+compiles. If a folder cannot be overwritten because a tester is running it, publish to the next
+number and say which one they are on.
+
 ## Test builds
 
 Anything handed to testers is never a plain version number. Suffix it:
