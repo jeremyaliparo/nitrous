@@ -1162,14 +1162,18 @@ public partial class NitrousDashboard : Window
                 => LightingSync.SoundModePeak,
             var m when string.Equals(m, LightingSync.SoundModeBeat, StringComparison.OrdinalIgnoreCase)
                 => LightingSync.SoundModeBeat,
+            var m when string.Equals(m, LightingSync.SoundModeVibe, StringComparison.OrdinalIgnoreCase)
+                => LightingSync.SoundModeVibe,
             _ => LightingSync.SoundModeSpectrum
         };
 
         SoundModeBox.Items.Add("Peak");
         SoundModeBox.Items.Add("Spectrum");
         SoundModeBox.Items.Add("Beat");
+        SoundModeBox.Items.Add("Vibe");
         SoundModeBox.SelectedIndex = soundMode == LightingSync.SoundModePeak ? 0
             : soundMode == LightingSync.SoundModeBeat ? 2
+            : soundMode == LightingSync.SoundModeVibe ? 3
             : 1;
 
         SyncTargetBox.Items.Add("Keyboard");
@@ -1295,10 +1299,14 @@ public partial class NitrousDashboard : Window
         {
             TogBrightnessSync.IsChecked = brightnessSyncOn;
 
-            var beat = !string.Equals(
-                SettingsManager.Get("KbBrightSyncMode", LightingSync.SoundModeBeat),
-                LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase);
-            BrightnessSyncModeBox.SelectedIndex = beat ? 0 : 1;
+            var brightnessMode = SettingsManager.Get(
+                "KbBrightSyncMode", LightingSync.SoundModeVibe);
+            BrightnessSyncModeBox.SelectedIndex =
+                string.Equals(brightnessMode, LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase)
+                    ? 2
+                    : string.Equals(brightnessMode, LightingSync.SoundModeBeat, StringComparison.OrdinalIgnoreCase)
+                        ? 1
+                        : 0;
 
             var brightnessSensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
             BrightnessSyncSensitivity.Value = brightnessSensitivity;
@@ -1766,6 +1774,7 @@ public partial class NitrousDashboard : Window
         {
             0 => LightingSync.SoundModePeak,
             2 => LightingSync.SoundModeBeat,
+            3 => LightingSync.SoundModeVibe,
             _ => LightingSync.SoundModeSpectrum
         });
     }
@@ -2126,9 +2135,12 @@ public partial class NitrousDashboard : Window
         if (_keyboardLoading || _brightnessSyncUpdating) return;
 
         SettingsManager.Save("KbBrightSyncMode",
-            BrightnessSyncModeBox.SelectedIndex == 1
-                ? LightingSync.SoundModePeak
-                : LightingSync.SoundModeBeat);
+            BrightnessSyncModeBox.SelectedIndex switch
+            {
+                2 => LightingSync.SoundModePeak,
+                1 => LightingSync.SoundModeBeat,
+                _ => LightingSync.SoundModeVibe
+            });
     }
 
     private void BrightnessSyncSensitivity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)

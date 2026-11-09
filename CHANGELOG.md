@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.28 - 2026-11-09
+
+### Lighting
+
+- **New Vibe sound mode, the default on five-step keyboards.** Ported from pr4u's KB-Breathe: three
+  layers (beat, highs, voice) over discrete steps, loudest wins. The beat layer holds about 110 ms
+  and then drops straight to the base level, so the backlight goes 4 -> 0 instead of walking
+  4-3-2-1. Hi-hats give 3, sustained vocals 1-2, silence gives 0.
+- Peak and Beat are unchanged, and Spectrum stays the default on RGB keyboards. Vibe is selectable
+  there too. The five-step "Sound style" list is now Vibe / Beat / Peak.
+- The simulator gained the same Vibe engine.
+
 ## 0.11.0-test.27 - 2026-11-09
 
 ### Lighting

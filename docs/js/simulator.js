@@ -580,14 +580,115 @@
     return Math.max(audioAlpha(0), audioAlpha(1), audioAlpha(2), audioAlpha(3));
   }
 
+  // Vibe: the same three layers as the app (beat 4, highs 3, voice 1-2, silence 0) over discrete
+  // steps, so the light snaps back to 0 instead of walking down. The bands here are FFT summaries,
+  // so the thresholds are approximations of the runtime's time-domain filters.
+  const vibe = {
+    step: 0,
+    beatLevel: 0,
+    beatUntil: 0,
+    highLevel: 0,
+    highUntil: 0,
+    highLast: -1000,
+    highSlow: 0,
+    highAvg: 0,
+    voiceOn: false,
+    above: 0,
+    below: 0,
+    pitch: 0.4,
+    centre: 0.4,
+    highPitch: false,
+    age: 0,
+    last: 0,
+  };
+
+  function resetVibe() {
+    vibe.step = 0;
+    vibe.beatLevel = 0;
+    vibe.beatUntil = 0;
+    vibe.highLevel = 0;
+    vibe.highUntil = 0;
+    vibe.highLast = -1000;
+    vibe.highSlow = 0;
+    vibe.highAvg = 0;
+    vibe.voiceOn = false;
+    vibe.above = 0;
+    vibe.below = 0;
+    vibe.pitch = 0.4;
+    vibe.centre = 0.4;
+    vibe.highPitch = false;
+    vibe.age = 0;
+  }
+
+  function updateVibe(now, dt, bands, justBeat) {
+    const low = bands[1];
+    const mid = bands[2];
+    const high = bands[3];
+    const live = low + mid + high > 0.02;
+
+    if (justBeat) {
+      vibe.beatLevel = bands[0] >= 0.55 ? 4 : 3;
+      vibe.beatUntil = now + 110;
+    } else if (now > vibe.beatUntil) {
+      vibe.beatLevel = 0;
+    }
+
+    vibe.highSlow += (high - vibe.highSlow) * Math.min(1, dt * 4);
+    const over = live ? Math.max(0, high - vibe.highSlow * 1.4) : 0;
+    vibe.highAvg += (over - vibe.highAvg) * Math.min(1, dt * 0.5);
+    const threshold = Math.max(0.015, vibe.highAvg * 2);
+    if (over > threshold && now - vibe.highLast >= 60) {
+      vibe.highLast = now;
+      vibe.highUntil = now + 120;
+    }
+    vibe.highLevel = now < vibe.highUntil ? 3 : 0;
+
+    const voice = Math.sqrt(low * low + mid * mid);
+    const total = Math.sqrt(bands.reduce((a, b) => a + b * b, 0));
+    const voiced = live && voice >= total * 0.4;
+
+    if (voiced) {
+      vibe.above += dt;
+      vibe.below = 0;
+    } else {
+      vibe.below += dt;
+      vibe.above = 0;
+    }
+    if (!vibe.voiceOn && vibe.above >= 0.04) vibe.voiceOn = true;
+    else if (vibe.voiceOn && vibe.below >= 0.18) vibe.voiceOn = false;
+    if (!live) vibe.voiceOn = false;
+
+    if (vibe.voiceOn && voice > 0.01) {
+      const pitch = mid / (low + mid + 1e-6);
+      vibe.pitch += (pitch - vibe.pitch) * Math.min(1, dt * 5);
+      vibe.centre += (vibe.pitch - vibe.centre) * Math.min(1, dt * 0.2);
+      const centre = Math.min(0.44, Math.max(0.36, vibe.centre));
+      if (vibe.highPitch && vibe.pitch < centre - 0.025) vibe.highPitch = false;
+      else if (!vibe.highPitch && vibe.pitch > centre + 0.025) vibe.highPitch = true;
+    }
+
+    const voiceLevel = vibe.voiceOn ? (vibe.highPitch ? 2 : 1) : 0;
+    let target = Math.max(vibe.beatLevel, vibe.highLevel, voiceLevel);
+    if (!live && now > vibe.beatUntil) target = 0;
+
+    if (target > vibe.step || (target < vibe.step && vibe.age >= 0.06)) {
+      vibe.step = target;
+      vibe.age = 0;
+    } else {
+      vibe.age += dt;
+    }
+  }
+
   function paint(t, dt) {
     const now = performance.now();
     const bands = Audio.read();
 
     const bass = bands[0];
+    let justBeat = false;
     if (bass > 0.32 && now - lastBeat > 140) {
       lastBeat = now;
       beatEnv = 1;
+      justBeat = true;
     }
     beatEnv = Math.max(0, beatEnv - dt * 1.9);
 
@@ -596,6 +697,8 @@
     for (let i = 0; i < 4; i += 1) {
       spectrumEnv[i] += (bands[i] - spectrumEnv[i]) * Math.min(1, dt * 18);
     }
+
+    if (state.soundSync && state.soundMode === "Vibe") updateVibe(now, dt, bands, justBeat);
 
     const cfg = currentConfig();
     const flashLeft = Math.max(0, (flash.until - now) / 1100);
@@ -610,8 +713,9 @@
 
       const audio = audioAlpha(key.zone);
       const animated = cfg.effect !== "Static";
+      const stepped = state.soundSync && state.soundMode === "Vibe";
 
-      if (audio !== null && !(state.soundSync && animated)) {
+      if (audio !== null && !stepped && !(state.soundSync && animated)) {
         alpha = audio;
       } else {
         // With an effect during sound sync the firmware keeps the animation running and the
@@ -619,7 +723,8 @@
         const eased = effectAt(cfg.effect, key.x, key.y, t, cfg.speed, colour);
         colour = eased.rgb;
         alpha = eased.a;
-        if (state.soundSync && animated) alpha *= audioBrightness();
+        if (stepped) alpha *= vibe.step / 4;
+        else if (state.soundSync && animated) alpha *= audioBrightness();
       }
 
       alpha *= cap;
@@ -963,6 +1068,8 @@
       state.soundSync = false;
     }
 
+    if (!state.soundSync) resetVibe();
+
     syncControls();
   }
 
@@ -1251,6 +1358,7 @@
 
     $("#soundMode").addEventListener("change", (event) => {
       state.soundMode = event.target.value;
+      resetVibe();
     });
 
     $("#sensitivity").addEventListener("input", (event) => {

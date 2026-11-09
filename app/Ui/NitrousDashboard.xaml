@@ -1110,6 +1110,7 @@
 								<Grid Margin="0,0,0,6">
 									<TextBlock Text="Sound style" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
 									<ComboBox x:Name="BrightnessSyncModeBox" Width="130" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="BrightnessSyncMode_Changed">
+										<ComboBoxItem Content="Vibe"/>
 										<ComboBoxItem Content="Beat"/>
 										<ComboBoxItem Content="Peak"/>
 									</ComboBox>

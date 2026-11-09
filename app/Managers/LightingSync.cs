@@ -19,6 +19,7 @@ internal static class LightingSync
     public const string SoundModePeak = "Peak";
     public const string SoundModeSpectrum = "Spectrum";
     public const string SoundModeBeat = "Beat";
+    public const string SoundModeVibe = "Vibe";
     public const string TargetBoth = "Both";
     public const string TargetKeyboard = "Keyboard";
 
@@ -347,13 +348,14 @@ internal static class LightingSync
                 }
 
                 var soundMode = _brightnessOnly
-                    ? SettingsManager.Get("KbBrightSyncMode", SoundModeBeat)
+                    ? SettingsManager.Get("KbBrightSyncMode", SoundModeVibe)
                     : SettingsManager.Get("KbSoundMode", SoundModeSpectrum);
 
                 var desired = soundMode switch
                 {
                     var m when string.Equals(m, SoundModePeak, StringComparison.OrdinalIgnoreCase) => SoundModePeak,
                     var m when string.Equals(m, SoundModeBeat, StringComparison.OrdinalIgnoreCase) => SoundModeBeat,
+                    var m when string.Equals(m, SoundModeVibe, StringComparison.OrdinalIgnoreCase) => SoundModeVibe,
                     _ => SoundModeSpectrum
                 };
 
@@ -455,6 +457,21 @@ internal static class LightingSync
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                         Logger.Info($"Sound sync (Beat): bass={bass:0.000} mid={mid:0.000} " +
                                     $"level={level:0.00} brightness={brightness}");
+                }
+                else if (mode == SoundModeVibe && spectrum != null)
+                {
+                    float bass = 0f, mid = 0f, full = 0f, high = 0f, voiceLow = 0f, voiceHigh = 0f;
+                    if (haveSamples)
+                        envelope.Analyze(samples, out bass, out mid, out full,
+                            out high, out voiceLow, out voiceHigh);
+
+                    var step = envelope.Vibe(bass, mid, full, high, voiceLow, voiceHigh, gain, dt);
+                    var brightness = (int)Math.Round(step / 4.0 * ceiling);
+                    for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+
+                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                        Logger.Info($"Sound sync (Vibe): step={step} bass={bass:0.000} " +
+                                    $"high={high:0.000} full={full:0.000} brightness={brightness}");
                 }
                 else if (spectrum != null)
                 {
@@ -949,8 +966,52 @@ internal static class LightingSync
     /// </summary>
     private sealed class SoundEnvelope
     {
+        // Vibe tuning, in seconds: the hold is what makes a hit read as a pulse rather than a fade,
+        // and the dwell stops the level chattering on busy material.
+        private const float SoftHit = 0.55f;
+        private const float BeatHoldSeconds = 0.11f;
+        private const float HighHoldSeconds = 0.12f;
+        private const float HighRefractorySeconds = 0.06f;
+        private const float MinDwellSeconds = 0.06f;
+
         private float _bassCoefficient;
         private float _midCoefficient;
+        private float _highCoefficient;
+        private float _voiceLowCoefficient;
+        private float _voiceMidCoefficient;
+        private float _voiceHighCoefficient;
+
+        // Persistent filter state for the Vibe bands. Bass/mid deliberately stay block-local: that
+        // path is what testers tuned, and restarting its two poles per window costs a few ms.
+        private float _high1;
+        private float _high2;
+        private float _voiceA1;
+        private float _voiceA2;
+        private float _voiceB1;
+        private float _voiceB2;
+        private float _voiceC1;
+        private float _voiceC2;
+        private float _voiceD1;
+
+        // Vibe state, all in seconds because the sound loop is not a fixed 10 ms hop.
+        private int _vibeLevel;
+        private int _vibeBeatLevel;
+        private float _vibeBeatHold;
+        private float _vibeHighHold;
+        private float _vibeHighLast = -1f;
+        private float _vibeHighSlow;
+        private float _vibeHighAvg;
+        private int _vibeHighLevel;
+        private float _vibeVoiceEnv;
+        private float _vibeFullEnv;
+        private float _vibeVoicePeak = 0.004f;
+        private float _vibeAbove;
+        private float _vibeBelow;
+        private bool _vibeVoiceOn;
+        private bool _vibeHighPitch;
+        private float _vibePitch = 0.4f;
+        private float _vibePitchCentre = 0.4f;
+        private float _vibeAge = 1f;
 
         private float _bassSlow;
         private float _midSlow;
@@ -967,8 +1028,17 @@ internal static class LightingSync
 
         public void Configure(int sampleRate)
         {
-            _bassCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 150f / sampleRate);
-            _midCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 2000f / sampleRate);
+            var rate = Math.Max(8000, sampleRate);
+            _bassCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 150f / rate);
+            _midCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 2000f / rate);
+
+            // Vibe bands, the same split pr4u uses: highs from 5 kHz, voice low half 300-1000 Hz and
+            // high half 1-3.4 kHz. The ceilings are clamped so low sample rates stay stable.
+            _highCoefficient = 1f - MathF.Exp(-2f * MathF.PI * Math.Min(5000f, rate * 0.3f) / rate);
+            _voiceLowCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 300f / rate);
+            _voiceMidCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 1000f / rate);
+            _voiceHighCoefficient =
+                1f - MathF.Exp(-2f * MathF.PI * Math.Min(3400f, rate * 0.3f) / rate);
         }
 
         public void Reset()
@@ -979,9 +1049,36 @@ internal static class LightingSync
             _hi = 0.004f;
             _lo = 0f;
             _env = 0f;
+
+            _high1 = _high2 = 0f;
+            _voiceA1 = _voiceA2 = _voiceB1 = _voiceB2 = 0f;
+            _voiceC1 = _voiceC2 = _voiceD1 = 0f;
+
+            _vibeLevel = _vibeBeatLevel = 0;
+            _vibeBeatHold = _vibeHighHold = 0f;
+            _vibeHighLast = -1f;
+            _vibeHighSlow = _vibeHighAvg = 0f;
+            _vibeHighLevel = 0;
+            _vibeVoiceEnv = _vibeFullEnv = 0f;
+            _vibeVoicePeak = 0.004f;
+            _vibeAbove = _vibeBelow = 0f;
+            _vibeVoiceOn = _vibeHighPitch = false;
+            _vibePitch = _vibePitchCentre = 0.4f;
+            _vibeAge = 1f;
         }
 
         public void Analyze(float[] samples, out float bass, out float mid, out float full)
+        {
+            Analyze(samples, out bass, out mid, out full,
+                out _, out _, out _);
+        }
+
+        /// <summary>
+        /// The same analysis plus the three Vibe bands. Vibe needs them every frame, so one pass
+        /// computes all six and the three-band callers simply ignore the extras.
+        /// </summary>
+        public void Analyze(float[] samples, out float bass, out float mid, out float full,
+            out float high, out float voiceLow, out float voiceHigh)
         {
             var low1 = 0f;
             var low2 = 0f;
@@ -989,6 +1086,9 @@ internal static class LightingSync
             double bassSum = 0;
             double midSum = 0;
             double fullSum = 0;
+            double highSum = 0;
+            double lowVoiceSum = 0;
+            double highVoiceSum = 0;
             var count = 0;
 
             for (var i = 0; i < samples.Length; i++)
@@ -998,50 +1098,63 @@ internal static class LightingSync
                 low2 += _bassCoefficient * (low1 - low2);
                 body += _midCoefficient * ((sample - low2) - body);
 
-                // Let the filters settle before accumulating; the window starts cold.
+                // Highs: two cascaded 5 kHz high-passes, so vocals and mids do not leak in.
+                _high1 += _highCoefficient * (sample - _high1);
+                var pass1 = sample - _high1;
+                _high2 += _highCoefficient * (pass1 - _high2);
+                var highs = pass1 - _high2;
+
+                // Voice, low half: 300 Hz high-pass then a 1 kHz two-pole low-pass.
+                _voiceA1 += _voiceLowCoefficient * (sample - _voiceA1);
+                var a1 = sample - _voiceA1;
+                _voiceA2 += _voiceLowCoefficient * (a1 - _voiceA2);
+                var a2 = a1 - _voiceA2;
+                _voiceB1 += _voiceMidCoefficient * (a2 - _voiceB1);
+                _voiceB2 += _voiceMidCoefficient * (_voiceB1 - _voiceB2);
+                var lowVoice = _voiceB2;
+
+                // Voice, high half: 1 kHz high-pass then a 3.4 kHz low-pass.
+                _voiceC1 += _voiceMidCoefficient * (sample - _voiceC1);
+                var c1 = sample - _voiceC1;
+                _voiceC2 += _voiceMidCoefficient * (c1 - _voiceC2);
+                var c2 = c1 - _voiceC2;
+                _voiceD1 += _voiceHighCoefficient * (c2 - _voiceD1);
+                var highVoice = _voiceD1;
+
+                // Let both filter pairs settle before accumulating; the window starts cold.
                 if (i < 128) continue;
 
                 bassSum += low2 * low2;
                 midSum += body * body;
                 fullSum += sample * sample;
+                highSum += highs * highs;
+                lowVoiceSum += lowVoice * lowVoice;
+                highVoiceSum += highVoice * highVoice;
                 count++;
             }
 
             if (count == 0)
             {
-                bass = mid = full = 0f;
+                bass = mid = full = high = voiceLow = voiceHigh = 0f;
                 return;
             }
 
             bass = (float)Math.Sqrt(bassSum / count);
             mid = (float)Math.Sqrt(midSum / count);
             full = (float)Math.Sqrt(fullSum / count);
+            high = (float)Math.Sqrt(highSum / count);
+            voiceLow = (float)Math.Sqrt(lowVoiceSum / count);
+            voiceHigh = (float)Math.Sqrt(highVoiceSum / count);
         }
 
         public float Beat(float bass, float mid, float full, float gain, float dt)
         {
-            var live = full >= 0.0006f;
-            _bassSlow += (bass - _bassSlow) * Math.Min(1f, dt / 0.25f);
-            _midSlow += (mid - _midSlow) * Math.Min(1f, dt / 0.25f);
-
-            var onset = live
-                ? Math.Max(0f, bass - _bassSlow * 1.25f) +
-                  Math.Max(0f, mid - _midSlow * 1.30f) * 0.55f
-                : 0f;
-
-            _onsetAvg += (onset - _onsetAvg) * Math.Min(1f, dt / 2.0f);
-            _onsetPeak = Math.Max(onset, _onsetPeak * MathF.Exp(-dt / 3.0f));
-
-            var threshold = Math.Max(0.0012f, _onsetAvg * 1.8f) / gain;
             _time += dt;
 
-            if (onset > threshold && _time - _lastBeat >= 0.10f)
+            if (Onset(bass, mid, full, gain, dt, 1.25f, 1.30f, out var strength))
             {
-                var strength = Math.Clamp(
-                    onset / Math.Max(_onsetPeak * 0.9f, threshold), 0.4f, 1f);
                 _flash = Math.Max(_flash, strength);
                 _holdUntil = _time + 0.08f;
-                _lastBeat = _time;
             }
             else if (_time >= _holdUntil)
             {
@@ -1049,6 +1162,155 @@ internal static class LightingSync
             }
 
             return _flash;
+        }
+
+        /// <summary>
+        /// One attack detector, shared by Beat and Vibe. The strength is how far this step jumped
+        /// above the band's own ~250 ms baseline, weighted towards the kick.
+        /// </summary>
+        private bool Onset(float bass, float mid, float full, float gain, float dt,
+            float bassWeight, float midWeight, out float strength)
+        {
+            var live = full >= 0.0006f;
+            _bassSlow += (bass - _bassSlow) * Math.Min(1f, dt / 0.25f);
+            _midSlow += (mid - _midSlow) * Math.Min(1f, dt / 0.25f);
+
+            var onset = live
+                ? Math.Max(0f, bass - _bassSlow * bassWeight) +
+                  Math.Max(0f, mid - _midSlow * midWeight) * 0.55f
+                : 0f;
+
+            _onsetAvg += (onset - _onsetAvg) * Math.Min(1f, dt / 2.0f);
+            _onsetPeak = Math.Max(onset, _onsetPeak * MathF.Exp(-dt / 3.0f));
+
+            var threshold = Math.Max(0.0012f, _onsetAvg * 1.8f) / gain;
+            strength = 0f;
+
+            if (onset > threshold && _time - _lastBeat >= 0.10f)
+            {
+                strength = Math.Clamp(
+                    onset / Math.Max(_onsetPeak * 0.9f, threshold), 0.4f, 1f);
+                _lastBeat = _time;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// pr4u's Sound Sync-Vibe, ported from KB-Breathe: three layers over discrete levels 0-4,
+        /// loudest wins. The beat layer drops straight to the base level when its hold expires, so
+        /// the five-step backlight goes 4 -> 0 instead of walking 4-3-2-1. Levels map 1:1 onto the
+        /// 25 % steps.
+        /// </summary>
+        public int Vibe(float bass, float mid, float full, float high, float voiceLow,
+            float voiceHigh, float gain, float dt)
+        {
+            var live = full >= 0.0006f;
+            _time += dt;
+
+            // Beat layer: a stricter attack test than Beat mode, so pads and steady noise do not
+            // fake a hit. A hat-like attack (highs dominate, no body) belongs to the highs layer.
+            var hit = Onset(bass, mid, full, gain, dt, 1.7f, 1.9f, out var strength);
+            if (hit && high > 1.2f * mid && bass < 0.3f * mid) hit = false;
+
+            if (hit)
+            {
+                var level = strength >= SoftHit ? 4 : 3;
+                if (level >= _vibeBeatLevel || _vibeBeatHold <= 0f) _vibeBeatLevel = level;
+                _vibeBeatHold = BeatHoldSeconds;
+            }
+            else if (_vibeBeatHold > 0f)
+            {
+                _vibeBeatHold = Math.Max(0f, _vibeBeatHold - dt);
+                if (_vibeBeatHold <= 0f) _vibeBeatLevel = 0;
+            }
+
+            // Highs layer: a burst above the high band's own slow average (hats, cymbals, "s").
+            _vibeHighSlow += (high - _vibeHighSlow) * Math.Min(1f, dt / 0.25f);
+            var over = live ? Math.Max(0f, high - _vibeHighSlow * 1.4f) : 0f;
+            _vibeHighAvg += (over - _vibeHighAvg) * Math.Min(1f, dt / 2.0f);
+            var highThreshold = Math.Max(0.0007f, _vibeHighAvg * 2f) / gain;
+
+            if (over > highThreshold && _time - _vibeHighLast >= HighRefractorySeconds)
+            {
+                _vibeHighLast = _time;
+                _vibeHighHold = HighHoldSeconds;
+            }
+            else if (_vibeHighHold > 0f)
+            {
+                _vibeHighHold = Math.Max(0f, _vibeHighHold - dt);
+            }
+
+            _vibeHighLevel = _vibeHighHold > 0f ? 3 : 0;
+
+            // Voice layer: sustained energy in 300 Hz-3.4 kHz, split by where its pitch sits. The
+            // slow rise means short drum hits barely register, and the hold stops words blinking.
+            var voice = MathF.Sqrt(voiceLow * voiceLow + voiceHigh * voiceHigh);
+            _vibeVoiceEnv += (voice - _vibeVoiceEnv) *
+                Math.Min(1f, dt / (voice > _vibeVoiceEnv ? 0.10f : 0.20f));
+            _vibeFullEnv += (full - _vibeFullEnv) *
+                Math.Min(1f, dt / (full > _vibeFullEnv ? 0.10f : 0.20f));
+
+            var voiced = _vibeVoiceEnv >= 0.22f * _vibeFullEnv && _vibeVoiceEnv >= 0.003f;
+            _vibeVoicePeak = _vibeVoiceEnv > _vibeVoicePeak
+                ? _vibeVoiceEnv
+                : Math.Max(0.004f, _vibeVoicePeak * MathF.Exp(-dt / 25f));
+
+            var presence = voiced ? _vibeVoiceEnv / _vibeVoicePeak * gain : 0f;
+            if (presence >= 0.16f)
+            {
+                _vibeAbove += dt;
+                _vibeBelow = 0f;
+            }
+            else if (presence < 0.08f)
+            {
+                _vibeBelow += dt;
+                _vibeAbove = 0f;
+            }
+            else
+            {
+                _vibeAbove = _vibeBelow = 0f;
+            }
+
+            if (!_vibeVoiceOn && _vibeAbove >= 0.04f) _vibeVoiceOn = true;
+            else if (_vibeVoiceOn && _vibeBelow >= 0.18f) _vibeVoiceOn = false;
+            if (!live)
+            {
+                _vibeVoiceOn = false;
+                _vibeAbove = 0f;
+            }
+
+            if (_vibeVoiceOn && voice > 0.003f)
+            {
+                var pitch = voiceHigh / (voiceLow + voiceHigh + 1e-6f);
+                _vibePitch += (pitch - _vibePitch) * Math.Min(1f, dt / 0.20f);
+                _vibePitchCentre += (_vibePitch - _vibePitchCentre) * Math.Min(1f, dt / 5.0f);
+
+                // Hysteresis around the song's own pitch centre, so one syllable cannot flip it.
+                var centre = Math.Clamp(_vibePitchCentre, 0.36f, 0.44f);
+                if (_vibeHighPitch && _vibePitch < centre - 0.025f) _vibeHighPitch = false;
+                else if (!_vibeHighPitch && _vibePitch > centre + 0.025f) _vibeHighPitch = true;
+            }
+
+            var voiceLevel = _vibeVoiceOn ? (_vibeHighPitch ? 2 : 1) : 0;
+
+            // Loudest layer wins. Rises are instant so hits land on time; falls wait a minimum
+            // dwell so the light never chatters.
+            var target = Math.Max(_vibeBeatLevel, Math.Max(_vibeHighLevel, voiceLevel));
+            if (!live && _vibeBeatHold <= 0f) target = 0;
+
+            if (target > _vibeLevel || (target < _vibeLevel && _vibeAge >= MinDwellSeconds))
+            {
+                _vibeLevel = target;
+                _vibeAge = 0f;
+            }
+            else
+            {
+                _vibeAge += dt;
+            }
+
+            return _vibeLevel;
         }
 
         public float Overall(float bass, float full, float gain, float dt)
