@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>VibeCheck</AssemblyName>
+    <RootNamespace>VibeCheck</RootNamespace>
+    <!-- Nitrous.dll is a WPF app assembly; this harness only reflects into the audio
+         envelope, so it needs no WPF reference of its own. -->
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Nitrous">
+      <HintPath>..\..\bin\Release\net10.0-windows\Nitrous.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>

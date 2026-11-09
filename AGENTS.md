@@ -31,6 +31,12 @@ publish into the next free `publishN`. Do not keep a pre-commit copy; the build 
 compiles. If a folder cannot be overwritten because a tester is running it, publish to the next
 number and say which one they are on.
 
+## Tools
+
+`tools/` holds the development scripts worth keeping across sessions: the site screenshot
+capture (run it elevated), the release-note dry run, and the Vibe reflection harness.
+`tools/README.md` explains each. Nothing in there ships with the app.
+
 ## Test builds
 
 Anything handed to testers is never a plain version number. Suffix it:
