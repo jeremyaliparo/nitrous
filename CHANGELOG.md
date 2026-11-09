@@ -3,279 +3,80 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.11.0-test.28 - 2026-11-09
+## 0.11.0 - 2026-11-09
+<!-- release-name: Total Lightning Control -->
 
 ### Lighting
 
-- **New Vibe sound mode, the default on five-step keyboards.** Ported from pr4u's KB-Breathe: three
-  layers (beat, highs, voice) over discrete steps, loudest wins. The beat layer holds about 110 ms
-  and then drops straight to the base level, so the backlight goes 4 -> 0 instead of walking
-  4-3-2-1. Hi-hats give 3, sustained vocals 1-2, silence gives 0.
-- Peak and Beat are unchanged, and Spectrum stays the default on RGB keyboards. Vibe is selectable
-  there too. The five-step "Sound style" list is now Vibe / Beat / Peak.
-- The simulator gained the same Vibe engine.
-
-## 0.11.0-test.27 - 2026-11-09
-
-### Lighting
-
-- **Fixed: sound sync reverted to the Global preset when the dashboard was reopened.** Opening the
-  dashboard recorded whichever tab the window started on (Global) over the saved Area preset, so
-  the next sync frame switched the keyboard back to the Global effect. The saved tab is now left
-  alone on open and only the user's tab change records a new source.
-
-## 0.11.0-test.26 - 2026-11-09
-
-### Lighting
-
-- **Sound sync can run the active preset's effect**: Global's effect, or Area Dynamic's, is
-  animated by the firmware while the audio envelope drives its brightness. The effect and speed
-  stay editable while sync is on.
-- The **lid is written once as Static**, because the cover logo stutters when its brightness or
-  speed is rewritten per frame; the keyboard does not. The same applies to Static sound sync,
-  which no longer rewrites the lid every few frames.
-
-## 0.11.0-test.25 - 2026-11-09
+- **Screen sync.** The four zones follow the colours on screen, with a **Screen saturation** slider
+  (0-200 %), a brightness cap and a **Follow** target (`Keyboard` or `Keyboard + lid logo`). It is a
+  software effect: the tray keeps writing while the dashboard is closed, and turning it off restores
+  the saved preset. Protected content and true fullscreen can block the capture; it is not a
+  firmware effect.
+- **Pulse with sound** on top of screen sync: the screen supplies the colours while the system audio
+  scales their brightness, with a **Silence floor** (0-10 %) so hits can fall fully dark or keep a
+  dim glow.
+- **Sound sync** is its own source, taken from WASAPI loopback (system audio, never the microphone).
+  **Peak** follows loudness, **Spectrum** splits bass / low-mid / high-mid / treble across the
+  zones, **Beat** lands on kick onsets, and **Vibe** is a three-layer engine ported from the
+  MIT-licensed KB-Breathe. A shared **Sensitivity** slider sets the threshold, and 16-, 24- and
+  32-bit mix formats are accepted.
+- **Vibe is the default on five-step keyboards.** A kick holds step 4 for about 110 ms and then
+  drops straight to the base level, so the backlight goes 4 -> 0 instead of walking 4-3-2-1. Hi-hats
+  give 3, sustained vocals 1-2, and silence gives 0. Levels map 1:1 onto the firmware's 25 % steps.
+- **The active preset is the sync base.** Global contributes its colour and effect, Area its zone
+  colours and Dynamic effect, and brightness follows that preset's slider. Switching Global/Area no
+  longer suspends sync; the source is remembered and resumed.
+- With sound sync on, the **firmware keeps animating the selected effect** while the audio drives
+  its brightness, and both effect and speed stay editable. The **lid is written once as Static**,
+  because the cover logo stutters when its brightness or speed is rewritten per frame.
+- Sync **pauses for 1.5 seconds during a power-mode flash** so the controller's acknowledgement is
+  not overwritten, and it keeps working from Area / Keyboard as well as Global.
+- The **lid-logo check writes green** and asks again once for older answers: red is already in the
+  power-mode palette, so it proved nothing on a Performance machine. A lid that only follows the
+  power-mode key is explained and its controls are hidden.
+- **Fn brightness is respected.** The LIGHT page reads the EC level once on open and, if it differs
+  from the saved preset, says so under the slider instead of overwriting it. The saved preset is
+  applied once when the tray starts, not every time the dashboard opens.
 
 ### Keyboard
 
-- Sound sync now uses a **time-domain envelope ported from pr4u's KB-Breathe-Acer-Nitro**:
-  adaptive Beat onset (kick plus snare body, 80 ms hold, straight fall to 0) and an overall
-  loudness envelope for Peak. Screen sync → **Pulse with sound** uses the same Beat detector.
-- Loopback now accepts 24-bit mix formats as well as 16- and 32-bit.
-
-## 0.11.0-test.24 - 2026-11-09
-
-### Keyboard
-
-- Sound sync on the five-step backlight now reaches **0%** between hits instead of stopping at
-  25%. pr4u reported that the floor made the beat read as a level change rather than a pulse.
-
-## 0.11.0-test.23 - 2026-11-09
-
-### Build
-
-- The executable metadata now names **Jeremy Aliparo** as the company/author and carries the
-  copyright and a one-line description.
-
-## 0.11.0-test.22 - 2026-11-09
-
-### Lighting
-
-- When the LIGHT page opens or the window is activated, Nitrous reads the EC backlight level
-  once. If it differs from the saved preset, a line under the brightness slider shows the Fn
-  level and explains that moving the slider applies the preset. It is read once, not polled.
-
-## 0.11.0-test.21 - 2026-11-09
-
-### Lighting
-
-- The saved preset is applied **once when the tray starts**, not every time the dashboard opens.
-  Pressing **Fn + brightness** while Nitrous is in the tray is no longer undone just by opening
-  the window; the brightness slider applies only when the user changes it.
-
-## 0.11.0-test.20 - 2026-11-09
+- **Backlight brightness on models without a lighting controller**, for example the single-colour
+  ANV15-52: a five-step row (`Off`, `25`, `50`, `75`, `100`) in Setup > KEYBOARD, using the EC HID
+  interface where the model has one and `APGeAction` where it does not. Values snap to the
+  firmware's levels, and toggling auto-off no longer resets the brightness.
+- **Sound sync on that same five-step path**: Setup > KEYBOARD > **Pulse with sound** drives the
+  backlight from the system audio with **Vibe**, **Beat** or **Peak**, and restores the chosen level
+  when it stops. The pulse reaches 0 between hits rather than stopping at 25 %.
 
 ### Hotkeys
 
-- The **Global Hotkeys** card is grouped by where each action applies — **WINDOW**, **DASHBOARD**
-  and **LIGHT PAGE** — with a separator and a one-line description for every binding.
-
-## 0.11.0-test.19 - 2026-11-09
-
-### Hotkeys
-
-- Four new global bindings: **Cycle Fan Mode** (Auto → Max → Custom), **Screen Sync**,
-  **Sound Sync** and **Next Lighting Effect**. All are unbound by default and confirm with the OSD.
-- **Screen Sync** and **Next Lighting Effect** are hidden where the keyboard has no RGB zones.
-  **Sound Sync** stays available where the five-step backlight path exists, so a single-colour
-  model still has one lighting hotkey.
-- **Next Lighting Effect** does nothing while a sync is on. It follows the active preset,
-  switches **Area Static** to **Dynamic** on the first press, and wraps through the effect list.
-- The OSD can now draw generic status cards, not only power profiles.
-
-## 0.11.0-test.18 - 2026-11-09
-
-### Keyboard
-
-- **Sound sync on models with no lighting controller** (for example the single-colour ANV15-52):
-  **Setup → Keyboard → Pulse with sound** drives the five-step backlight from the system audio,
-  with **Beat** or **Peak** and the shared sensitivity slider. The chosen level is restored when
-  sync stops, and the lowest step stays lit between hits instead of strobing off.
-- This is the tester build for pr4u before the 0.11.0 release.
-
-## 0.11.0-test.17 - 2026-11-08
-
-### Lighting
-
-- The **SYNC** card draws a divider between **Screen sync** and **Sound sync**, so the two software
-  effects read as separate blocks instead of one long list.
-
-## 0.11.0-test.16 - 2026-11-08
-
-### Lighting
-
-- The **Silence floor** row explains itself: “Brightness between hits: 0% is off, 10% keeps a dim
-  glow.”
-
-### Docs
-
-- The README and site use the **TOTAL LIGHTNING CONTROL** phrase and describe the screen/audio sync,
-  Spectrum/Beat and saturation features.
-
-## 0.11.0-test.15 - 2026-11-08
-
-### Lighting
-
-- **Pulse with sound** gains a **Silence floor** slider (0–10%): 0 is fully off between hits, 10
-  keeps a dim glow of the screen colours. It is a percentage of the brightness cap.
-
-## 0.11.0-test.14 - 2026-11-08
-
-### Lighting
-
-- Screen sync gains **Pulse with sound**: the screen still supplies the four zone colours, while the
-  system-audio envelope scales their brightness at 25 Hz. Silence falls to a 10% glow, and the shared
-  Sound sensitivity sets the pulse strength. The screen is recaptured every third pulse frame, so
-  colours update at ~8 fps without slowing the beat.
-
-## 0.11.0-test.13 - 2026-11-08
-
-### Lighting
-
-- **Sound sync now forces Static** instead of disabling the effect: the Global Effect list contains
-  only `Static`, so its colour stays editable as the sync base. Area keeps the four zone swatches
-  editable and disables only `Dynamic`. Brightness acts as the cap, and the sync card says so.
-- **Screen sync stays brightness-only**: its colour and zone editors remain disabled because the
-  screen supplies the colours.
-
-## 0.11.0-test.12 - 2026-11-08
-
-### Lighting
-
-- With **Screen sync** on, only brightness is adjustable: Global Colour greys to `Auto`, and the Area
-  Static/Dynamic selector, effect, speed, zone swatches and single-colour chip are disabled. A hint
-  says the screen owns the colours.
-- The **Cover logo** panel follows the Follow target. `Keyboard + lid logo` disables its controls and
-  TEST LID LOGO with a hint; `Keyboard` leaves the logo editable. Sound sync keeps the preset colours
-  as its base and leaves the colour editors usable.
-
-## 0.11.0-test.11 - 2026-11-08
-
-### Lighting
-
-- Screen sync gains a **Screen saturation** slider (0–200%): 0 is grey, 100 leaves the captured
-  colours unchanged, 200 boosts them. It transforms the RGB values before they are written; the
-  keyboard LEDs have no hardware saturation control.
-
-## 0.11.0-test.10 - 2026-11-08
-
-### Lighting
-
-- An old **Yes** from the ambiguous red lid-logo test is invalidated once, so the green test runs
-  again. Until a logo is explicitly confirmed, the Follow selector stays on **Keyboard** and the lid
-  option is disabled.
-- Keep the mode flash on if the power-mode key's colour is wanted; that key is firmware-driven and
-  is not a separately addressable cover logo.
-
-## 0.11.0-test.9 - 2026-11-08
-
-### Lighting
-
-- The lid-logo check now writes **green**, not red: the power-mode palette already includes red
-  (Performance), so a red test on a Performance machine looked unchanged. The prompt asks for green
-  or another non-mode colour, and says to choose No when the logo only follows the power mode.
-- The unavailable panel explains that same case, so a mode-only lid logo is hidden instead of
-  offering controls that do nothing.
-
-## 0.11.0-test.8 - 2026-11-08
-
-### Lighting
-
-- Sync now uses the **active preset's static colours** as its base: Global's one colour, or Area's
-  four zone colours. Editing a colour while sync is on takes effect on the next refresh instead of
-  being ignored, and switching Global/Area switches the base.
-- Brightness follows the active preset's slider (Area or Global), not always Global.
-- The Global colour chip stays editable while sync is on, even for an animated preset. The shared
-  card now says the preset's colours are the base and that turning sync off is only needed to edit
-  the effects.
-
-## 0.11.0-test.7 - 2026-11-08
-
-### Lighting
-
-- **Beat** joins Peak and Spectrum in the Sound mode list. It watches the bass band for onsets,
-  requires a 140 ms gap between hits, and fades a short flash, so it lands on kicks instead of
-  following every transient. The sensitivity slider sets its threshold.
-
-## 0.11.0-test.6 - 2026-11-08
-
-### Lighting
-
-- Sync is now one shared card under the Global/Area tabs, so it works from **Area → Keyboard**
-  as well. A **Follow** selector chooses `Keyboard` or `Keyboard + lid logo`.
-- Sound sync has **Peak** and **Spectrum** modes. Spectrum runs a 2048-point FFT on WASAPI loopback
-  and drives bass / low-mid / high-mid / treble into the four zones; Peak keeps the single
-  brightness pulse.
-- Switching Global/Area no longer suspends sync. The saved preset returns when it is turned off.
-
-## 0.11.0-test.5 - 2026-11-08
-
-### Lighting
-
-- **Sound sync now reacts to beats, not overall loudness.** The raw peak is compared with a slow
-  baseline and the transient drives the brightness, with a fast release. The previous square-root
-  gain pushed most music to full, which is why it looked static.
-- Silence turns the keyboard off completely. A **Sound sensitivity** slider (1-10) appears while
-  Sound sync is on.
-
-## 0.11.0-test.4 - 2026-11-08
-
-### Lighting
-
-- **Sound sync** on the LIGHT page under Global: the keyboard and cover logo pulse with the default
-  audio output (system audio, not the microphone). It is a software effect like screen sync, runs in
-  the tray, and the two sources are mutually exclusive.
-- Both syncs now share one tray worker, restore path and power-mode pause. Turning either on raises a
-  zero brightness to 100 so the effect is visible.
-- Settings are unified as `KbSyncEnabled`/`KbSyncSource`; the screen-only prototype keys migrate on
-  first launch.
-
-## 0.11.0-test.3 - 2026-11-08
-
-### Lighting
-
-- **Screen sync is remembered across the Global/Area tabs.** Opening Area suspends it and applies the
-  Area preset; returning to Global resumes the same switch state instead of turning it off.
-- The sync worker **pauses for 1.5 seconds during a power-mode flash**, so the controller's
-  acknowledgement is not overwritten by the next frame.
-
-## 0.11.0-test.2 - 2026-11-08
-
-### Lighting
-
-- **Prototype screen sync.** A new **Screen sync** switch on the LIGHT page under Global makes the
-  four keyboard zones follow the screen's colours, with the cover logo following the average. It is
-  a software effect: the tray writes the zones continuously, so it keeps running when the dashboard
-  is closed, and turning it off restores the saved Global or Area preset. Protected content and true
-  fullscreen can block the capture, and it is not a firmware effect.
-
-## 0.11.0-test.1 - 2026-11-08
-
-### Keyboard
-
-- **Backlight brightness** on models without a lighting controller: a five-step row in
-  **Setup → KEYBOARD** (`Off`, `25`, `50`, `75`, `100`). It uses the EC HID interface where the
-  model has one and `APGeAction` where it does not, snaps to the firmware's levels, and preserves
-  the auto-off timeout. Toggling auto-off no longer resets the brightness.
-- **EC probe version 12** records the keyboard type and both brightness paths, plus which one the
-  model uses, so coverage can be mapped from a diagnostic report without writing anything.
+- Four new global bindings: **Cycle Fan Mode** (Auto -> Max -> Custom), **Screen Sync**,
+  **Sound Sync** and **Next Lighting Effect**. All are unbound by default, confirm with an OSD, and
+  the two lighting ones are hidden where the keyboard has no RGB zones.
+- The **Global Hotkeys** card is grouped by where each action applies (WINDOW, DASHBOARD, LIGHT
+  PAGE), with a separator and a one-line description for every binding.
 
 ### Dashboard
 
-- The **Whisper Mode** label now follows the request without waiting for a mode change, so it no
-  longer disappears while Quiet is still asking for it. Releasing it in another mode still hides
-  it.
+- The **Whisper Mode** label follows the request immediately, so it no longer vanishes while Quiet
+  is still asking for it.
+
+### Website
+
+- An **interactive simulator** renders the dashboard, the four zones, the lid logo and the sync
+  behaviour in the browser, linked from the header and the hero.
+- The README and site describe the screen and audio sync as **TOTAL LIGHTNING CONTROL**.
+
+### Diagnostics
+
+- **EC probe version 12** records the keyboard type and both brightness paths, plus which one the
+  model uses, so coverage can be mapped from a report without writing anything to the hardware.
+
+### Build
+
+- The executable carries **Jeremy Aliparo** as company and author, a copyright line and a one-line
+  description.
 
 ## 0.10.0 - 2026-11-08
 
