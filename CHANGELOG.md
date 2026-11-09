@@ -3,6 +3,22 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.25 - 2026-11-09
+
+### Keyboard
+
+- Sound sync now uses a **time-domain envelope ported from pr4u's KB-Breathe-Acer-Nitro**:
+  adaptive Beat onset (kick plus snare body, 80 ms hold, straight fall to 0) and an overall
+  loudness envelope for Peak. Screen sync → **Pulse with sound** uses the same Beat detector.
+- Loopback now accepts 24-bit mix formats as well as 16- and 32-bit.
+
+## 0.11.0-test.24 - 2026-11-09
+
+### Keyboard
+
+- Sound sync on the five-step backlight now reaches **0%** between hits instead of stopping at
+  25%. pr4u reported that the floor made the beat read as a level change rather than a pulse.
+
 ## 0.11.0-test.23 - 2026-11-09
 
 ### Build

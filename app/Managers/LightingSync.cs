@@ -27,6 +27,8 @@ internal static class LightingSync
     private const int ZoneCount = AcerKeyboard.ZoneCount;
     private const int ScreenRateMs = 125;
     private const int SoundRateMs = 40;
+    private const int PulseRateMs = 40;
+    private const int BrightnessSoundRateMs = 20;
     private const int LogoEveryFrames = 4;
     private const int SoundFloorPercent = 0;
 
@@ -201,11 +203,11 @@ internal static class LightingSync
         using var capture = new ScreenCapture(Columns, Rows);
         var zones = new KeyboardColor[ZoneCount];
         var logo = KeyboardColor.White;
-        var baseline = 0f;
-        var pulse = 0f;
         var frame = 0;
-        AudioMeter? meter = null;
-        var meterWarned = false;
+        var envelope = new SoundEnvelope();
+        var samples = new float[SpectrumAnalyzer.Size];
+        SpectrumSource? spectrum = null;
+        var sourceWarned = false;
 
         try
         {
@@ -218,34 +220,38 @@ internal static class LightingSync
                 }
 
                 var wanted = SettingsManager.Get("KbScreenPulse", 0) == 1;
-                if (wanted && meter == null && !meterWarned)
+                if (wanted && spectrum == null && !sourceWarned)
                 {
-                    meter = AudioMeter.TryCreate();
-                    if (meter == null)
+                    spectrum = SpectrumSource.TryCreate();
+                    if (spectrum == null)
                     {
                         Logger.Warn("Screen sync: no audio output for the pulse.");
-                        meterWarned = true;
+                        sourceWarned = true;
+                    }
+                    else
+                    {
+                        envelope.Configure(spectrum.SampleRate);
+                        envelope.Reset();
                     }
                 }
-                else if (!wanted && meter != null)
+                else if (!wanted && spectrum != null)
                 {
-                    meter.Dispose();
-                    meter = null;
-                    meterWarned = false;
-                    baseline = 0f;
-                    pulse = 0f;
+                    spectrum.Dispose();
+                    spectrum = null;
+                    sourceWarned = false;
+                    envelope.Reset();
                 }
 
-                var pulseOn = wanted && meter != null;
+                var pulseOn = wanted && spectrum != null;
                 var rate = pulseOn
-                    ? SoundRateMs
+                    ? PulseRateMs
                     : Math.Clamp(SettingsManager.Get("KbSyncRate",
                         SettingsManager.Get("KbScreenSyncRate", ScreenRateMs)), 80, 500);
                 var saturation = Math.Clamp(
                     SettingsManager.Get("KbSyncSaturation", 100), 0, 200) / 100f;
                 var cap = BaseBrightness();
 
-                // At 25 Hz the pulse is smooth; the screen only needs a new frame every third one.
+                // At 50 Hz the pulse is smooth; the screen only needs a new frame every third one.
                 if (frame % (pulseOn ? 3 : 1) == 0 && capture.TryCapture(out var pixels))
                 {
                     if (!_running) break;
@@ -255,23 +261,21 @@ internal static class LightingSync
                 }
 
                 var brightness = cap;
-                if (pulseOn && meter != null)
+                if (pulseOn && spectrum != null)
                 {
-                    var peak = meter.Peak();
-                    var transient = Math.Max(0f, peak - baseline);
-                    baseline += (peak - baseline) * 0.02f; // ~2 s at 25 Hz
-                    pulse = Math.Max(transient, pulse * 0.75f);
+                    float bass = 0f, mid = 0f, full = 0f;
+                    if (spectrum.Read(samples))
+                        envelope.Analyze(samples, out bass, out mid, out full);
 
                     var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
                     var floor = Math.Clamp(SettingsManager.Get("KbSyncFloor", 0), 0, 10);
-                    var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
-                    var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
-                    brightness = (int)Math.Round(
-                        (floor + level * (100 - floor)) * cap / 100.0);
+                    var gain = 0.5f + sensitivity * 0.1f;
+                    var level = envelope.Beat(bass, mid, full, gain, PulseRateMs / 1000f);
+                    brightness = (int)Math.Round((floor + level * (100 - floor)) * cap / 100.0);
 
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
-                        Logger.Info($"Screen sync (pulse): peak={peak:0.00} " +
-                                    $"pulse={pulse:0.00} brightness={brightness}");
+                        Logger.Info($"Screen sync (pulse): bass={bass:0.000} full={full:0.000} " +
+                                    $"level={level:0.00} brightness={brightness}");
                 }
 
                 WriteFrame(zones, Math.Clamp(brightness, 0, 100), logo,
@@ -283,7 +287,7 @@ internal static class LightingSync
         }
         finally
         {
-            meter?.Dispose();
+            spectrum?.Dispose();
         }
     }
 
@@ -293,14 +297,13 @@ internal static class LightingSync
         var levels = new int[ZoneCount];
         var baseline = 0f;
         var pulse = 0f;
-        var bassBaseline = 0f;
-        var beatFlash = 0f;
-        var lastBeat = DateTime.MinValue;
         var frame = 0;
         var mode = "";
         AudioMeter? meter = null;
         SpectrumSource? spectrum = null;
         var analyzer = new SpectrumAnalyzer();
+        var envelope = new SoundEnvelope();
+        var samples = new float[SpectrumAnalyzer.Size];
 
         try
         {
@@ -335,13 +338,12 @@ internal static class LightingSync
                     mode = desired;
                     baseline = 0f;
                     pulse = 0f;
-                    bassBaseline = 0f;
-                    beatFlash = 0f;
-                    lastBeat = DateTime.MinValue;
                     Array.Clear(levels);
+                    envelope.Reset();
 
-                    if (mode == SoundModePeak) meter = AudioMeter.TryCreate();
-                    else spectrum = SpectrumSource.TryCreate();
+                    spectrum = SpectrumSource.TryCreate();
+                    if (spectrum == null && mode == SoundModePeak)
+                        meter = AudioMeter.TryCreate();
 
                     if (meter == null && spectrum == null)
                     {
@@ -350,6 +352,8 @@ internal static class LightingSync
                         RestoreSavedPreset();
                         return;
                     }
+
+                    if (spectrum != null) envelope.Configure(spectrum.SampleRate);
                 }
 
                 if (frame % 25 == 0)
@@ -359,6 +363,9 @@ internal static class LightingSync
                 // uses the full five steps, because a 25% ceiling would be barely visible.
                 var ceiling = _brightnessOnly ? 100 : BaseBrightness();
                 var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+                var gain = 0.5f + sensitivity * 0.1f;
+                var rate = _brightnessOnly ? BrightnessSoundRateMs : SoundRateMs;
+                var dt = rate / 1000f;
 
                 if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                 {
@@ -366,52 +373,64 @@ internal static class LightingSync
                                 $"{string.Join(",", zones.Select(z => z.ToHex()))} cap={ceiling}");
                 }
 
-                if (mode == SoundModePeak && meter != null)
-                {
-                    var peak = meter.Peak();
-                    var transient = Math.Max(0f, peak - baseline);
-                    baseline += (peak - baseline) * 0.02f;
-                    pulse = Math.Max(transient, pulse * 0.75f);
+                var haveSamples = spectrum?.Read(samples) == true;
 
-                    var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
-                    var level = Math.Clamp(pulse * sensitivity + presence, 0f, 1f);
+                if (mode == SoundModePeak)
+                {
+                    int brightness;
+
+                    if (spectrum != null)
+                    {
+                        float bass = 0f, mid = 0f, full = 0f;
+                        if (haveSamples) envelope.Analyze(samples, out bass, out mid, out full);
+                        var level = envelope.Overall(bass, full, gain, dt);
+                        brightness = (int)Math.Round(level * ceiling);
+
+                        if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                            Logger.Info($"Sound sync (Overall): bass={bass:0.000} full={full:0.000} " +
+                                        $"level={level:0.00} brightness={brightness}");
+                    }
+                    else if (meter != null)
+                    {
+                        // Fallback for endpoints whose mix format the spectrum reader cannot open.
+                        var peak = meter.Peak();
+                        var transient = Math.Max(0f, peak - baseline);
+                        baseline += (peak - baseline) * (1f - MathF.Exp(-dt / 0.5f));
+                        pulse = Math.Max(transient, pulse * MathF.Exp(-dt / 0.15f));
+                        var presence = Math.Max(0f, peak - 0.08f) * 0.35f;
+                        var level = Math.Clamp(pulse * gain + presence, 0f, 1f);
+                        brightness = (int)Math.Round(level * ceiling);
+
+                        if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                            Logger.Info($"Sound sync (Peak fallback): peak={peak:0.00} " +
+                                        $"pulse={pulse:0.00} brightness={brightness}");
+                    }
+                    else
+                    {
+                        brightness = 0;
+                    }
+
+                    for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
+                }
+                else if (mode == SoundModeBeat && spectrum != null)
+                {
+                    float bass = 0f, mid = 0f, full = 0f;
+                    if (haveSamples) envelope.Analyze(samples, out bass, out mid, out full);
+                    var level = envelope.Beat(bass, mid, full, gain, dt);
                     var brightness = (int)Math.Round(level * ceiling);
                     for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
 
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
-                        Logger.Info($"Sound sync (Peak): peak={peak:0.00} pulse={pulse:0.00} brightness={brightness}");
+                        Logger.Info($"Sound sync (Beat): bass={bass:0.000} mid={mid:0.000} " +
+                                    $"level={level:0.00} brightness={brightness}");
                 }
                 else if (spectrum != null)
                 {
-                    if (spectrum.Read(analyzer.Samples))
+                    if (haveSamples)
                         analyzer.Analyze(spectrum.SampleRate, sensitivity, ceiling, levels);
 
-                    if (mode == SoundModeBeat)
-                    {
-                        var bass = analyzer.Bass;
-                        var onset = Math.Max(0f, bass - bassBaseline);
-                        bassBaseline += (bass - bassBaseline) * 0.04f; // ~1 s at 25 Hz
-
-                        var threshold = 0.35f / sensitivity;
-                        if (onset > threshold &&
-                            DateTime.UtcNow - lastBeat > TimeSpan.FromMilliseconds(140))
-                        {
-                            lastBeat = DateTime.UtcNow;
-                            beatFlash = 1f;
-                        }
-
-                        beatFlash *= 0.80f; // ~0.15 s flash
-                        var brightness = (int)Math.Round(beatFlash * ceiling);
-                        for (var i = 0; i < levels.Length; i++) levels[i] = brightness;
-
-                        if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
-                            Logger.Info($"Sound sync (Beat): bass={bass:0.00} onset={onset:0.00} " +
-                                        $"flash={beatFlash:0.00} brightness={brightness}");
-                    }
-                    else if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
-                    {
+                    if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                         Logger.Info($"Sound sync (Spectrum): {string.Join(",", levels)}");
-                    }
                 }
 
                 if (_brightnessOnly)
@@ -425,7 +444,7 @@ internal static class LightingSync
                 }
 
                 frame++;
-                Thread.Sleep(SoundRateMs);
+                Thread.Sleep(rate);
             }
         }
         finally
@@ -542,13 +561,14 @@ internal static class LightingSync
     }
 
     /// <summary>
-    /// Snap a 0-100 level to the firmware's five steps, keeping the lowest step lit between hits
-    /// so the keyboard does not strobe off. The saved level is restored when sync stops.
+    /// Snap a 0-100 level to the firmware's five steps. The path is allowed to reach 0 between
+    /// hits: pr4u reported that stopping at 25% made the beat read as a level change rather than
+    /// a pulse. The saved level is restored when sync stops.
     /// </summary>
     private static int SnapBrightness(int raw)
     {
         var step = (int)Math.Round(Math.Clamp(raw, 0, 100) / 25.0) * 25;
-        return Math.Clamp(step, 25, 100);
+        return Math.Clamp(step, 0, 100);
     }
 
     private static void WriteBrightness(int raw)
@@ -861,6 +881,137 @@ internal static class LightingSync
     /// WASAPI loopback on the default render endpoint, downmixed to mono and kept in a short ring
     /// so the FFT always has the latest 2048 samples.
     /// </summary>
+    /// <summary>
+    /// Time-domain envelope ported from pr4u's KB-Breathe-Acer-Nitro. The kick band is a two-pole
+    /// 150 Hz low-pass, the snare body a 2 kHz low-pass, and the levels are RMS over the latest
+    /// audio window. Beat is an adaptive attack detector with an 80 ms hold and a straight fall;
+    /// Overall follows the tune's loudness with an auto-ranged envelope.
+    /// </summary>
+    private sealed class SoundEnvelope
+    {
+        private float _bassCoefficient;
+        private float _midCoefficient;
+
+        private float _bassSlow;
+        private float _midSlow;
+        private float _onsetAvg;
+        private float _onsetPeak;
+        private float _flash;
+        private float _holdUntil;
+        private float _time;
+        private float _lastBeat;
+
+        private float _hi = 0.004f;
+        private float _lo;
+        private float _env;
+
+        public void Configure(int sampleRate)
+        {
+            _bassCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 150f / sampleRate);
+            _midCoefficient = 1f - MathF.Exp(-2f * MathF.PI * 2000f / sampleRate);
+        }
+
+        public void Reset()
+        {
+            _bassSlow = _midSlow = _onsetAvg = _onsetPeak = 0f;
+            _flash = _holdUntil = _time = 0f;
+            _lastBeat = -1f;
+            _hi = 0.004f;
+            _lo = 0f;
+            _env = 0f;
+        }
+
+        public void Analyze(float[] samples, out float bass, out float mid, out float full)
+        {
+            var low1 = 0f;
+            var low2 = 0f;
+            var body = 0f;
+            double bassSum = 0;
+            double midSum = 0;
+            double fullSum = 0;
+            var count = 0;
+
+            for (var i = 0; i < samples.Length; i++)
+            {
+                var sample = samples[i];
+                low1 += _bassCoefficient * (sample - low1);
+                low2 += _bassCoefficient * (low1 - low2);
+                body += _midCoefficient * ((sample - low2) - body);
+
+                // Let the filters settle before accumulating; the window starts cold.
+                if (i < 128) continue;
+
+                bassSum += low2 * low2;
+                midSum += body * body;
+                fullSum += sample * sample;
+                count++;
+            }
+
+            if (count == 0)
+            {
+                bass = mid = full = 0f;
+                return;
+            }
+
+            bass = (float)Math.Sqrt(bassSum / count);
+            mid = (float)Math.Sqrt(midSum / count);
+            full = (float)Math.Sqrt(fullSum / count);
+        }
+
+        public float Beat(float bass, float mid, float full, float gain, float dt)
+        {
+            var live = full >= 0.0006f;
+            _bassSlow += (bass - _bassSlow) * Math.Min(1f, dt / 0.25f);
+            _midSlow += (mid - _midSlow) * Math.Min(1f, dt / 0.25f);
+
+            var onset = live
+                ? Math.Max(0f, bass - _bassSlow * 1.25f) +
+                  Math.Max(0f, mid - _midSlow * 1.30f) * 0.55f
+                : 0f;
+
+            _onsetAvg += (onset - _onsetAvg) * Math.Min(1f, dt / 2.0f);
+            _onsetPeak = Math.Max(onset, _onsetPeak * MathF.Exp(-dt / 3.0f));
+
+            var threshold = Math.Max(0.0012f, _onsetAvg * 1.8f) / gain;
+            _time += dt;
+
+            if (onset > threshold && _time - _lastBeat >= 0.10f)
+            {
+                var strength = Math.Clamp(
+                    onset / Math.Max(_onsetPeak * 0.9f, threshold), 0.4f, 1f);
+                _flash = Math.Max(_flash, strength);
+                _holdUntil = _time + 0.08f;
+                _lastBeat = _time;
+            }
+            else if (_time >= _holdUntil)
+            {
+                _flash = Math.Max(0f, _flash - dt * 5f);
+            }
+
+            return _flash;
+        }
+
+        public float Overall(float bass, float full, float gain, float dt)
+        {
+            var loudness = full < 0.0006f ? 0f : bass * 2.1f + full * 0.55f;
+
+            _hi = Math.Max(loudness, _hi * MathF.Exp(-dt / 3.0f));
+            if (loudness < _lo) _lo = loudness;
+            else _lo += (loudness - _lo) * Math.Min(1f, dt / 8.0f);
+
+            var range = Math.Max(_hi - _lo, Math.Max(0.0006f, _hi * 0.25f));
+            var normalized = Math.Clamp((loudness - _lo) / range, 0f, 1f) * gain;
+            if (normalized > 1f) normalized = 1f;
+
+            if (normalized > _env)
+                _env += (normalized - _env) * Math.Min(1f, dt / 0.035f);
+            else
+                _env = Math.Max(0f, _env - dt * 2.0f);
+
+            return _env;
+        }
+    }
+
     private sealed class SpectrumSource : IDisposable
     {
         private const int Shared = 0;
@@ -880,6 +1031,7 @@ internal static class LightingSync
         private int _count;
         private float[] _packet = new float[4096];
         private short[] _packet16 = new short[4096];
+        private byte[] _packet24 = new byte[12288];
 
         public int SampleRate { get; private set; }
 
@@ -907,7 +1059,7 @@ internal static class LightingSync
                 source._channels = Math.Max(1, (int)wave.Channels);
                 source.SampleRate = (int)wave.SamplesPerSec;
                 source._bits = wave.BitsPerSample;
-                if (source._bits is not (16 or 32) || source.SampleRate <= 0)
+                if (source._bits is not (16 or 24 or 32) || source.SampleRate <= 0)
                     throw new InvalidOperationException($"Unsupported sample format ({source._bits}-bit).");
 
                 if (client.Initialize(Shared, Loopback, 1_000_000, 0, format, IntPtr.Zero) != 0)
@@ -975,10 +1127,23 @@ internal static class LightingSync
             if (_packet16.Length < samples) _packet16 = new short[samples];
 
             if (_bits == 32) Marshal.Copy(data, _packet, 0, samples);
-            else
+            else if (_bits == 16)
             {
                 Marshal.Copy(data, _packet16, 0, samples);
                 for (var i = 0; i < samples; i++) _packet[i] = _packet16[i] / 32768f;
+            }
+            else
+            {
+                // 24-bit packed: the same sign-extended conversion pr4u's capture uses.
+                var bytes = samples * 3;
+                if (_packet24.Length < bytes) _packet24 = new byte[bytes];
+                Marshal.Copy(data, _packet24, 0, bytes);
+                for (var i = 0; i < samples; i++)
+                {
+                    var o = i * 3;
+                    var value = (_packet24[o] << 8) | (_packet24[o + 1] << 16) | (_packet24[o + 2] << 24);
+                    _packet[i] = value / 2147483648f;
+                }
             }
 
             var frames = (int)frameCount;
