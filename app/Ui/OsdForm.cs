@@ -46,6 +46,7 @@ public sealed class OsdForm : Form
     private readonly System.Windows.Forms.Timer _frameTimer;
     private readonly Stopwatch _clock = new();
     private readonly Dictionary<CardKey, CardSurface> _cards = new();
+    private readonly Dictionary<string, CardSurface> _statusCards = new();
     private readonly Color _quiet = Color.FromArgb(52, 199, 89);
     private readonly Color _balanced = Color.FromArgb(10, 132, 255);
     private readonly Color _performance = Color.FromArgb(255, 159, 10);
@@ -150,53 +151,7 @@ public sealed class OsdForm : Form
             _accent = color;
 
             var layout = ComputeLayout();
-            var surface = GetSurface(profile, layout);
-            var sizeChanged = _surface != surface || _surfaceSize != layout.Size;
-
-            _surface = surface;
-            _surfaceSize = layout.Size;
-            _baseLocation = layout.BaseLocation;
-            _slide = layout.Slide;
-            _scale = layout.Size.Width / (float)BaseWidthDip;
-
-            _ = Handle;
-
-            if (Visible && _animating && _phase is Phase.In or Phase.Hold)
-            {
-                // A second profile change while the toast is visible: swap the card without
-                // flashing it out and back in.
-                SetFrame(255, 0);
-                _phase = Phase.Hold;
-                _phaseStart = _clock.Elapsed;
-                return;
-            }
-
-            if (sizeChanged)
-                Size = layout.Size;
-
-            // Put the surface in place while the window is still hidden, then show at alpha 0.
-            SetFrame(0, _slide);
-            if (!Visible) Show();
-            RaiseToTop();
-
-            _phase = Phase.In;
-            _phaseStart = TimeSpan.Zero;
-            _clock.Restart();
-            _animating = true;
-            _frameTimer.Start();
-
-            _reduceMotion = !SystemInformation.UIEffectsEnabled;
-
-            if (_reduceMotion)
-            {
-                // Reduced motion: no fade, just hold the card for the normal duration.
-                SetFrame(255, 0);
-                _phase = Phase.Hold;
-            }
-            else
-            {
-                OnFrame(null, EventArgs.Empty);
-            }
+            ShowSurface(GetSurface(profile, layout), layout);
         }
         catch (Exception ex)
         {
@@ -205,6 +160,96 @@ public sealed class OsdForm : Form
             _animating = false;
             _frameTimer.Stop();
             _phase = Phase.Idle;
+        }
+    }
+
+    /// <summary>
+    /// A one-off status card for hotkeys that are not a power profile (fan mode, lighting sync,
+    /// effect). These are rare, so the card is drawn on demand rather than pre-warmed.
+    /// </summary>
+    public void ShowStatus(Color color, string caption, string title)
+    {
+        if (IsDisposed) return;
+
+        if (InvokeRequired)
+        {
+            try { BeginInvoke(new Action(() => ShowStatus(color, caption, title))); }
+            catch (InvalidOperationException) { }
+            return;
+        }
+
+        try
+        {
+            _accent = color;
+
+            var layout = ComputeLayout();
+            var key = $"{caption}|{title}|{color.ToArgb()}|{layout.Size.Width}x{layout.Size.Height}";
+            if (!_statusCards.TryGetValue(key, out var surface))
+            {
+                surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
+                    graphics => RenderCardCore(graphics, layout.Size, color, caption, title));
+                _statusCards[key] = surface;
+            }
+
+            ShowSurface(surface, layout);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("OSD: could not show the status card.", ex);
+            try { Hide(); } catch { }
+            _animating = false;
+            _frameTimer.Stop();
+            _phase = Phase.Idle;
+        }
+    }
+
+    private void ShowSurface(CardSurface surface, OsdLayout layout)
+    {
+        var sizeChanged = _surface != surface || _surfaceSize != layout.Size;
+
+        _surface = surface;
+        _surfaceSize = layout.Size;
+        _baseLocation = layout.BaseLocation;
+        _slide = layout.Slide;
+        _scale = layout.Size.Width / (float)BaseWidthDip;
+
+        _ = Handle;
+
+        if (Visible && _animating && _phase is Phase.In or Phase.Hold)
+        {
+            // A second change while the toast is visible: swap the card without flashing it out
+            // and back in.
+            SetFrame(255, 0);
+            _phase = Phase.Hold;
+            _phaseStart = _clock.Elapsed;
+            return;
+        }
+
+        if (sizeChanged)
+            Size = layout.Size;
+
+        // Put the surface in place while the window is still hidden, then show at alpha 0.
+        SetFrame(0, _slide);
+        if (!Visible) Show();
+        RaiseToTop();
+
+        _phase = Phase.In;
+        _phaseStart = TimeSpan.Zero;
+        _clock.Restart();
+        _animating = true;
+        _frameTimer.Start();
+
+        _reduceMotion = !SystemInformation.UIEffectsEnabled;
+
+        if (_reduceMotion)
+        {
+            // Reduced motion: no fade, just hold the card for the normal duration.
+            SetFrame(255, 0);
+            _phase = Phase.Hold;
+        }
+        else
+        {
+            OnFrame(null, EventArgs.Empty);
         }
     }
 
@@ -406,7 +451,11 @@ public sealed class OsdForm : Form
         return surface;
     }
 
-    private void RenderCard(Graphics graphics, Size size, PowerProfile profile)
+    private void RenderCard(Graphics graphics, Size size, PowerProfile profile) =>
+        RenderCardCore(graphics, size, GetAccent(profile), "POWER PROFILE",
+            profile.ToString().ToUpperInvariant());
+
+    private void RenderCardCore(Graphics graphics, Size size, Color accent, string caption, string title)
     {
         var scale = size.Width / (float)BaseWidthDip;
         var width = (float)size.Width;
@@ -418,8 +467,6 @@ public sealed class OsdForm : Form
         graphics.CompositingQuality = CompositingQuality.HighQuality;
         graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         graphics.Clear(Color.Transparent);
-
-        var accent = GetAccent(profile);
 
         using (var card = RoundedRect(new RectangleF(0.5f, 0.5f, width - 1f, height - 1f), 22f * scale))
         using (var fill = new LinearGradientBrush(new RectangleF(0, 0, width, height),
@@ -487,9 +534,9 @@ public sealed class OsdForm : Form
             Trimming = StringTrimming.EllipsisCharacter
         };
 
-        graphics.DrawString("POWER PROFILE", captionFont, captionBrush,
+        graphics.DrawString(caption, captionFont, captionBrush,
             new RectangleF(textX, 24f * scale, width - textX - 24f * scale, 18f * scale), textFormat);
-        graphics.DrawString(profile.ToString().ToUpperInvariant(), titleFont, titleBrush,
+        graphics.DrawString(title, titleFont, titleBrush,
             new RectangleF(textX, 41f * scale, width - textX - 24f * scale, 36f * scale), textFormat);
 
         var dotX = width - 28f * scale;
@@ -548,6 +595,10 @@ public sealed class OsdForm : Form
             foreach (var surface in _cards.Values)
                 surface.Dispose();
             _cards.Clear();
+
+            foreach (var surface in _statusCards.Values)
+                surface.Dispose();
+            _statusCards.Clear();
             _surface = null;
 
             _logo?.Dispose();

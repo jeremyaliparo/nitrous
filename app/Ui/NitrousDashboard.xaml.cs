@@ -35,6 +35,11 @@ public partial class NitrousDashboard : Window
     private FanProfile? _lastSyncedFanMode;
     private RefreshMode? _lastSyncedRefreshMode;
     private int _lastSyncedRefreshHz;
+    private bool? _lastSyncedSyncEnabled;
+    private string _lastSyncedSyncSource = "";
+    private KeyboardEffect? _lastSyncedGlobalEffect;
+    private string _lastSyncedAreaStyle = "";
+    private KeyboardEffect? _lastSyncedAreaEffect;
 
     public NitrousDashboard()
     {
@@ -134,6 +139,8 @@ public partial class NitrousDashboard : Window
             : FanProfile.Auto;
         var activeRefresh = DisplayManager.GetMode();
 
+        SyncLightingFromSettings();
+
         if (activeMode == _lastSyncedPowerMode &&
             activeFan == _lastSyncedFanMode &&
             activeRefresh == _lastSyncedRefreshMode &&
@@ -141,6 +148,93 @@ public partial class NitrousDashboard : Window
             return;
 
         RefreshDashboardState();
+    }
+
+    /// <summary>
+    /// Follows sync and effect changes made by the tray hotkeys. The UI is updated without applying
+    /// or saving anything; the tray already did the hardware write.
+    /// </summary>
+    private void SyncLightingFromSettings()
+    {
+        if (!IsVisible || WindowState == WindowState.Minimized || DataContext is not DashboardViewModel)
+            return;
+
+        var enabled = SettingsManager.Get("KbSyncEnabled", 0) == 1;
+        var source = SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen);
+        var globalEffect = AcerKeyboard.ParseEffect(SettingsManager.Get("KbGlobal_Effect", "Static"));
+        var areaStyle = SettingsManager.Get("KbStyle", "Static");
+        var areaEffect = AcerKeyboard.ParseEffect(SettingsManager.Get("KbEffect", "Breathing"));
+
+        var changed = _lastSyncedSyncEnabled != enabled
+            || !string.Equals(_lastSyncedSyncSource, source, StringComparison.Ordinal)
+            || _lastSyncedGlobalEffect != globalEffect
+            || !string.Equals(_lastSyncedAreaStyle, areaStyle, StringComparison.OrdinalIgnoreCase)
+            || _lastSyncedAreaEffect != areaEffect;
+
+        _lastSyncedSyncEnabled = enabled;
+        _lastSyncedSyncSource = source;
+        _lastSyncedGlobalEffect = globalEffect;
+        _lastSyncedAreaStyle = areaStyle;
+        _lastSyncedAreaEffect = areaEffect;
+
+        if (!changed) return;
+
+        _syncToggleUpdating = true;
+        try
+        {
+            _syncEnabled = enabled;
+            _syncSource = source;
+            TogScreenSync.IsChecked = enabled &&
+                string.Equals(source, LightingSync.SourceScreen, StringComparison.OrdinalIgnoreCase);
+            TogSoundSync.IsChecked = enabled &&
+                string.Equals(source, LightingSync.SourceSound, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            _syncToggleUpdating = false;
+        }
+
+        var wasLoading = _keyboardLoading;
+        _keyboardLoading = true;
+        try
+        {
+            var globalIndex = Array.FindIndex(KeyboardEffects, item => item.Effect == globalEffect);
+            if (globalIndex >= 0 && GlobalEffectBox.SelectedIndex != globalIndex)
+                GlobalEffectBox.SelectedIndex = globalIndex;
+            _globalEffect = globalEffect;
+
+            var areaIndex = Array.FindIndex(DynamicEffects, item => item.Effect == areaEffect);
+            if (areaIndex >= 0 && KeyboardEffectBox.SelectedIndex != areaIndex)
+                KeyboardEffectBox.SelectedIndex = areaIndex;
+            _keyboardEffect = areaEffect;
+
+            if (string.Equals(areaStyle, "Dynamic", StringComparison.OrdinalIgnoreCase))
+                KbDynamicTab.IsChecked = true;
+            else
+                KbStaticTab.IsChecked = true;
+        }
+        finally
+        {
+            _keyboardLoading = wasLoading;
+        }
+
+        if (_keyboardBrightnessAvailable)
+        {
+            _brightnessSyncUpdating = true;
+            try
+            {
+                TogBrightnessSync.IsChecked = enabled &&
+                    string.Equals(source, LightingSync.SourceSound, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                _brightnessSyncUpdating = false;
+            }
+
+            UpdateBrightnessSyncUi();
+        }
+
+        UpdateLightingInteractivity();
     }
 
     private void TitleBar_MouseDown(object sender, MouseButtonEventArgs e)
@@ -517,6 +611,10 @@ public partial class NitrousDashboard : Window
         {
             TxtHkCycle.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_CyclePower", ""));
             TxtHkDash.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_Dashboard", ""));
+            TxtHkFan.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_CycleFan", ""));
+            TxtHkScreenSync.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_ScreenSync", ""));
+            TxtHkSoundSync.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_SoundSync", ""));
+            TxtHkEffect.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_NextEffect", ""));
         }
 
         _lastSyncedPowerMode = activeMode;

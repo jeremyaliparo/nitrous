@@ -80,7 +80,50 @@ public class TrayApplication : ApplicationContext
     }
 
     private const int HK_CYCLE_POWER = 1;
+    private const int HK_CYCLE_FAN = 2;
+    private const int HK_SCREEN_SYNC = 3;
+    private const int HK_SOUND_SYNC = 4;
+    private const int HK_NEXT_EFFECT = 5;
     private const int HK_DASHBOARD = 99;
+
+    private static readonly (string Name, KeyboardEffect Effect)[] GlobalEffectCycle =
+    {
+        ("Static", KeyboardEffect.Static),
+        ("Breathing", KeyboardEffect.Breathing),
+        ("Neon", KeyboardEffect.Neon),
+        ("Wave", KeyboardEffect.Wave),
+        ("Ripple", KeyboardEffect.Shifting),
+        ("Zoom", KeyboardEffect.Zoom),
+        ("Snake", KeyboardEffect.Meteor),
+        ("Disco", KeyboardEffect.Twinkling)
+    };
+
+    private static readonly (string Name, KeyboardEffect Effect)[] DynamicEffectCycle =
+    {
+        ("Breathing", KeyboardEffect.Breathing),
+        ("Neon", KeyboardEffect.Neon),
+        ("Wave", KeyboardEffect.Wave),
+        ("Ripple", KeyboardEffect.Shifting),
+        ("Zoom", KeyboardEffect.Zoom),
+        ("Snake", KeyboardEffect.Meteor),
+        ("Disco", KeyboardEffect.Twinkling)
+    };
+
+    /// <summary>Whether the keyboard has RGB zones, which screen sync and effects need.</summary>
+    private static bool LightingZoned() =>
+        AcerKeyboard.IsAvailable() &&
+        AcerCapabilitiesProvider.Current.Smbios.KeyboardColor is not 1;
+
+    /// <summary>Whether sound sync has a path: RGB zones or the five-step backlight.</summary>
+    private static bool SoundSyncAvailable() =>
+        LightingZoned() ||
+        AcerWmiManager.GetKeyboardBacklightPath() != AcerWmiManager.KeyboardBacklightPath.None;
+
+    private static bool SyncOn()
+    {
+        var value = SettingsManager.Get("KbSyncEnabled", -1);
+        return value >= 0 ? value == 1 : SettingsManager.Get("KbScreenSync", 0) == 1;
+    }
 
     public TrayApplication()
     {
@@ -122,12 +165,13 @@ public class TrayApplication : ApplicationContext
             // instant without holding GDI+ surfaces for users who never switch profiles.
             if (_shuttingDown) return;
 
-            // The OSD is only opened by the cycle hotkey. Without one there is nothing to
+            // The OSD is only opened by an action hotkey. Without one there is nothing to
             // pre-warm, so skip the extra window handle and surfaces entirely.
-            if (string.IsNullOrEmpty(SettingsManager.Get("Hotkey_CyclePower", ""))) return;
+            if (!AnyOsdHotkey()) return;
 
             RunOnUi(() => EnsureOsd()?.Prewarm());
         });
+
 
         StartBackgroundEngine();
     }
@@ -432,13 +476,40 @@ public class TrayApplication : ApplicationContext
     {
         if (_shuttingDown) return;
 
-        _hotkeys.UnregisterAll(HK_CYCLE_POWER, HK_DASHBOARD);
+        _hotkeys.UnregisterAll(
+            HK_CYCLE_POWER, HK_CYCLE_FAN, HK_SCREEN_SYNC, HK_SOUND_SYNC, HK_NEXT_EFFECT, HK_DASHBOARD);
 
         RegisterSavedHotkey("Hotkey_CyclePower", HK_CYCLE_POWER);
         RegisterSavedHotkey("Hotkey_Dashboard", HK_DASHBOARD);
+        RegisterSavedHotkey("Hotkey_CycleFan", HK_CYCLE_FAN);
+
+        if (LightingZoned())
+        {
+            RegisterSavedHotkey("Hotkey_ScreenSync", HK_SCREEN_SYNC);
+            RegisterSavedHotkey("Hotkey_NextEffect", HK_NEXT_EFFECT);
+        }
+
+        if (SoundSyncAvailable())
+            RegisterSavedHotkey("Hotkey_SoundSync", HK_SOUND_SYNC);
 
         _registeredCycleHotkey = SettingsManager.Get("Hotkey_CyclePower", "");
         _registeredDashboardHotkey = SettingsManager.Get("Hotkey_Dashboard", "");
+    }
+
+    /// <summary>Any action that needs the OSD, so the tray only pays for it when it is used.</summary>
+    private static bool AnyOsdHotkey()
+    {
+        string[] keys =
+        {
+            "Hotkey_CyclePower", "Hotkey_CycleFan", "Hotkey_ScreenSync",
+            "Hotkey_SoundSync", "Hotkey_NextEffect"
+        };
+
+        foreach (var key in keys)
+            if (!string.IsNullOrEmpty(SettingsManager.Get(key, "")))
+                return true;
+
+        return false;
     }
 
     private void RegisterSavedHotkey(string settingKey, int id)
@@ -462,6 +533,18 @@ public class TrayApplication : ApplicationContext
         {
             case HK_CYCLE_POWER:
                 _ = CyclePowerModeAsync();
+                break;
+            case HK_CYCLE_FAN:
+                _ = CycleFanModeAsync();
+                break;
+            case HK_SCREEN_SYNC:
+                ToggleLightingSync(LightingSync.SourceScreen);
+                break;
+            case HK_SOUND_SYNC:
+                ToggleLightingSync(LightingSync.SourceSound);
+                break;
+            case HK_NEXT_EFFECT:
+                CycleLightingEffect();
                 break;
             case HK_DASHBOARD:
                 ShowDashboard();
@@ -535,6 +618,150 @@ public class TrayApplication : ApplicationContext
         // Marshal through the control whose handle was created on the UI thread; the OSD form
         // itself may not have a handle yet on its first show.
         RunOnUi(() => EnsureOsd()?.ShowProfile(color, profile));
+    }
+
+    private void ShowStatusOsd(Color color, string caption, string title)
+    {
+        if (_shuttingDown) return;
+        RunOnUi(() => EnsureOsd()?.ShowStatus(color, caption, title));
+    }
+
+    private async Task CycleFanModeAsync()
+    {
+        if (_shuttingDown) return;
+
+        var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        var current = GetActiveFan(isOnline);
+        var next = current switch
+        {
+            FanProfile.Auto => FanProfile.Max,
+            FanProfile.Max => FanProfile.Medium,
+            FanProfile.Medium => FanProfile.Auto,
+            _ => FanProfile.Auto
+        };
+
+        SettingsManager.Save("LastFanMode", next.ToString());
+        SettingsManager.Save(isOnline ? "LastAcFanMode" : "LastDcFanMode", next.ToString());
+
+        var curve = SettingsManager.Get("IsCurveModeEnabled", 0) == 1;
+        var title = next switch
+        {
+            FanProfile.Auto => "AUTO",
+            FanProfile.Max => "MAX",
+            FanProfile.Medium => curve ? "CUSTOM (CURVE)" : "CUSTOM (FIXED)",
+            _ => next.ToString().ToUpperInvariant()
+        };
+
+        ShowStatusOsd(Color.FromArgb(255, 159, 10), "FAN MODE", title);
+
+        try
+        {
+            await ApplyPowerSettingsAsync(isStartup: false, force: true).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Fans: the hotkey cycle failed.", ex);
+        }
+    }
+
+    /// <summary>
+    /// One key per source. Pressing the active source turns sync off; pressing the other source
+    /// switches to it and turns it on.
+    /// </summary>
+    private void ToggleLightingSync(string source)
+    {
+        if (_shuttingDown) return;
+
+        var on = SyncOn();
+        var current = SettingsManager.Get("KbSyncSource", LightingSync.SourceScreen);
+        var same = string.Equals(current, source, StringComparison.OrdinalIgnoreCase);
+        var enable = !on || !same;
+
+        SettingsManager.Save("KbSyncEnabled", enable ? 1 : 0);
+        if (enable) SettingsManager.Save("KbSyncSource", source);
+
+        var label = string.Equals(source, LightingSync.SourceScreen, StringComparison.Ordinal)
+            ? "SCREEN"
+            : "SOUND";
+        ShowStatusOsd(Color.FromArgb(167, 139, 250), "LIGHTING SYNC",
+            $"{label} {(enable ? "ON" : "OFF")}");
+
+        // Start/Stop joins the previous worker, so keep that off the hotkey's UI thread.
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                if (!enable)
+                {
+                    LightingSync.Stop(restorePreset: true);
+                    return;
+                }
+
+                LightingSync.Start(source);
+                if (LightingSync.IsRunning) return;
+
+                SettingsManager.Save("KbSyncEnabled", 0);
+                ShowStatusOsd(Color.FromArgb(255, 69, 58), "LIGHTING SYNC", "UNAVAILABLE");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Lighting sync: the hotkey toggle failed.", ex);
+            }
+        });
+    }
+
+    private void CycleLightingEffect()
+    {
+        if (_shuttingDown) return;
+
+        if (!LightingZoned())
+        {
+            ShowStatusOsd(Color.FromArgb(255, 69, 58), "LIGHTING", "NOT AVAILABLE");
+            return;
+        }
+
+        if (SyncOn())
+        {
+            ShowStatusOsd(Color.FromArgb(167, 139, 250), "LIGHTING", "SYNC IS ON");
+            return;
+        }
+
+        var area = string.Equals(SettingsManager.Get("KbLightingSource", "Global"), "Area",
+            StringComparison.OrdinalIgnoreCase);
+
+        string caption;
+        string name;
+
+        if (area)
+        {
+            var dynamic = string.Equals(SettingsManager.Get("KbStyle", "Static"), "Dynamic",
+                StringComparison.OrdinalIgnoreCase);
+            var current = AcerKeyboard.ParseEffect(SettingsManager.Get("KbEffect", "Breathing"));
+            var index = Array.FindIndex(DynamicEffectCycle, entry => entry.Effect == current);
+            var next = dynamic
+                ? (index + 1 + DynamicEffectCycle.Length) % DynamicEffectCycle.Length
+                : index >= 0 ? index : 0;
+
+            name = DynamicEffectCycle[next].Name;
+            SettingsManager.Save("KbStyle", "Dynamic");
+            SettingsManager.Save("KbEffect", name);
+            caption = "AREA EFFECT";
+        }
+        else
+        {
+            var current = AcerKeyboard.ParseEffect(SettingsManager.Get("KbGlobal_Effect", "Static"));
+            var index = Array.FindIndex(GlobalEffectCycle, entry => entry.Effect == current);
+            var next = (index + 1 + GlobalEffectCycle.Length) % GlobalEffectCycle.Length;
+
+            name = GlobalEffectCycle[next].Name;
+            SettingsManager.Save("KbGlobal_Effect", name);
+            caption = "GLOBAL EFFECT";
+        }
+
+        SettingsManager.Save("KbLightingSource", area ? "Area" : "Global");
+        ShowStatusOsd(Color.FromArgb(167, 139, 250), caption, name.ToUpperInvariant());
+
+        _ = Task.Run(() => LightingSync.ReapplySavedPreset());
     }
 
     private OsdForm? EnsureOsd()

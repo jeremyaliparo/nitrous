@@ -111,6 +111,9 @@ internal static class LightingSync
             : "Lighting sync: suspended for Area.");
     }
 
+    /// <summary>Re-applies the saved preset immediately, for a hotkey outside the dashboard.</summary>
+    public static void ReapplySavedPreset() => RestoreSavedPreset();
+
     /// <summary>
     /// Skips frames while the firmware plays an acknowledgement, so sync doesn't erase it. The
     /// deadline lives in settings because the dashboard and tray are separate processes.
