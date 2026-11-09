@@ -15,13 +15,20 @@
 		     that property is ignored when a custom manifest is supplied. -->
 		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.11.0-test.16</Version>
+		<Version>0.11.0-test.23</Version>
 		<Product>Nitrous</Product>
-		<Company>Nitrous</Company>
+		<Company>Jeremy Aliparo</Company>
+		<Authors>Jeremy Aliparo</Authors>
+		<Copyright>© 2026 Jeremy Aliparo</Copyright>
+		<Description>Lightweight NitroSense alternative for Acer Nitro laptops.</Description>
 		<RepositoryUrl>https://github.com/jeremyaliparo/nitrous</RepositoryUrl>
 		<DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
 		<DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<AssemblyMetadata Include="Author" Value="Jeremy Aliparo" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="System.Management" Version="10.0.10" />
