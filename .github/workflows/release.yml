@@ -98,6 +98,16 @@ jobs:
             throw "The changelog section for $version is empty."
           }
 
+          # The section may carry a display name, for example:
+          #   <!-- release-name: Total Lightning Control -->
+          # It sets the GitHub release title and is stripped from the notes.
+          $title = "Nitrous $version"
+          $nameMatch = [regex]::Match($section, '<!--\s*release-name:\s*(.+?)\s*-->')
+          if ($nameMatch.Success) {
+            $title = $nameMatch.Groups[1].Value.Trim()
+            $section = ($section -replace [regex]::Escape($nameMatch.Value), '').TrimEnd()
+          }
+
           $hash = (Get-Content "dist/Nitrous.exe.sha256" -Raw).Trim().Split(' ')[0]
           if ($hash -notmatch '^[0-9a-f]{64}$') {
             throw "Could not read a SHA-256 digest for Nitrous.exe."
@@ -121,7 +131,7 @@ jobs:
             "dist/Nitrous.exe",
             "dist/SHA256SUMS",
             "dist/Nitrous.exe.sha256",
-            "--title", "Nitrous $version",
+            "--title", $title,
             "--notes", $notes,
             "--verify-tag"
           )
