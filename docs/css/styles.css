@@ -252,6 +252,21 @@ em {
   transform: translateY(-2px);
 }
 
+.btn-sim {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.38);
+  color: var(--violet-soft);
+}
+
+.btn-sim:hover {
+  background: rgba(167, 139, 250, 0.17);
+  border-color: rgba(167, 139, 250, 0.62);
+}
+
+.btn-sim .icon {
+  color: var(--violet);
+}
+
 .btn-sm {
   height: 36px;
   padding: 0 13px;

@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nitrous simulator — TOTAL LIGHTNING CONTROL</title>
+  <meta name="description" content="An interactive simulation of Nitrous on the Acer Nitro 16S AN16S-61: four-zone lighting, screen sync, sound sync, Spectrum, Beat and the lid logo.">
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/simulator.css">
+</head>
+<body class="sim-body">
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="nitroGrad" x1="6" y1="58" x2="58" y2="6" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#ff8a1e"/>
+        <stop offset=".32" stop-color="#ef2b3f"/>
+        <stop offset=".62" stop-color="#b545e8"/>
+        <stop offset="1" stop-color="#4f8dff"/>
+      </linearGradient>
+    </defs>
+  </svg>
+  <header class="sim-nav">
+    <a class="sim-brand" href="index.html" aria-label="Nitrous home">
+      <svg class="sim-brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M8 8h12l24 34V8h12v48H44L20 22v34H8z" fill="url(#nitroGrad)"/>
+      </svg>
+      <span class="sim-brand-name">Nitrous</span>
+    </a>
+    <span class="sim-badge">Interactive demo</span>
+    <a class="sim-back" href="index.html">Back to site <span aria-hidden="true">↗</span></a>
+  </header>
+
+  <main class="sim-main">
+    <section class="sim-intro">
+      <p class="sim-eyebrow">TOTAL LIGHTNING CONTROL</p>
+      <h1>Meet the lighting,<br><span>before you install.</span></h1>
+      <p class="sim-lede">
+        A live simulation of Nitrous on the Nitro 16S — the AN16S-61. Change the four zones,
+        follow the screen, pulse to a beat, or combine the two.
+      </p>
+      <div class="sim-quick" aria-label="Demo shortcuts">
+        <button type="button" data-preset="screen">Try screen sync</button>
+        <button type="button" data-preset="sound">Try sound sync</button>
+        <button type="button" data-preset="hybrid">Screen + beat</button>
+        <button type="button" class="quiet" data-preset="reset">Reset</button>
+      </div>
+      <p class="sim-disclaimer">
+        Simulation only — this page draws the keyboard, it does not touch your hardware.
+        The real app is a portable Windows executable that talks to the controller.
+      </p>
+    </section>
+
+    <section class="sim-stage" aria-label="Nitrous simulator">
+      <div class="laptop-area">
+        <div class="laptop" id="laptop">
+          <div class="laptop-lid">
+            <div class="laptop-camera" aria-hidden="true"></div>
+            <div class="laptop-screen" id="laptopScreen">
+              <div class="screen-top">
+                <span>NOW PLAYING</span>
+                <span id="screenSceneName">Neon sky</span>
+              </div>
+              <div class="screen-content" id="screenContent">
+                <div class="screen-art" id="screenArt">
+                  <div class="album-disc" aria-hidden="true"></div>
+                  <div class="album-copy">
+                    <b id="albumTitle">TOTAL LIGHTNING CONTROL</b>
+                    <span>Acer Nitro 16S · AN16S-61</span>
+                  </div>
+                </div>
+                <div class="screen-bars" id="screenBars" aria-label="Screen colour samples">
+                  <i></i><i></i><i></i><i></i>
+                </div>
+              </div>
+              <div class="screen-scenes" id="screenScenes" aria-label="Screen content">
+                <button type="button" data-scene="0" class="active">Neon sky</button>
+                <button type="button" data-scene="1">Sunset drive</button>
+                <button type="button" data-scene="2">Four bars</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="laptop-base">
+            <div class="deck-glow" aria-hidden="true"></div>
+            <div class="keyboard" id="keyboard" data-effect="Static" aria-label="Simulated four-zone keyboard"></div>
+            <div class="mode-key" id="modeKey" title="Power mode key">
+              <span class="mode-dot" aria-hidden="true"></span>
+              <span id="modeKeyText">Performance</span>
+            </div>
+            <div class="laptop-pad" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div class="laptop-foot">
+          <span>AN16S-61 · four-zone RGB · lid logo</span>
+          <div class="lid-preview" id="lidPreview" data-effect="Static" aria-label="Simulated lid logo">
+            <span class="lid-n">N</span>
+            <small>lid logo</small>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sim-app" aria-label="Nitrous simulated app">
+        <header class="app-head">
+          <span class="app-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><path d="M8 8h12l24 34V8h12v48H44L20 22v34H8z" fill="url(#nitroGrad)"/></svg>
+          </span>
+          <div class="app-title">
+            <b>Nitrous</b>
+            <small>The Nitro AN16S-61</small>
+          </div>
+          <button type="button" class="app-mode" id="appMode" title="Change power mode">
+            <span class="mode-dot" aria-hidden="true"></span>
+            <span id="appModeText">Performance</span>
+          </button>
+        </header>
+
+        <nav class="app-tabs" role="tablist" aria-label="Nitrous pages">
+          <button type="button" data-tab="dash" role="tab">DASH</button>
+          <button type="button" data-tab="gpu" role="tab">GPU</button>
+          <button type="button" data-tab="light" role="tab" class="active" aria-selected="true">LIGHT</button>
+          <button type="button" data-tab="setup" role="tab">SETUP</button>
+        </nav>
+
+        <div class="app-body" id="appBody">
+          <section data-page="light">
+            <div class="page-line">
+              <span class="page-kicker">LIGHTING</span>
+              <span class="page-status" id="lightStatus">Static</span>
+            </div>
+
+            <div class="seg" id="lightingTabs" role="group" aria-label="Lighting preset">
+              <button type="button" data-lighting="global" class="active">Global</button>
+              <button type="button" data-lighting="area">Area</button>
+            </div>
+
+            <div id="globalPanel">
+              <div class="card">
+                <p class="card-hint">One effect for the keyboard and the cover logo.</p>
+                <div class="ctl">
+                  <label for="globalEffect">Effect</label>
+                  <select id="globalEffect">
+                    <option>Static</option><option>Breathing</option><option>Neon</option>
+                    <option>Wave</option><option>Ripple</option><option>Zoom</option>
+                    <option>Snake</option><option>Disco</option>
+                  </select>
+                </div>
+                <div class="ctl">
+                  <label>Colour</label>
+                  <div class="colour-line">
+                    <div class="swatches" id="globalSwatches"></div>
+                    <input type="color" id="globalColor" value="#b388ff" title="Custom colour">
+                  </div>
+                </div>
+                <div class="ctl">
+                  <label for="globalBrightness">Brightness <b id="globalBrightnessValue">100%</b></label>
+                  <input type="range" id="globalBrightness" min="0" max="100" value="100">
+                </div>
+                <div class="ctl">
+                  <label for="globalSpeed">Speed <b id="globalSpeedValue">3</b></label>
+                  <input type="range" id="globalSpeed" min="1" max="5" value="3">
+                </div>
+              </div>
+            </div>
+
+            <div id="areaPanel" hidden>
+              <div class="card">
+                <div class="seg small" id="areaDevice" role="group" aria-label="Area device">
+                  <button type="button" data-device="keyboard" class="active">Keyboard</button>
+                  <button type="button" data-device="logo">Cover logo</button>
+                </div>
+
+                <div id="keyboardArea">
+                  <div class="seg small" id="areaMode" role="group" aria-label="Keyboard style">
+                    <button type="button" data-style="Static" class="active">Static</button>
+                    <button type="button" data-style="Dynamic">Dynamic</button>
+                  </div>
+
+                  <div id="staticArea">
+                    <div class="zones" id="zones"></div>
+                    <div class="ctl">
+                      <label for="areaBrightness">Brightness <b id="areaBrightnessValue">100%</b></label>
+                      <input type="range" id="areaBrightness" min="0" max="100" value="100">
+                    </div>
+                  </div>
+
+                  <div id="dynamicArea" hidden>
+                    <div class="ctl">
+                      <label for="areaEffect">Effect</label>
+                      <select id="areaEffect">
+                        <option>Breathing</option><option>Neon</option><option>Wave</option>
+                        <option>Ripple</option><option>Zoom</option><option>Snake</option><option>Disco</option>
+                      </select>
+                    </div>
+                    <div class="ctl">
+                      <label for="areaSpeed">Speed <b id="areaSpeedValue">4</b></label>
+                      <input type="range" id="areaSpeed" min="1" max="9" value="4">
+                    </div>
+                    <div class="ctl">
+                      <label for="areaBrightnessDynamic">Brightness <b id="areaBrightnessDynamicValue">100%</b></label>
+                      <input type="range" id="areaBrightnessDynamic" min="0" max="100" value="100">
+                    </div>
+                  </div>
+                </div>
+
+                <div id="logoArea" hidden>
+                  <p class="card-hint" id="logoLock" hidden>
+                    Sync is driving the lid logo while “Keyboard + lid logo” is selected.
+                  </p>
+                  <div class="ctl">
+                    <label for="logoEffect">Effect</label>
+                    <select id="logoEffect"><option>Static</option><option>Breathing</option><option>Neon</option></select>
+                  </div>
+                  <div class="ctl">
+                    <label>Colour</label>
+                    <div class="colour-line">
+                      <div class="swatches" id="logowatches"></div>
+                      <input type="color" id="logoColor" value="#b388ff" title="Lid logo colour">
+                    </div>
+                  </div>
+                  <div class="ctl">
+                    <label for="logoBrightness">Brightness <b id="logoBrightnessValue">100%</b></label>
+                    <input type="range" id="logoBrightness" min="0" max="100" value="100">
+                  </div>
+                  <div class="ctl">
+                    <label for="logoSpeed">Speed <b id="logoSpeedValue">3</b></label>
+                    <input type="range" id="logoSpeed" min="1" max="5" value="3">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card sync-card">
+              <div class="card-title"><span>SYNC</span><small>Software effect</small></div>
+              <p class="card-hint">
+                Follow the screen or the system audio. Screen owns the colours; Sound uses the
+                preset's static colours. Sync overrides the effect while on.
+              </p>
+
+              <div class="toggle-row">
+                <div><b>Screen sync</b><span>Follows the screen's colours.</span></div>
+                <label class="switch"><input type="checkbox" id="screenSync"><i></i></label>
+              </div>
+
+              <div class="sub" id="screenOptions">
+                <div class="ctl">
+                  <label for="saturation">Screen saturation <b id="saturationValue">100%</b></label>
+                  <input type="range" id="saturation" min="0" max="200" value="100">
+                </div>
+                <div class="toggle-row">
+                  <div><b>Pulse with sound</b><span>Brightness follows the audio.</span></div>
+                  <label class="switch"><input type="checkbox" id="pulse"><i></i></label>
+                </div>
+                <div class="ctl" id="floorCtl">
+                  <label for="floor">Silence floor <b id="floorValue">0%</b></label>
+                  <input type="range" id="floor" min="0" max="10" value="0">
+                  <small class="range-note">Brightness between hits: 0% is off, 10% keeps a dim glow.</small>
+                </div>
+                <button type="button" class="beat-btn" id="beatBtnScreen">▶ Play demo beat</button>
+              </div>
+
+              <div class="toggle-row">
+                <div><b>Sound sync</b><span>Pulses with the system audio.</span></div>
+                <label class="switch"><input type="checkbox" id="soundSync"><i></i></label>
+              </div>
+
+              <div class="sub" id="soundOptions">
+                <div class="ctl">
+                  <label for="soundMode">Sound mode</label>
+                  <select id="soundMode"><option>Peak</option><option selected>Spectrum</option><option>Beat</option></select>
+                </div>
+                <div class="ctl">
+                  <label for="sensitivity">Sensitivity <b id="sensitivityValue">4</b></label>
+                  <input type="range" id="sensitivity" min="1" max="10" value="4">
+                </div>
+                <button type="button" class="beat-btn" id="beatBtn">▶ Play demo beat</button>
+                <small class="range-note">
+                  The demo beat is synthesised in this page. It never captures your system audio.
+                </small>
+              </div>
+
+              <div class="ctl">
+                <label for="follow">Follow</label>
+                <select id="follow">
+                  <option value="both">Keyboard + lid logo</option>
+                  <option value="keyboard">Keyboard</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <section data-page="dash" hidden>
+            <div class="page-line">
+              <span class="page-kicker">DASHBOARD</span>
+              <span class="page-status">Simulated</span>
+            </div>
+
+            <div class="card mock-stats">
+              <div><span>CPU</span><b id="dashCpuTemp">48 °C</b><small id="dashCpuRpm">1 200 RPM</small></div>
+              <div><span>GPU</span><b id="dashGpuTemp">44 °C</b><small id="dashGpuRpm">1 100 RPM</small></div>
+              <div><span>MODE</span><b id="dashMode">Performance</b><small id="dashPower">30 W</small></div>
+            </div>
+
+            <div class="card">
+              <div class="card-title"><span>WORKLOAD</span><small>Demo load</small></div>
+              <div class="seg four" id="workload" role="group" aria-label="Demo workload">
+                <button type="button" data-load="idle">Idle</button>
+                <button type="button" data-load="office" class="active">Office</button>
+                <button type="button" data-load="gaming">Gaming</button>
+                <button type="button" data-load="stress">Stress</button>
+              </div>
+              <p class="card-hint" style="margin-bottom:0">The temperatures and fans respond to this load.</p>
+            </div>
+
+            <div class="card">
+              <div class="card-title"><span>POWER</span><small>Limits and fan curve</small></div>
+              <div class="seg four" id="dashModes" role="group" aria-label="Power mode">
+                <button type="button" data-mode="0">Quiet</button>
+                <button type="button" data-mode="1">Balanced</button>
+                <button type="button" data-mode="2" class="active">Performance</button>
+                <button type="button" data-mode="3">Turbo</button>
+              </div>
+              <div class="ctl last">
+                <label for="refreshRate">Refresh rate</label>
+                <select id="refreshRate">
+                  <option value="60">60 Hz</option>
+                  <option value="144" selected>144 Hz</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title"><span>FANS</span><small>Auto follows the temperature</small></div>
+              <div class="seg three" id="fanMode" role="group" aria-label="Fan mode">
+                <button type="button" data-fan="auto" class="active">Auto</button>
+                <button type="button" data-fan="max">Max</button>
+                <button type="button" data-fan="custom">Custom</button>
+              </div>
+              <div id="customFans" hidden>
+                <div class="ctl">
+                  <label for="cpuFan">CPU fan <b id="cpuFanValue">40%</b></label>
+                  <input type="range" id="cpuFan" min="1" max="100" value="40">
+                </div>
+                <div class="ctl">
+                  <label for="gpuFan">GPU fan <b id="gpuFanValue">40%</b></label>
+                  <input type="range" id="gpuFan" min="1" max="100" value="40">
+                </div>
+              </div>
+            </div>
+
+            <p class="card-hint">
+              Simulated telemetry and fan response. The real dashboard reads the EC and the NVIDIA
+              driver; nothing here writes to your hardware.
+            </p>
+          </section>
+
+          <section data-page="gpu" hidden>
+            <div class="page-line"><span class="page-kicker">GPU</span><span class="page-status">RTX 5060</span></div>
+            <div class="card mock-stats">
+              <div><span>CORE</span><b>1 800 MHz</b><small>+100 offset</small></div>
+              <div><span>MEMORY</span><b>9 001 MHz</b><small>+900 offset</small></div>
+              <div><span>POWER</span><b>58 W</b><small>P0</small></div>
+            </div>
+            <p class="card-hint">Simulated telemetry. The real GPU page is read-only unless clock ownership is enabled.</p>
+          </section>
+
+          <section data-page="setup" hidden>
+            <div class="page-line"><span class="page-kicker">SETUP</span></div>
+            <div class="card">
+              <p class="card-hint">
+                The real Setup page holds CPU power, fan modes, battery limits, hotkeys and the
+                Acer service snapshot. This demo focuses on lighting.
+              </p>
+              <a class="sim-link" href="index.html">Back to the Nitrous site →</a>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="sim-footer">
+    <span>Nitrous simulator · not the real app</span>
+    <a href="index.html">nitrous</a>
+  </footer>
+
+  <script src="js/simulator.js"></script>
+</body>
+</html>
