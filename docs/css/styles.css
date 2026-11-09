@@ -430,6 +430,14 @@ em {
   transform: scaleX(1);
 }
 
+.nav a.nav-sim {
+  color: var(--violet-soft);
+}
+
+.nav a.nav-sim:hover {
+  color: #fff;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
