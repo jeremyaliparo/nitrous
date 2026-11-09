@@ -3,6 +3,66 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.0-test.23 - 2026-11-09
+
+### Build
+
+- The executable metadata now names **Jeremy Aliparo** as the company/author and carries the
+  copyright and a one-line description.
+
+## 0.11.0-test.22 - 2026-11-09
+
+### Lighting
+
+- When the LIGHT page opens or the window is activated, Nitrous reads the EC backlight level
+  once. If it differs from the saved preset, a line under the brightness slider shows the Fn
+  level and explains that moving the slider applies the preset. It is read once, not polled.
+
+## 0.11.0-test.21 - 2026-11-09
+
+### Lighting
+
+- The saved preset is applied **once when the tray starts**, not every time the dashboard opens.
+  Pressing **Fn + brightness** while Nitrous is in the tray is no longer undone just by opening
+  the window; the brightness slider applies only when the user changes it.
+
+## 0.11.0-test.20 - 2026-11-09
+
+### Hotkeys
+
+- The **Global Hotkeys** card is grouped by where each action applies — **WINDOW**, **DASHBOARD**
+  and **LIGHT PAGE** — with a separator and a one-line description for every binding.
+
+## 0.11.0-test.19 - 2026-11-09
+
+### Hotkeys
+
+- Four new global bindings: **Cycle Fan Mode** (Auto → Max → Custom), **Screen Sync**,
+  **Sound Sync** and **Next Lighting Effect**. All are unbound by default and confirm with the OSD.
+- **Screen Sync** and **Next Lighting Effect** are hidden where the keyboard has no RGB zones.
+  **Sound Sync** stays available where the five-step backlight path exists, so a single-colour
+  model still has one lighting hotkey.
+- **Next Lighting Effect** does nothing while a sync is on. It follows the active preset,
+  switches **Area Static** to **Dynamic** on the first press, and wraps through the effect list.
+- The OSD can now draw generic status cards, not only power profiles.
+
+## 0.11.0-test.18 - 2026-11-09
+
+### Keyboard
+
+- **Sound sync on models with no lighting controller** (for example the single-colour ANV15-52):
+  **Setup → Keyboard → Pulse with sound** drives the five-step backlight from the system audio,
+  with **Beat** or **Peak** and the shared sensitivity slider. The chosen level is restored when
+  sync stops, and the lowest step stays lit between hits instead of strobing off.
+- This is the tester build for pr4u before the 0.11.0 release.
+
+## 0.11.0-test.17 - 2026-11-08
+
+### Lighting
+
+- The **SYNC** card draws a divider between **Screen sync** and **Sound sync**, so the two software
+  effects read as separate blocks instead of one long list.
+
 ## 0.11.0-test.16 - 2026-11-08
 
 ### Lighting
