@@ -867,6 +867,7 @@ public partial class NitrousDashboard : Window
     private bool _keyboardBrightnessAvailable;
     private bool _keyboardBrightnessViaWmi;
     private int _keyboardBrightnessLevel = 100;
+    private bool _brightnessSyncUpdating;
 
     /// <summary>
     /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
@@ -1105,6 +1106,41 @@ public partial class NitrousDashboard : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         KeyboardBrightnessBox.IsEnabled = _keyboardBrightnessAvailable;
+
+        var brightnessSyncOn = _keyboardBrightnessAvailable
+            && SettingsManager.Get("KbSyncEnabled", 0) == 1
+            && string.Equals(SettingsManager.Get("KbSyncSource", ""),
+                LightingSync.SourceSound, StringComparison.OrdinalIgnoreCase);
+
+        _brightnessSyncUpdating = true;
+        try
+        {
+            TogBrightnessSync.IsChecked = brightnessSyncOn;
+
+            var beat = !string.Equals(
+                SettingsManager.Get("KbBrightSyncMode", LightingSync.SoundModeBeat),
+                LightingSync.SoundModePeak, StringComparison.OrdinalIgnoreCase);
+            BrightnessSyncModeBox.SelectedIndex = beat ? 0 : 1;
+
+            var brightnessSensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
+            BrightnessSyncSensitivity.Value = brightnessSensitivity;
+            BrightnessSyncSensitivityText.Text = brightnessSensitivity.ToString();
+        }
+        finally
+        {
+            _brightnessSyncUpdating = false;
+        }
+
+        UpdateBrightnessSyncUi();
+
+        // A one-zone keyboard has no effects or colour sync to cycle; sound sync through the
+        // five-step backlight is the only lighting hotkey it can offer.
+        var zonedLighting = _keyboardAvailable && _keyboardZoned;
+        HkScreenSyncRow.Visibility = zonedLighting ? Visibility.Visible : Visibility.Collapsed;
+        HkEffectRow.Visibility = zonedLighting ? Visibility.Visible : Visibility.Collapsed;
+        HkSoundSyncRow.Visibility = zonedLighting || _keyboardBrightnessAvailable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
         UpdateZoneButtons();
 
@@ -1921,6 +1957,60 @@ public partial class NitrousDashboard : Window
         KeyboardBrightnessStatus.Text = AcerWmiManager.SetKeyboardBrightness(level)
             ? string.Empty
             : "Brightness refused";
+    }
+
+    /// <summary>
+    /// Sound sync on a model whose only backlight control is the five-step brightness path. The
+    /// tray worker owns the writes; this is the switch and its options.
+    /// </summary>
+    private void BrightnessSync_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_keyboardLoading || _brightnessSyncUpdating || !_keyboardBrightnessAvailable) return;
+
+        var on = TogBrightnessSync.IsChecked == true;
+
+        if (on && _keyboardBrightnessLevel == 0)
+        {
+            // A zero backlight would make the pulse invisible; 100 is also the level restored later.
+            _keyboardBrightnessLevel = 100;
+            SettingsManager.Save("KbBrightLevel", 100);
+            KeyboardBrightnessBox.SelectedIndex = AcerWmiManager.KeyboardBrightnessLevels.Count - 1;
+        }
+
+        SettingsManager.Save("KbSyncEnabled", on ? 1 : 0);
+        if (on) SettingsManager.Save("KbSyncSource", LightingSync.SourceSound);
+
+        UpdateBrightnessSyncUi();
+    }
+
+    private void BrightnessSyncMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_keyboardLoading || _brightnessSyncUpdating) return;
+
+        SettingsManager.Save("KbBrightSyncMode",
+            BrightnessSyncModeBox.SelectedIndex == 1
+                ? LightingSync.SoundModePeak
+                : LightingSync.SoundModeBeat);
+    }
+
+    private void BrightnessSyncSensitivity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var value = (int)Math.Round(e.NewValue);
+        if (BrightnessSyncSensitivityText != null) BrightnessSyncSensitivityText.Text = value.ToString();
+        if (_keyboardLoading || _brightnessSyncUpdating) return;
+
+        SettingsManager.Save("KbSoundSensitivity", value);
+    }
+
+    private void UpdateBrightnessSyncUi()
+    {
+        var on = _keyboardBrightnessAvailable && TogBrightnessSync.IsChecked == true;
+
+        BrightnessSyncOptions.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        KeyboardBrightnessBox.IsEnabled = _keyboardBrightnessAvailable && !on;
+        BrightnessSyncStatus.Text = on
+            ? "The tray is pulsing the backlight with the system audio."
+            : string.Empty;
     }
 
     private async void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)

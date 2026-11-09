@@ -36,6 +36,10 @@ internal static class LightingSync
     private static string _source = SourceScreen;
     private static bool _writeWarned;
     private static bool _logoAvailable = true;
+    private static bool _brightnessOnly;
+    private static bool _brightnessWarned;
+    private static int _lastBrightness = -1;
+    private static DateTime _lastBrightnessWrite = DateTime.MinValue;
 
     public static bool IsRunning => _running;
 
@@ -61,11 +65,22 @@ internal static class LightingSync
                 try { _thread?.Join(1200); } catch { }
             }
 
-            if (!AcerKeyboard.IsAvailable()) return;
+            var hasLighting = AcerKeyboard.IsAvailable();
+            var hasBrightness = !hasLighting
+                && AcerWmiManager.GetKeyboardBacklightPath()
+                != AcerWmiManager.KeyboardBacklightPath.None;
+
+            // A model with no lighting controller can still pulse its backlight with sound. There
+            // are no colours to follow, so screen sync is not offered on that path.
+            if (!hasLighting && (!hasBrightness || normalized != SourceSound)) return;
 
             _source = normalized;
+            _brightnessOnly = !hasLighting;
             _writeWarned = false;
+            _brightnessWarned = false;
             _logoAvailable = true;
+            _lastBrightness = -1;
+            _lastBrightnessWrite = DateTime.MinValue;
             _running = true;
             _thread = new Thread(Loop)
             {
@@ -294,12 +309,19 @@ internal static class LightingSync
                     continue;
                 }
 
-                var desired = SettingsManager.Get("KbSoundMode", SoundModeSpectrum) switch
+                var soundMode = _brightnessOnly
+                    ? SettingsManager.Get("KbBrightSyncMode", SoundModeBeat)
+                    : SettingsManager.Get("KbSoundMode", SoundModeSpectrum);
+
+                var desired = soundMode switch
                 {
                     var m when string.Equals(m, SoundModePeak, StringComparison.OrdinalIgnoreCase) => SoundModePeak,
                     var m when string.Equals(m, SoundModeBeat, StringComparison.OrdinalIgnoreCase) => SoundModeBeat,
                     _ => SoundModeSpectrum
                 };
+
+                // A single-colour backlight has no zones to split, so Spectrum becomes Peak.
+                if (_brightnessOnly && desired == SoundModeSpectrum) desired = SoundModePeak;
 
                 if (!string.Equals(desired, mode, StringComparison.Ordinal))
                 {
@@ -330,7 +352,9 @@ internal static class LightingSync
                 if (frame % 25 == 0)
                     zones = BaseColors();
 
-                var ceiling = BaseBrightness();
+                // The saved level is what the backlight returns to when sync stops; the pulse itself
+                // uses the full five steps, because a 25% ceiling would be barely visible.
+                var ceiling = _brightnessOnly ? 100 : BaseBrightness();
                 var sensitivity = Math.Clamp(SettingsManager.Get("KbSoundSensitivity", 4), 1, 10);
 
                 if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
@@ -387,8 +411,15 @@ internal static class LightingSync
                     }
                 }
 
-                WriteZones(zones, levels, AverageColor(zones), levels.Max(),
-                    frame % LogoEveryFrames == 0 && WritesLogo());
+                if (_brightnessOnly)
+                {
+                    WriteBrightness(levels.Max());
+                }
+                else
+                {
+                    WriteZones(zones, levels, AverageColor(zones), levels.Max(),
+                        frame % LogoEveryFrames == 0 && WritesLogo());
+                }
 
                 frame++;
                 Thread.Sleep(SoundRateMs);
@@ -489,7 +520,11 @@ internal static class LightingSync
     {
         try
         {
-            if (!AcerKeyboard.IsAvailable()) return;
+            if (!AcerKeyboard.IsAvailable())
+            {
+                if (_brightnessOnly) RestoreBrightness();
+                return;
+            }
 
             var source = SettingsManager.Get("KbLightingSource", "Global");
             if (string.Equals(source, "Area", StringComparison.OrdinalIgnoreCase))
@@ -501,6 +536,50 @@ internal static class LightingSync
         {
             Logger.Warn("Lighting sync: could not restore the saved lighting.", ex);
         }
+    }
+
+    /// <summary>
+    /// Snap a 0-100 level to the firmware's five steps, keeping the lowest step lit between hits
+    /// so the keyboard does not strobe off. The saved level is restored when sync stops.
+    /// </summary>
+    private static int SnapBrightness(int raw)
+    {
+        var step = (int)Math.Round(Math.Clamp(raw, 0, 100) / 25.0) * 25;
+        return Math.Clamp(step, 25, 100);
+    }
+
+    private static void WriteBrightness(int raw)
+    {
+        var level = SnapBrightness(raw);
+        if (level == _lastBrightness) return;
+
+        var now = DateTime.UtcNow;
+        if ((now - _lastBrightnessWrite).TotalMilliseconds < 70) return;
+
+        if (!AcerWmiManager.SetKeyboardBrightness(level))
+        {
+            if (!_brightnessWarned)
+            {
+                Logger.Warn("Sound sync: the backlight refused a level; keeping the last one.");
+                _brightnessWarned = true;
+            }
+            return;
+        }
+
+        _lastBrightness = level;
+        _lastBrightnessWrite = now;
+
+        if (SettingsManager.Get("KbSyncDebug", 0) == 1)
+            Logger.Info($"Sound sync (brightness): level={level}");
+    }
+
+    private static void RestoreBrightness()
+    {
+        var level = Math.Clamp(SettingsManager.Get("KbBrightLevel", 100), 0, 100);
+        if (AcerWmiManager.SetKeyboardBrightness(level))
+            Logger.Info($"Lighting sync: restored the backlight to {level}%.");
+        else
+            Logger.Warn("Lighting sync: could not restore the backlight level.");
     }
 
     private static void RestoreGlobal()
