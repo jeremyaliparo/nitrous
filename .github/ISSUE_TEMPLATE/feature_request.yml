@@ -69,8 +69,8 @@ body:
     id: nitrous-version
     attributes:
       label: Nitrous version
-      description: Shown at the top of the Settings page (for example, 0.10.0). Optional for a suggestion.
-      placeholder: "0.10.0"
+      description: Shown at the top of the Settings page (for example, 0.11.0). Optional for a suggestion.
+      placeholder: "0.11.0"
     validations:
       required: false
 
