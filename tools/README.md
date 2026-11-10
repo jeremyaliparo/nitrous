@@ -7,6 +7,7 @@ Development scripts that do not ship with the app. Nothing here is referenced by
 |---|---|
 | `capture-site-shots.ps1` | Re-takes the four `docs/assets` screenshots from a build, with the preset, backlight and registry handling that makes them presentable. |
 | `check-release-notes.ps1` | Runs the release workflow's note extraction against `CHANGELOG.md` locally and prints the title, line count and marker state. |
+| `probe-boot-logo.ps1` | Read-only probe for the firmware's custom boot logo: SMBIOS game record 0x0D and Acer's misc-8 switch. |
 | `vibecheck/` | Reflection harness that feeds synthetic audio through `LightingSync+SoundEnvelope` and prints the Vibe step per 20 ms tick. |
 | `asinvoker.manifest` | Lets the capture build run without the app's administrator manifest. |
 
@@ -30,6 +31,21 @@ Two things it cannot fix:
   the SYNC card in view).
 - The GPU page shows `Asleep` with `--` clocks when the dGPU is in runtime D3. Do not wake it
   for a screenshot; re-shoot while the machine is already using the dGPU.
+
+## Boot logo probe
+
+```powershell
+# Read-only; run it elevated for the WMI half.
+pwsh -File tools\probe-boot-logo.ps1
+```
+
+Parses SMBIOS type 0xAC directly (game record 0x0D) and asks
+`AcerGamingFunction.GetGamingMiscSetting(0x08)`, the BIOS setup's "Customize POST animation"
+switch. Neither call writes anything and neither touches the EFI system partition. On the
+AN16S-61: record 0x0D = 1 and misc 8 answers `0x100` (valid, switch off).
+
+The WMI half needs elevation; without it the class answers "Access to a CIM resource was not
+available to the client" and only the SMBIOS result is printed.
 
 ## Release notes
 
