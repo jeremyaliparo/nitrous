@@ -3,7 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.11.1-test.1 - 2026-11-10
+## 0.12.0-test.1 - 2026-11-10
+
+### Setup
+
+- **Custom boot logo.** SETUP > STARTUP shows the picture Acer's firmware reads at power-on and
+  replaces it with your own. Any picture is accepted and re-encoded to a baseline JPEG (or a GIF if
+  the encoder produces anything else), scaled to at most 40 % of the panel so the firmware's decoder
+  takes it. REMOVE deletes the picture and brings Acer's logo back. The card only appears where the
+  firmware advertises the feature: SMBIOS record 0x0D or the BIOS setup's switch answering 0/1.
+- The write is a file on the EFI system partition, not a BIOS change: temp file, flush, rename,
+  read-back hash check and a free-space guard, and the firmware switch is remembered so REMOVE puts
+  it back. Wiping or reinstalling the OS removes the picture with the partition.
+- Diagnostics record the model's answer (record 0x0D, switch state, picture in use).
 
 ### Lighting
 

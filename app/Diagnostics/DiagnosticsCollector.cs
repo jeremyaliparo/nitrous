@@ -500,6 +500,7 @@ public static class DiagnosticsCollector
                            $"gamingClass={Text(acer, "gamingClassAvailable")}, " +
                            $"batteryClass={Text(acer, "batteryClassAvailable")}, " +
                            $"profileBitmap={Text(profiles, "bitmap")}");
+        builder.AppendLine($"Boot logo: {BootLogo.Describe()}");
 
         var telemetry = Section(acer, "telemetry");
         builder.AppendLine($"Acer telemetry: CPU {Text(telemetry, "cpuTemperatureC")} C / " +

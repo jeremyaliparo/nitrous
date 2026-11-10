@@ -1141,6 +1141,31 @@
 							<ComboBox Grid.Column="1" x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
 						</Grid>
 					</Border>
+					<TextBlock Text="STARTUP" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
+
+					<Border x:Name="BootLogoCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+								<Path Data="M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+								<TextBlock Text="Boot Logo" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							</StackPanel>
+							<TextBlock Text="Replaces Acer's splash at power-on. The picture is read from the EFI system partition; the BIOS is never modified, and REMOVE brings Acer's logo back." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+							<Border Height="96" Margin="0,10,0,0" CornerRadius="6" Background="#0B0B0F" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+								<Image x:Name="BootLogoPreview" Stretch="Uniform" Margin="4"/>
+							</Border>
+							<TextBlock x:Name="BootLogoStatus" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="8"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+								<Button x:Name="BootLogoChooseButton" Content="CHOOSE IMAGE" Click="BootLogoChoose_Click" Style="{StaticResource SetupActionButtonStyle}"/>
+								<Button x:Name="BootLogoRemoveButton" Grid.Column="2" Content="REMOVE" Click="BootLogoRemove_Click" Style="{StaticResource SetupActionButtonStyle}"/>
+							</Grid>
+						</StackPanel>
+					</Border>
+
 					<TextBlock Text="APPEARANCE" Style="{StaticResource SetupSectionLabelStyle}" Margin="4,4,0,6"/>
 
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">

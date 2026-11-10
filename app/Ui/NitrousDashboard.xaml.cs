@@ -71,6 +71,7 @@ public partial class NitrousDashboard : Window
         InitializeStickyKeys();
         InitializeUsbCharging();
         InitializeLcdOverdrive();
+        InitializeBootLogo();
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -2429,6 +2430,119 @@ public partial class NitrousDashboard : Window
         // The row is collapsed as a whole, so the card closes up rather than leaving a gap where
         // the control would have been. Nothing else has to move: each row owns its own line.
         LcdOverdriveRow.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// The card exists only where the firmware advertises the feature (SMBIOS 0x0D or the misc 8
+    /// switch). The probe touches WMI, so it runs off the UI thread.
+    /// </summary>
+    private void InitializeBootLogo()
+    {
+        _ = Task.Run(() =>
+        {
+            if (!BootLogo.IsSupported) return;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    BootLogoCard.Visibility = Visibility.Visible;
+                    RefreshBootLogo();
+                }));
+            }
+            catch (InvalidOperationException) { }
+        });
+    }
+
+    private void RefreshBootLogo()
+    {
+        var current = BootLogo.Read();
+        BootLogoPreview.Source = current?.Data is { } data ? LoadLogoImage(data) : null;
+        BootLogoRemoveButton.IsEnabled = current is not null;
+        BootLogoStatus.Text = current is null
+            ? "Acer's splash is showing. A change appears at the next power-on."
+            : $"Custom picture in use ({current.Value.Name}); shown at the next power-on.";
+    }
+
+    private static System.Windows.Media.Imaging.BitmapImage? LoadLogoImage(byte[] data)
+    {
+        try
+        {
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            image.BeginInit();
+            image.StreamSource = new System.IO.MemoryStream(data);
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or System.IO.IOException)
+        {
+            return null;
+        }
+    }
+
+    private void BootLogoChoose_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose a boot logo",
+            Filter = "Pictures|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var path = dialog.FileName;
+        BootLogoChooseButton.IsEnabled = false;
+        BootLogoStatus.Text = "Writing the picture to the EFI partition...";
+
+        _ = Task.Run(() =>
+        {
+            var written = BootLogo.Apply(path, out var error);
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    BootLogoChooseButton.IsEnabled = true;
+                    if (!written)
+                    {
+                        BootLogoStatus.Text = error;
+                        return;
+                    }
+
+                    RefreshBootLogo();
+                    BootLogoStatus.Text = "Written. Restart to see it at power-on.";
+                }));
+            }
+            catch (InvalidOperationException) { }
+        });
+    }
+
+    private void BootLogoRemove_Click(object sender, RoutedEventArgs e)
+    {
+        BootLogoRemoveButton.IsEnabled = false;
+        BootLogoStatus.Text = "Removing the picture...";
+
+        _ = Task.Run(() =>
+        {
+            var restored = BootLogo.Restore(out var error);
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    BootLogoRemoveButton.IsEnabled = true;
+                    if (!restored)
+                    {
+                        BootLogoStatus.Text = error;
+                        return;
+                    }
+
+                    RefreshBootLogo();
+                    BootLogoStatus.Text = "Acer's logo is back. Restart to see it.";
+                }));
+            }
+            catch (InvalidOperationException) { }
+        });
     }
 
     private void SetLcdOverdriveToggle(bool on)
