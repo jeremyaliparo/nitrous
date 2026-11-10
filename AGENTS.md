@@ -34,8 +34,9 @@ number and say which one they are on.
 ## Tools
 
 `tools/` holds the development scripts worth keeping across sessions: the site screenshot
-capture (run it elevated), the release-note dry run, and the Vibe reflection harness.
-`tools/README.md` explains each. Nothing in there ships with the app.
+capture (run it elevated), the release-note dry run, the boot-logo probe and the Vibe
+reflection harness. The folder is git-ignored on purpose — it is local tooling, not part of the
+product — so it stays on this machine and never appears in the repository or the release.
 
 ## Test builds
 

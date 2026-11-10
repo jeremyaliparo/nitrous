@@ -8,3 +8,7 @@ TestResults/
 *.user
 *.suo
 *.old
+
+# Local development scripts: capture, release-note dry run, probes, DSP harness.
+# They stay on the machine and are never published with the app or the site.
+tools/
