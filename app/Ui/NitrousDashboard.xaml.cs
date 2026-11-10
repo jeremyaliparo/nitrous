@@ -65,6 +65,7 @@ public partial class NitrousDashboard : Window
             $"Nitrous {UpdateManager.CurrentVersion}";
 
         _autoOffRearmTimer.Tick += (_, _) => RearmKeyboardAutoOff();
+        _fnBrightnessTimer.Tick += (_, _) => FlushFnBrightness();
 
         InitializeKeyboardLighting();
         InitializeStickyKeys();
@@ -835,22 +836,75 @@ public partial class NitrousDashboard : Window
             return;
         }
 
+        _fnBrightnessLevel = value;
+
         var text = $"Fn keys are at {value}%. Moving this slider applies the saved preset.";
         GlobalFnBrightnessHint.Text = text;
-        GlobalFnBrightnessHint.Visibility = value != _globalBrightness
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        // The register only has the five steps, so compare like with like or a 43% slider would
+        // keep reporting a difference after it has been applied.
+        GlobalFnBrightnessHint.Visibility =
+            value != AcerWmiManager.NearestKeyboardBrightness(_globalBrightness)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
         AreaFnBrightnessHint.Text = text;
-        AreaFnBrightnessHint.Visibility = value != _keyboardBrightness
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        AreaFnBrightnessHint.Visibility =
+            value != AcerWmiManager.NearestKeyboardBrightness(_keyboardBrightness)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     private void HideFnBrightnessHints()
     {
         if (GlobalFnBrightnessHint != null) GlobalFnBrightnessHint.Visibility = Visibility.Collapsed;
         if (AreaFnBrightnessHint != null) AreaFnBrightnessHint.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// The Fn register and the lighting controller's brightness are separate on a model with a
+    /// controller: Fn writes the EC, the sliders write the controller. The hint promises that
+    /// moving a slider applies the saved preset, so the EC level is written too; without this the
+    /// hint returned on every reopen because the Fn level never changed.
+    /// </summary>
+    private void PushFnBrightness(int level)
+    {
+        if (IgnoreLightingChanges || _syncEnabled || !_keyboardAvailable) return;
+
+        // Null means the EC register could not be read on this model, so there is nothing to keep
+        // in step and no point paying for an HID open on every slider move.
+        if (_fnBrightnessLevel is null) return;
+
+        // The register has five steps; writing 43 stores 50, so compare and cache the snapped value.
+        level = AcerWmiManager.NearestKeyboardBrightness(level);
+        if (_fnBrightnessLevel == level) return;
+
+        _fnBrightnessPending = level;
+        _fnBrightnessTimer.Stop();
+        _fnBrightnessTimer.Start();
+    }
+
+    private void FlushFnBrightness()
+    {
+        _fnBrightnessTimer.Stop();
+        if (_fnBrightnessPending is not { } level) return;
+        _fnBrightnessPending = null;
+
+        // Each write opens the EC HID and takes ~60-100 ms, so keep it off the UI thread.
+        _ = Task.Run(() =>
+        {
+            var written = AcerWmiManager.SetKeyboardBrightness(level);
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!written) return;
+                    _fnBrightnessLevel = level;
+                    HideFnBrightnessHints();
+                }));
+            }
+            catch (InvalidOperationException) { }
+            catch (TaskCanceledException) { }
+        });
     }
 
     private void Window_Deactivated(object sender, EventArgs e)
@@ -864,6 +918,7 @@ public partial class NitrousDashboard : Window
     {
         base.OnClosed(e);
         _profileSyncTimer.Stop();
+        _fnBrightnessTimer.Stop();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         StateChanged -= Window_StateChanged;
@@ -973,6 +1028,19 @@ public partial class NitrousDashboard : Window
     {
         Interval = TimeSpan.FromMilliseconds(600)
     };
+
+    /// <summary>
+    /// The Fn backlight register is written from the LIGHT sliders too, but each write opens the
+    /// EC HID (~60-100 ms), so a drag coalesces into one write.
+    /// </summary>
+    private readonly DispatcherTimer _fnBrightnessTimer = new(DispatcherPriority.Background)
+    {
+        Interval = TimeSpan.FromMilliseconds(350)
+    };
+
+    /// <summary>The level the Fn register was last seen or set to; null when it could not be read.</summary>
+    private int? _fnBrightnessLevel;
+    private int? _fnBrightnessPending;
 
     // The labels NitroSense shows, mapped onto the controller's own mode bytes. Three of them are
     // renamed by Acer: Ripple is Shifting (8), Snake is Meteor (10), Disco is Twinkling (11).
@@ -1812,6 +1880,7 @@ public partial class NitrousDashboard : Window
         if (_syncEnabled) return;
 
         ApplyGlobalLighting();
+        PushFnBrightness(_globalBrightness);
     }
 
     private void GlobalSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -2088,6 +2157,8 @@ public partial class NitrousDashboard : Window
 
         SettingsManager.Save("KbBrightness", _keyboardBrightness);
         if (!_syncEnabled) ApplyKeyboardLighting();
+
+        PushFnBrightness(_keyboardBrightness);
     }
 
     private void KeyboardBrightness_Changed(object sender, SelectionChangedEventArgs e)

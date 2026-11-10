@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.11.1-test.1 - 2026-11-10
+
+### Lighting
+
+- **The Fn-brightness hint no longer comes back after the slider is moved.** On models with the
+  lighting controller the brightness sliders write the controller, while the Fn keys write a
+  separate EC register, so moving a slider left the register untouched and the hint reappeared on
+  the next open. A slider move now applies its level to that register as well - snapped to the
+  register's five steps and debounced, because each write opens the EC HID.
+- The hint compares the two levels on the same five steps, so a 43% slider counts as applied once
+  the register holds 50% instead of reporting a difference forever.
+
 ## 0.11.0 - 2026-11-09
 <!-- release-name: Total Lightning Control -->
 
