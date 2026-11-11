@@ -44,7 +44,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private readonly List<int> _cpuHistory = new(HistoryCapacity);
     private readonly List<int> _gpuHistory = new(HistoryCapacity);
     private readonly List<int> _cpuRpmHistory = new(HistoryCapacity);
+    private readonly List<int> _cpuUsageHistory = new(HistoryCapacity);
     private readonly List<int> _gpuRpmHistory = new(HistoryCapacity);
+    private readonly List<int> _gpuUsageHistory = new(HistoryCapacity);
 
     private string _historyPeakText = "";
     public string HistoryPeakText
@@ -1432,7 +1434,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
     /// skipped rather than drawn at the floor, so a sleeping dGPU does not look like a drop to
     /// freezing.
     /// </summary>
-    private void AppendHistory(int cpuTemp, int gpuTemp, int cpuRpm, int gpuRpm)
+    private void AppendHistory(int cpuTemp, int gpuTemp, int cpuRpm, int gpuRpm,
+        int? cpuUsage, int? gpuUsage)
     {
         if (cpuTemp <= 0) return;
 
@@ -1444,6 +1447,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
             // The GPU series keep their own length: they simply start once the firmware answers.
             if (gpuTemp > 0) Add(_gpuHistory, gpuTemp);
             if (gpuRpm > 0) Add(_gpuRpmHistory, gpuRpm);
+
+            if (cpuUsage is { } cpu) Add(_cpuUsageHistory, cpu);
+            if (gpuUsage is { } gpu) Add(_gpuUsageHistory, gpu);
         }
 
         static void Add(List<int> samples, int value)
@@ -1485,6 +1491,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 var cpuMax = _cpuRpmHistory.Max();
                 var gpuMax = _gpuRpmHistory.Count > 0 ? _gpuRpmHistory.Max() : 0;
                 parts.Add(gpuMax > 0 ? $"{cpuMax}/{gpuMax} RPM" : $"{cpuMax} RPM");
+            }
+
+            if (_cpuUsageHistory.Count > 0)
+            {
+                var cpuMax = _cpuUsageHistory.Max();
+                var gpuMax = _gpuUsageHistory.Count > 0 ? _gpuUsageHistory.Max() : 0;
+                parts.Add(gpuMax > 0 ? $"{cpuMax}/{gpuMax}%" : $"{cpuMax}%");
             }
 
             return string.Join(" \u00b7 ", parts);
@@ -1563,7 +1576,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                         var chartCpuTemp = telemetry.CpuTemp;
                         var chartGpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
-                        AppendHistory(chartCpuTemp, chartGpuTemp, telemetry.CpuRpm, telemetry.GpuRpm);
+                        AppendHistory(chartCpuTemp, chartGpuTemp, telemetry.CpuRpm, telemetry.GpuRpm,
+                            cpuUsage, smi is { HasData: true } ? smi.GpuLoad : null);
 
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {

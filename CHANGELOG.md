@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.6 - 2026-11-11
+
+### Dashboard
+
+- The history peak now includes CPU and GPU **usage** beside the temperatures and fan speeds.
+
+### Setup
+
+- **Battery Health moved into the 80% Battery Limit card**, so the charge limit and the pack's wear
+  sit together instead of in three adjacent cards.
+- Section labels share one spacing rule and the cards one gap, so the page reads as sections rather
+  than a stack of blocks.
+- The USB charging card no longer repeats its own title in the description.
+- `EXPORT DIAGNOSTICS` is now `EXPORT ZIP`, which is what it does, and its label no longer clips.
+
 ## 0.12.0-test.5 - 2026-11-11
 
 ### Dashboard
