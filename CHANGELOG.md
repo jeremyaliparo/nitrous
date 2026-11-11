@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.8 - 2026-11-11
+
+### Setup
+
+- The battery card is one block now: charge limit, health and **USB Charging While Off**, with no
+  separator lines between them.
+- Health reads as plain text beside its detail - `91% Â· 69.4 Wh of 76.3 Wh when new Â· 32 cycles` -
+  instead of a large number on its own line.
+
 ## 0.12.0-test.7 - 2026-11-11
 
 ### Setup
