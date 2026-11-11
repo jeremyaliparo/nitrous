@@ -3,6 +3,13 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.9 - 2026-11-11
+
+### Setup
+
+- The **USB Charging While Off** row no longer carries an icon, so it reads the same as the battery
+  health line above it.
+
 ## 0.12.0-test.8 - 2026-11-11
 
 ### Setup
