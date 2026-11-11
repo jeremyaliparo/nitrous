@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.7 - 2026-11-11
+
+### Setup
+
+- The merged battery card now matches the rest of the page: same padding as every other card, and a
+  hairline between the charge limit and the health row instead of the two running together.
+- The health percentage sits beside the cycle count - `69.4 Wh of 76.3 Wh when new Â· 32 cycles 91%` -
+  rather than floating alone at the card's right edge.
+
 ## 0.12.0-test.6 - 2026-11-11
 
 ### Dashboard
