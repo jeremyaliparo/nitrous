@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.4 - 2026-11-11
+
+### Dashboard
+
+- **Temperature history** under the CPU/GPU cards: the last two minutes as one line per device
+  (60 samples at the 2 s poll), 20-100 C, right-aligned so the newest sample is always at the edge.
+  The GPU line appears once the firmware reports a GPU temperature; a sleeping dGPU leaves the
+  series alone instead of drawing a drop to zero.
+
 ## 0.12.0-test.3 - 2026-11-11
 
 ### Setup

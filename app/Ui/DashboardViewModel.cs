@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
 using Nitrous.Helpers;
@@ -33,6 +34,15 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private ulong _cpuKernel;
     private ulong _cpuUser;
     private bool _haveCpuSample;
+
+    // Temperature history: one sample per poll, drawn right-aligned in a fixed 500x88 space.
+    private const int HistoryCapacity = 60;
+    private const double ChartWidth = 500;
+    private const double ChartHeight = 88;
+
+    private readonly object _historyGate = new();
+    private readonly List<int> _cpuHistory = new(HistoryCapacity);
+    private readonly List<int> _gpuHistory = new(HistoryCapacity);
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
@@ -75,6 +85,20 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     private string _gpuUsageText = "";
     public string GpuUsageText { get => _gpuUsageText; set => SetProperty(ref _gpuUsageText, value); }
+
+    private PointCollection _cpuHistoryPoints = new();
+    public PointCollection CpuHistoryPoints
+    {
+        get => _cpuHistoryPoints;
+        set => SetProperty(ref _cpuHistoryPoints, value);
+    }
+
+    private PointCollection _gpuHistoryPoints = new();
+    public PointCollection GpuHistoryPoints
+    {
+        get => _gpuHistoryPoints;
+        set => SetProperty(ref _gpuHistoryPoints, value);
+    }
 
     private string _gpuTempText = "--°C";
     public string GpuTempText { get => _gpuTempText; set => SetProperty(ref _gpuTempText, value); }
@@ -1394,6 +1418,58 @@ public class DashboardViewModel : ObservableObject, IDisposable
         return (int)Math.Round(100.0 * ((double)total - idleDelta) / total);
     }
 
+    /// <summary>
+    /// Appends one sample to the temperature history. A zero (the EC could not answer) is skipped
+    /// rather than drawn at the floor, so a sleeping dGPU does not look like a drop to freezing.
+    /// </summary>
+    private void AppendHistory(int cpuTemp, int gpuTemp)
+    {
+        if (cpuTemp <= 0) return;
+
+        lock (_historyGate)
+        {
+            _cpuHistory.Add(cpuTemp);
+            if (_cpuHistory.Count > HistoryCapacity) _cpuHistory.RemoveAt(0);
+
+            // The GPU series keeps its own length: it simply starts once the firmware answers.
+            if (gpuTemp > 0)
+            {
+                _gpuHistory.Add(gpuTemp);
+                if (_gpuHistory.Count > HistoryCapacity) _gpuHistory.RemoveAt(0);
+            }
+        }
+    }
+
+    private void UpdateHistoryChart()
+    {
+        PointCollection cpu;
+        PointCollection gpu;
+        lock (_historyGate)
+        {
+            cpu = BuildHistoryPoints(_cpuHistory);
+            gpu = BuildHistoryPoints(_gpuHistory);
+        }
+
+        CpuHistoryPoints = cpu;
+        GpuHistoryPoints = gpu;
+    }
+
+    /// <summary>Right-aligned so the newest sample is always at the right edge, 20-100 C.</summary>
+    private static PointCollection BuildHistoryPoints(List<int> samples)
+    {
+        var points = new PointCollection(samples.Count);
+        var step = ChartWidth / (HistoryCapacity - 1);
+
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var x = ChartWidth - (samples.Count - 1 - i) * step;
+            var y = Math.Clamp((100 - samples[i]) / 80.0, 0, 1) * ChartHeight;
+            points.Add(new System.Windows.Point(x, y));
+        }
+
+        return points;
+    }
+
     private void StartTelemetryPolling()
     {
         StopTelemetryPolling();
@@ -1448,6 +1524,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
                                 driverGpuTemp = fallback.CoreTemp;
                         }
 
+                        var chartCpuTemp = telemetry.CpuTemp;
+                        var chartGpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
+                        AppendHistory(chartCpuTemp, chartGpuTemp);
+
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {
                             if (gpuAsleep)
@@ -1488,11 +1568,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
                             CpuUsageText = cpuUsage is { } usage ? $"{usage}%" : "--%";
                             CpuTempColor = telemetry.CpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
-                            var gpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
+                            var gpuTemp = chartGpuTemp;
                             GpuTempText = gpuTemp > 0 ? $"{gpuTemp} C" : "-- C";
                             GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
                             GpuUsageText = smi is { HasData: true } ? $"{smi.GpuLoad}%" : "--%";
                             GpuTempColor = gpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
+
+                            UpdateHistoryChart();
 
                             if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
                             {

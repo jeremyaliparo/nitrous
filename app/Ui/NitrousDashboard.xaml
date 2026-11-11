@@ -696,6 +696,26 @@
 							</Grid>
 						</Border>
 					</Grid>
+					<!-- Temperature history: the last two minutes, one point per 2 s poll -->
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10" Margin="0,0,0,8">
+						<StackPanel>
+							<Grid>
+								<TextBlock Text="TEMPERATURE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+									<TextBlock Text="CPU" Foreground="{DynamicResource AccentBrush}" FontSize="9.5" FontWeight="SemiBold"/>
+									<TextBlock Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" FontWeight="SemiBold" Margin="8,0,0,0"/>
+									<TextBlock Text="2 min" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" Margin="8,0,0,0"/>
+								</StackPanel>
+							</Grid>
+							<Viewbox Height="56" Stretch="Fill" Margin="0,6,0,0">
+								<Grid Width="500" Height="88">
+									<Polyline Points="{Binding GpuHistoryPoints}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+									<Polyline Points="{Binding CpuHistoryPoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+								</Grid>
+							</Viewbox>
+						</StackPanel>
+					</Border>
+
 					<!-- Power Modes -->
 					<Grid Margin="0,0,0,8">
 						<TextBlock Text="POWER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
