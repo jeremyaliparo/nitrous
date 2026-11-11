@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -24,8 +25,14 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private readonly NvidiaGpuManager _gpuManager = new();
     private CancellationTokenSource? _pollingCts;
     private volatile bool _telemetryEnabled = true;
-    private volatile bool _gpuPageActive;
+    private volatile bool _gpuTelemetryActive;
     private bool _telemetryErrorLogged;
+
+    // CPU usage is the idle/total delta between two polls; the first poll only records a baseline.
+    private ulong _cpuIdle;
+    private ulong _cpuKernel;
+    private ulong _cpuUser;
+    private bool _haveCpuSample;
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
@@ -61,6 +68,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     private string _cpuRpmText = "-- RPM";
     public string CpuRpmText { get => _cpuRpmText; set => SetProperty(ref _cpuRpmText, value); }
+
+    /// <summary>Short "· 12%" suffix; empty until a second sample exists.</summary>
+    private string _cpuUsageText = "";
+    public string CpuUsageText { get => _cpuUsageText; set => SetProperty(ref _cpuUsageText, value); }
+
+    private string _gpuUsageText = "";
+    public string GpuUsageText { get => _gpuUsageText; set => SetProperty(ref _gpuUsageText, value); }
 
     private string _gpuTempText = "--°C";
     public string GpuTempText { get => _gpuTempText; set => SetProperty(ref _gpuTempText, value); }
@@ -820,15 +834,15 @@ public class DashboardViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// NVML telemetry is only polled while the GPU page is on screen. Reading NVML wakes the
-    /// dGPU, and the rest of the dashboard does not display any of its values, so polling from
-    /// another page would keep an idle GPU out of RTD3 for no visible benefit.
+    /// NVML is polled only while a page that shows GPU figures is on screen: the GPU page, and now
+    /// the dashboard, which shows GPU usage next to its temperature. Reading NVML wakes the dGPU,
+    /// so every other page leaves it alone.
     /// </summary>
     public void SetGpuTelemetryActive(bool active)
     {
-        if (_gpuPageActive == active) return;
+        if (_gpuTelemetryActive == active) return;
 
-        _gpuPageActive = active;
+        _gpuTelemetryActive = active;
         if (active) _deepTelemetryFailures = 0;
     }
 
@@ -1158,7 +1172,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     /// </summary>
     public void RefreshGpuOffsets()
     {
-        if (!_gpuPageActive) return;
+        if (!_gpuTelemetryActive) return;
 
         _ = Task.Run(() =>
         {
@@ -1295,6 +1309,37 @@ public class DashboardViewModel : ObservableObject, IDisposable
         return display;
     }
 
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetSystemTimes(out ulong idle, out ulong kernel, out ulong user);
+
+    /// <summary>
+    /// CPU usage from the idle/total delta between polls. Kernel time includes idle, so the total
+    /// is kernel + user. Null on the first call, which only records the baseline.
+    /// </summary>
+    private int? ReadCpuUsage()
+    {
+        if (!GetSystemTimes(out var idle, out var kernel, out var user)) return null;
+
+        if (!_haveCpuSample)
+        {
+            _haveCpuSample = true;
+            _cpuIdle = idle;
+            _cpuKernel = kernel;
+            _cpuUser = user;
+            return null;
+        }
+
+        var idleDelta = idle - _cpuIdle;
+        var total = (kernel - _cpuKernel) + (user - _cpuUser);
+        _cpuIdle = idle;
+        _cpuKernel = kernel;
+        _cpuUser = user;
+
+        if (total == 0) return null;
+        return (int)Math.Round(100.0 * ((double)total - idleDelta) / total);
+    }
+
     private void StartTelemetryPolling()
     {
         StopTelemetryPolling();
@@ -1321,7 +1366,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var batteryTask = Task.Run(() => SystemInfoManager.GetBatteryPowerTelemetry(), token);
 
                         Task<NvidiaGpuManager.GpuTelemetry>? smiTask = null;
-                        if (DeepGpuTelemetry && _gpuPageActive)
+                        if (DeepGpuTelemetry && _gpuTelemetryActive)
                         {
                             smiTask = _gpuManager.GetNvmlTelemetryAsync(token);
                             await Task.WhenAll(wmiTask, batteryTask, smiTask);
@@ -1335,6 +1380,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var battery = await batteryTask;
                         var smi = smiTask != null ? await smiTask : null;
                         var gpuAsleep = _gpuManager.IsGpuSleeping;
+                        var cpuUsage = ReadCpuUsage();
                         _telemetryErrorLogged = false;
 
                         // The EC reports 0 for the dGPU on some models, and while it sits in a low
@@ -1385,11 +1431,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                             CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
                             CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
+                            CpuUsageText = cpuUsage is { } usage ? $"{usage}%" : "--%";
                             CpuTempColor = telemetry.CpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
                             var gpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
                             GpuTempText = gpuTemp > 0 ? $"{gpuTemp} C" : "-- C";
                             GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
+                            GpuUsageText = smi is { HasData: true } ? $"{smi.GpuLoad}%" : "--%";
                             GpuTempColor = gpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
                             if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")

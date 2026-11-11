@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.2 - 2026-11-11
+
+### Dashboard
+
+- The CPU and GPU cards now show **usage** beside the fan speed: CPU from the idle/total time
+  between polls, GPU from the same NVML reading the GPU page uses. Both are sampled on the 2 s
+  tick that already fetches the temperatures.
+- GPU usage reads `--` while the dGPU is in D3, because Nitrous will not wake it to take a
+  measurement; the GPU page's Deep GPU Telemetry switch still decides whether NVML is polled.
+
 ## 0.12.0-test.1 - 2026-11-10
 
 ### Setup

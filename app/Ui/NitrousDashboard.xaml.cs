@@ -552,7 +552,7 @@ public partial class NitrousDashboard : Window
         if (DataContext is not DashboardViewModel vm) return;
 
         var visible = Visibility == Visibility.Visible && WindowState != WindowState.Minimized;
-        vm.SetGpuTelemetryActive(visible && _activeNavIndex == 1);
+        vm.SetGpuTelemetryActive(visible && _activeNavIndex is 0 or 1);
     }
 
     private void NavDashBtn_Click(object sender, RoutedEventArgs e) => SetActiveNav(0);

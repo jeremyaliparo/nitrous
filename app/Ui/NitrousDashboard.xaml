@@ -658,7 +658,10 @@
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="CPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+								<StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+									<TextBlock Text="CPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+									<TextBlock Text="{Binding CpuUsageText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="5,0,0,0"/>
+								</StackPanel>
 								<!-- Inline Fan RPM -->
 								<StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,2,0,0">
 									<Path Fill="{DynamicResource AccentBrush}" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M9,2V4H15V2H17V4H19A2,2 0 0,1 21,6V8H23V10H21V16H23V18H21V20A2,2 0 0,1 19,22H17V24H15V22H9V24H7V22H5A2,2 0 0,1 3,20V18H1V16H3V10H1V8H3V6A2,2 0 0,1 5,4H7V2H9M5,6V20H19V6H5M7,8H17V18H7V8M9,10H15V16H9V10Z"/>
@@ -679,7 +682,10 @@
 									<RowDefinition Height="Auto"/>
 									<RowDefinition Height="Auto"/>
 								</Grid.RowDefinitions>
-								<TextBlock Grid.Row="0" Grid.Column="0" Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+								<StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal">
+									<TextBlock Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+									<TextBlock Text="{Binding GpuUsageText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="SemiBold" Margin="5,0,0,0"/>
+								</StackPanel>
 								<!-- Inline Fan RPM -->
 								<StackPanel Grid.Row="1" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,2,0,0">
 									<Path Fill="{DynamicResource AccentBrush}" Opacity="0.8" Stretch="Uniform" Width="10" Height="10" Margin="0,0,4,0" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
