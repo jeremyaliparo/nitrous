@@ -73,6 +73,9 @@ public partial class NitrousDashboard : Window
         InitializeLcdOverdrive();
         InitializeBootLogo();
 
+        if (DataContext is DashboardViewModel batteryVm)
+            _ = batteryVm.LoadBatteryHealthAsync();
+
         System.Threading.Tasks.Task.Run(() =>
         {
             var modelName = SystemInfoManager.GetSystemModel();

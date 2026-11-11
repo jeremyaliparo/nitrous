@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management;
+using System.Diagnostics;
+using System.IO;
+using System.Xml.Linq;
+using System.Xml;
 using Nitrous.Diagnostics;
 
 namespace Nitrous.Managers;
@@ -20,6 +24,125 @@ public static class SystemInfoManager
         int ChargeRateMw,
         int DischargeRateMw,
         int VoltageMv);
+
+    /// <summary>Wear of the pack: what it holds now against what it was built to hold.</summary>
+    public sealed record BatteryHealthInfo(int DesignCapacityMwh, int FullChargeCapacityMwh, int? CycleCount)
+    {
+        public int Percent => DesignCapacityMwh <= 0
+            ? 0
+            : (int)Math.Round(100.0 * FullChargeCapacityMwh / DesignCapacityMwh);
+    }
+
+    /// <summary>
+    /// Design capacity, current full-charge capacity and cycle count. Read-only, no Acer interface
+    /// involved, so it works on every laptop. Null when the pack reports no design capacity, which
+    /// would make a percentage meaningless.
+    /// </summary>
+    public static BatteryHealthInfo? GetBatteryHealth() => ReadBatteryClasses() ?? ReadBatteryReport();
+
+    /// <summary>
+    /// The direct WMI classes. Some battery drivers fail to instantiate BatteryStaticData even
+    /// though the class is listed (the AN16S-61 does), hence the report fallback below.
+    /// </summary>
+    private static BatteryHealthInfo? ReadBatteryClasses()
+    {
+        try
+        {
+            int design = 0;
+            int? cycles = null;
+
+            using (var searcher = new ManagementObjectSearcher(
+                       @"root\wmi", "SELECT DesignedCapacity, CycleCount FROM BatteryStaticData"))
+            {
+                foreach (ManagementBaseObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        design = Convert.ToInt32(item["DesignedCapacity"] ?? 0);
+                        if (item["CycleCount"] is { } reported && Convert.ToInt32(reported) > 0)
+                            cycles = Convert.ToInt32(reported);
+                        break;
+                    }
+                }
+            }
+
+            var full = 0;
+            using (var searcher = new ManagementObjectSearcher(
+                       @"root\wmi", "SELECT FullChargedCapacity FROM BatteryFullChargedCapacity"))
+            {
+                foreach (ManagementBaseObject item in searcher.Get())
+                {
+                    using (item)
+                    {
+                        full = Convert.ToInt32(item["FullChargedCapacity"] ?? 0);
+                        break;
+                    }
+                }
+            }
+
+            return design > 0 && full > 0 ? new BatteryHealthInfo(design, full, cycles) : null;
+        }
+        catch (Exception ex) when (ex is ManagementException or UnauthorizedAccessException or FormatException
+                                       or InvalidCastException)
+        {
+            Logger.Info($"System info: BatteryStaticData unavailable ({ex.Message}); using the battery report.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// <c>powercfg /batteryreport /xml</c> carries the same figures Windows shows, including the
+    /// design capacity the class above cannot always provide. Written to a temp file, parsed, deleted.
+    /// </summary>
+    private static BatteryHealthInfo? ReadBatteryReport()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"nitrous-battery-{Guid.NewGuid():N}.xml");
+        try
+        {
+            var start = new ProcessStartInfo("powercfg.exe", $"/batteryreport /xml /output \"{path}\"")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var process = Process.Start(start);
+            if (process is null) return null;
+
+            _ = process.StandardOutput.ReadToEnd();
+            _ = process.StandardError.ReadToEnd();
+            if (!process.WaitForExit(5000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+                return null;
+            }
+
+            if (!File.Exists(path)) return null;
+
+            var document = XDocument.Load(path);
+            XNamespace ns = "http://schemas.microsoft.com/battery/2012";
+            var battery = document.Descendants(ns + "Battery")
+                .FirstOrDefault(b => (int?)b.Element(ns + "DesignCapacity") > 0);
+            if (battery is null) return null;
+
+            var design = (int?)battery.Element(ns + "DesignCapacity") ?? 0;
+            var full = (int?)battery.Element(ns + "FullChargeCapacity") ?? 0;
+            var cycles = (int?)battery.Element(ns + "CycleCount");
+            if (design <= 0 || full <= 0) return null;
+
+            return new BatteryHealthInfo(design, full, cycles is > 0 ? cycles : null);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or XmlException)
+        {
+            Logger.Warn("System info: the battery report could not be read.", ex);
+            return null;
+        }
+        finally
+        {
+            try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
 
     public static string GetSystemModel()
     {

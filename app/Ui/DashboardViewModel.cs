@@ -734,6 +734,60 @@ public class DashboardViewModel : ObservableObject, IDisposable
     }
 
     // --- SETTINGS PROPERTIES & LOGIC ---
+    private bool _batteryHealthAvailable;
+    public bool BatteryHealthAvailable
+    {
+        get => _batteryHealthAvailable;
+        set => SetProperty(ref _batteryHealthAvailable, value);
+    }
+
+    private string _batteryHealthPercent = "--%";
+    public string BatteryHealthPercent
+    {
+        get => _batteryHealthPercent;
+        set => SetProperty(ref _batteryHealthPercent, value);
+    }
+
+    private string _batteryHealthDetail = "";
+    public string BatteryHealthDetail
+    {
+        get => _batteryHealthDetail;
+        set => SetProperty(ref _batteryHealthDetail, value);
+    }
+
+    private string _batteryHealthColor = ThemeManager.TextPrimaryHex;
+    public string BatteryHealthColor
+    {
+        get => _batteryHealthColor;
+        set => SetProperty(ref _batteryHealthColor, value);
+    }
+
+    /// <summary>Read once on open: design and full-charge capacity do not change while running.</summary>
+    public async Task LoadBatteryHealthAsync()
+    {
+        var health = await Task.Run(SystemInfoManager.GetBatteryHealth);
+        if (health is null) return;
+
+        var percent = health.Percent;
+        var colour = percent >= 85
+            ? ThemeManager.TextPrimaryHex
+            : percent >= 70
+                ? ThemeManager.WarnHex
+                : ThemeManager.DangerHex;
+
+        var detail = $"{health.FullChargeCapacityMwh / 1000.0:0.0} Wh of " +
+                     $"{health.DesignCapacityMwh / 1000.0:0.0} Wh when new" +
+                     (health.CycleCount is { } cycles ? $" \u00b7 {cycles} cycles" : "");
+
+        await RunOnUiAsync(() =>
+        {
+            BatteryHealthPercent = $"{percent}%";
+            BatteryHealthColor = colour;
+            BatteryHealthDetail = detail;
+            BatteryHealthAvailable = true;
+        });
+    }
+
     private bool _chargeLimit;
     public bool ChargeLimit
     {

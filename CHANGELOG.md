@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.3 - 2026-11-11
+
+### Setup
+
+- **Battery Health** on the SETUP page: design capacity, what the pack holds now, the cycle count and
+  a percentage, coloured once the pack has lost a fifth of its capacity. Read once when the dashboard
+  opens, from the battery's WMI classes, with `powercfg /batteryreport /xml` as the fallback for
+  drivers whose `BatteryStaticData` class fails to instantiate (the AN16S-61 is one).
+- The boot-logo preview no longer throws when the EFI partition cannot be read, which happens on a
+  dashboard opened without elevation; it shows no preview and logs the reason instead.
+
 ## 0.12.0-test.2 - 2026-11-11
 
 ### Dashboard

@@ -930,6 +930,23 @@
 						</Grid>
 					</Border>
 
+					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="{Binding BatteryHealthAvailable, Converter={StaticResource BoolToVis}}">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+									<Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+									<TextBlock Text="Battery Health" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+								</StackPanel>
+								<TextBlock Text="{Binding BatteryHealthDetail}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+							</StackPanel>
+							<TextBlock Grid.Column="1" Text="{Binding BatteryHealthPercent}" Foreground="{Binding BatteryHealthColor}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+						</Grid>
+					</Border>
+
 					<Border Style="{StaticResource SetupCardStyle}">
 						<Grid>
 							<Grid.ColumnDefinitions>

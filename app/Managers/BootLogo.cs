@@ -38,11 +38,21 @@ internal static class BootLogo
         foreach (var name in new[] { JpegName, GifName })
         {
             var path = Path.Combine(root, "EFI", "OEM", name);
-            if (!File.Exists(path)) continue;
+            try
+            {
+                if (!File.Exists(path)) continue;
 
-            var info = new FileInfo(path);
-            var data = info.Length <= MaxBytes ? File.ReadAllBytes(path) : null;
-            return (name, data);
+                var info = new FileInfo(path);
+                var data = info.Length <= MaxBytes ? File.ReadAllBytes(path) : null;
+                return (name, data);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Dashboard opened without elevation, or the volume is locked: no preview is a
+                // better outcome than a crash, and nothing here is required for the other cards.
+                Logger.Warn($"Boot logo: could not read {name}.", ex);
+                return null;
+            }
         }
 
         return null;
