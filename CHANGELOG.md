@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.10 - 2026-11-11
+
+### Diagnostics
+
+- **EC probe version 13** asks the firmware about CoolBoost the way Acer's own software does:
+  APGeAction function 7's marker (1 = CoolBoost, 6 = the operating mode) and, when it is CoolBoost,
+  sub-function 2's state. Both answers and a verdict go into the JSON and the text report.
+- Three Nitro V 15 machines measured so far - ANV15-41 on V1.52, ANV15-52 on V1.53 (twice) - answer
+  zero to both, so CoolBoost is not offered on that line.
+
 ## 0.12.0-test.9 - 2026-11-11
 
 ### Setup

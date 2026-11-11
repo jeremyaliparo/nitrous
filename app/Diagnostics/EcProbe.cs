@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 12,
+            ["probeVersion"] = 13,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -104,6 +104,7 @@ public static class EcProbe
         cancellationToken.ThrowIfCancellationRequested();
 
         report["genericFunction"] = CollectGenericFunction(errors);
+        report["coolBoost"] = CollectCoolBoost(errors);
         report["keyboardBacklight"] = CollectKeyboardBacklight(errors);
         report["ledState"] = CollectLedState(errors);
         report["fans"] = CollectFans(errors);
@@ -504,6 +505,51 @@ public static class EcProbe
 
         return result;
     }
+
+    /// <summary>
+    /// CoolBoost, the way Acer's own software exposes it: APGeAction function 7, where sub-function 0
+    /// says what function 7 is (byte 2: 1 = CoolBoost, 6 = the operating mode) and sub-function 2
+    /// reports the state (byte 1: 1 = on). Firmware without it answers zero to both. Read-only: the
+    /// sweep in CollectGenericFunction covers 0..0x40 and would miss the 0x0207 query.
+    /// </summary>
+    private static Dictionary<string, object?> CollectCoolBoost(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+        WithInstance(AcerWmiProtocol.ActionClass, instance =>
+        {
+            var (functionRaw, functionError) =
+                TryReadRaw(instance, "GetFunction", "uiInput", 0x0007, "uiOutput");
+            var (stateRaw, stateError) =
+                TryReadRaw(instance, "GetFunction", "uiInput", 0x0207, "uiOutput");
+
+            result["function7Raw"] = functionRaw;
+            result["stateRaw"] = stateRaw;
+            if (functionError != null) result["function7Error"] = functionError;
+            if (stateError != null) result["stateError"] = stateError;
+
+            var kind = ByteAt(functionRaw, 16);
+            var value = ByteAt(stateRaw, 8);
+            result["function7Kind"] = kind;
+            result["stateValue"] = value;
+            result["verdict"] = kind switch
+            {
+                1 => value == 1 ? "supported; currently on" : "supported; currently off",
+                6 => "function 7 is the operating mode, not CoolBoost",
+                _ => "not advertised by this firmware"
+            };
+
+            return true;
+        }, errors, "coolBoost");
+
+        return result;
+    }
+
+    private static int? ByteAt(string? raw, int shift) =>
+        ulong.TryParse(raw, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var value)
+            ? (int)((value >> shift) & 0xFF)
+            : null;
 
     private static void WithGamingInstance(
         Func<ManagementObject, bool> action,
@@ -1146,6 +1192,18 @@ public static class EcProbe
                           $"[{string.Join(", ", names)}]");
             sb.AppendLine($"  misc 0x0B        : {profiles.GetValueOrDefault("misc0BValue")} " +
                           "(last value written, not necessarily applied)");
+            sb.AppendLine();
+        }
+
+        if (report.GetValueOrDefault("coolBoost") is Dictionary<string, object?> coolBoost &&
+            coolBoost.Count > 0)
+        {
+            sb.AppendLine("CoolBoost (APGeAction function 7)");
+            sb.AppendLine($"  function 7 answer : {coolBoost.GetValueOrDefault("function7Raw")} " +
+                          $"(kind {coolBoost.GetValueOrDefault("function7Kind")})");
+            sb.AppendLine($"  state answer      : {coolBoost.GetValueOrDefault("stateRaw")} " +
+                          $"(value {coolBoost.GetValueOrDefault("stateValue")})");
+            sb.AppendLine($"  verdict           : {coolBoost.GetValueOrDefault("verdict")}");
             sb.AppendLine();
         }
 
