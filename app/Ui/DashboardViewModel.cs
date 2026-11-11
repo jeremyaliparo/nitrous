@@ -43,6 +43,15 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private readonly object _historyGate = new();
     private readonly List<int> _cpuHistory = new(HistoryCapacity);
     private readonly List<int> _gpuHistory = new(HistoryCapacity);
+    private readonly List<int> _cpuRpmHistory = new(HistoryCapacity);
+    private readonly List<int> _gpuRpmHistory = new(HistoryCapacity);
+
+    private string _historyPeakText = "";
+    public string HistoryPeakText
+    {
+        get => _historyPeakText;
+        set => SetProperty(ref _historyPeakText, value);
+    }
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
@@ -1419,24 +1428,28 @@ public class DashboardViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Appends one sample to the temperature history. A zero (the EC could not answer) is skipped
-    /// rather than drawn at the floor, so a sleeping dGPU does not look like a drop to freezing.
+    /// Appends one sample to the temperature and fan history. A zero (the EC could not answer) is
+    /// skipped rather than drawn at the floor, so a sleeping dGPU does not look like a drop to
+    /// freezing.
     /// </summary>
-    private void AppendHistory(int cpuTemp, int gpuTemp)
+    private void AppendHistory(int cpuTemp, int gpuTemp, int cpuRpm, int gpuRpm)
     {
         if (cpuTemp <= 0) return;
 
         lock (_historyGate)
         {
-            _cpuHistory.Add(cpuTemp);
-            if (_cpuHistory.Count > HistoryCapacity) _cpuHistory.RemoveAt(0);
+            Add(_cpuHistory, cpuTemp);
+            if (cpuRpm > 0) Add(_cpuRpmHistory, cpuRpm);
 
-            // The GPU series keeps its own length: it simply starts once the firmware answers.
-            if (gpuTemp > 0)
-            {
-                _gpuHistory.Add(gpuTemp);
-                if (_gpuHistory.Count > HistoryCapacity) _gpuHistory.RemoveAt(0);
-            }
+            // The GPU series keep their own length: they simply start once the firmware answers.
+            if (gpuTemp > 0) Add(_gpuHistory, gpuTemp);
+            if (gpuRpm > 0) Add(_gpuRpmHistory, gpuRpm);
+        }
+
+        static void Add(List<int> samples, int value)
+        {
+            samples.Add(value);
+            if (samples.Count > HistoryCapacity) samples.RemoveAt(0);
         }
     }
 
@@ -1444,14 +1457,38 @@ public class DashboardViewModel : ObservableObject, IDisposable
     {
         PointCollection cpu;
         PointCollection gpu;
+        string peaks;
         lock (_historyGate)
         {
             cpu = BuildHistoryPoints(_cpuHistory);
             gpu = BuildHistoryPoints(_gpuHistory);
+            peaks = FormatPeaks();
         }
 
         CpuHistoryPoints = cpu;
         GpuHistoryPoints = gpu;
+        HistoryPeakText = peaks;
+
+        string FormatPeaks()
+        {
+            var parts = new List<string>(2);
+
+            if (_cpuHistory.Count > 0)
+            {
+                var cpuMax = _cpuHistory.Max();
+                var gpuMax = _gpuHistory.Count > 0 ? _gpuHistory.Max() : 0;
+                parts.Add(gpuMax > 0 ? $"peak {cpuMax}/{gpuMax} C" : $"peak {cpuMax} C");
+            }
+
+            if (_cpuRpmHistory.Count > 0)
+            {
+                var cpuMax = _cpuRpmHistory.Max();
+                var gpuMax = _gpuRpmHistory.Count > 0 ? _gpuRpmHistory.Max() : 0;
+                parts.Add(gpuMax > 0 ? $"{cpuMax}/{gpuMax} RPM" : $"{cpuMax} RPM");
+            }
+
+            return string.Join(" \u00b7 ", parts);
+        }
     }
 
     /// <summary>Right-aligned so the newest sample is always at the right edge, 20-100 C.</summary>
@@ -1526,7 +1563,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                         var chartCpuTemp = telemetry.CpuTemp;
                         var chartGpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
-                        AppendHistory(chartCpuTemp, chartGpuTemp);
+                        AppendHistory(chartCpuTemp, chartGpuTemp, telemetry.CpuRpm, telemetry.GpuRpm);
 
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {

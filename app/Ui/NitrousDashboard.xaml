@@ -713,6 +713,7 @@
 									<Polyline Points="{Binding CpuHistoryPoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
 								</Grid>
 							</Viewbox>
+							<TextBlock Text="{Binding HistoryPeakText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" Margin="0,5,0,0"/>
 						</StackPanel>
 					</Border>
 

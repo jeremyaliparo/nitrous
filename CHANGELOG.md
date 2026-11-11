@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.5 - 2026-11-11
+
+### Dashboard
+
+- The temperature history now reports the **peak** in the window: the highest CPU and GPU
+  temperature and the highest fan speed, in the same CPU/GPU order as the legend. They reset with
+  the window, so they answer "how hot did it get", not "how hot has it ever been".
+
 ## 0.12.0-test.4 - 2026-11-11
 
 ### Dashboard
