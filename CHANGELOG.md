@@ -3,108 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.12.0-test.11 - 2026-11-13
-
-### Lighting
-
-- **The saved lighting is re-applied after a power-mode change**, two seconds later so Acer's
-  acknowledgement has finished. The firmware lights the keyboard on a mode change even when the
-  saved state is off (reported on an ANV16-41, BIOS V1.04), and the flash left its colour behind on
-  models that have one; until now nothing put the preset back until the next manual edit.
-- The same restore runs at startup, because the tray applies the saved mode then.
-- On a five-step backlight the restore no longer depends on the sync worker having started: it
-  writes the saved EC level directly, which is what makes the startup case work.
-- Skipped while lighting sync runs, since the worker owns the LEDs.
-
-## 0.12.0-test.10 - 2026-11-11
-
-### Diagnostics
-
-- **EC probe version 13** asks the firmware about CoolBoost the way Acer's own software does:
-  APGeAction function 7's marker (1 = CoolBoost, 6 = the operating mode) and, when it is CoolBoost,
-  sub-function 2's state. Both answers and a verdict go into the JSON and the text report.
-- Three Nitro V 15 machines measured so far - ANV15-41 on V1.52, ANV15-52 on V1.53 (twice) - answer
-  zero to both, so CoolBoost is not offered on that line.
-
-## 0.12.0-test.9 - 2026-11-11
-
-### Setup
-
-- The **USB Charging While Off** row no longer carries an icon, so it reads the same as the battery
-  health line above it.
-
-## 0.12.0-test.8 - 2026-11-11
-
-### Setup
-
-- The battery card is one block now: charge limit, health and **USB Charging While Off**, with no
-  separator lines between them.
-- Health reads as plain text beside its detail - `91% Â· 69.4 Wh of 76.3 Wh when new Â· 32 cycles` -
-  instead of a large number on its own line.
-
-## 0.12.0-test.7 - 2026-11-11
-
-### Setup
-
-- The merged battery card now matches the rest of the page: same padding as every other card, and a
-  hairline between the charge limit and the health row instead of the two running together.
-- The health percentage sits beside the cycle count - `69.4 Wh of 76.3 Wh when new Â· 32 cycles 91%` -
-  rather than floating alone at the card's right edge.
-
-## 0.12.0-test.6 - 2026-11-11
+## 0.12.0 - 2026-11-13
 
 ### Dashboard
 
-- The history peak now includes CPU and GPU **usage** beside the temperatures and fan speeds.
-
-### Setup
-
-- **Battery Health moved into the 80% Battery Limit card**, so the charge limit and the pack's wear
-  sit together instead of in three adjacent cards.
-- Section labels share one spacing rule and the cards one gap, so the page reads as sections rather
-  than a stack of blocks.
-- The USB charging card no longer repeats its own title in the description.
-- `EXPORT DIAGNOSTICS` is now `EXPORT ZIP`, which is what it does, and its label no longer clips.
-
-## 0.12.0-test.5 - 2026-11-11
-
-### Dashboard
-
-- The temperature history now reports the **peak** in the window: the highest CPU and GPU
-  temperature and the highest fan speed, in the same CPU/GPU order as the legend. They reset with
-  the window, so they answer "how hot did it get", not "how hot has it ever been".
-
-## 0.12.0-test.4 - 2026-11-11
-
-### Dashboard
-
-- **Temperature history** under the CPU/GPU cards: the last two minutes as one line per device
-  (60 samples at the 2 s poll), 20-100 C, right-aligned so the newest sample is always at the edge.
-  The GPU line appears once the firmware reports a GPU temperature; a sleeping dGPU leaves the
-  series alone instead of drawing a drop to zero.
-
-## 0.12.0-test.3 - 2026-11-11
-
-### Setup
-
-- **Battery Health** on the SETUP page: design capacity, what the pack holds now, the cycle count and
-  a percentage, coloured once the pack has lost a fifth of its capacity. Read once when the dashboard
-  opens, from the battery's WMI classes, with `powercfg /batteryreport /xml` as the fallback for
-  drivers whose `BatteryStaticData` class fails to instantiate (the AN16S-61 is one).
-- The boot-logo preview no longer throws when the EFI partition cannot be read, which happens on a
-  dashboard opened without elevation; it shows no preview and logs the reason instead.
-
-## 0.12.0-test.2 - 2026-11-11
-
-### Dashboard
-
-- The CPU and GPU cards now show **usage** beside the fan speed: CPU from the idle/total time
-  between polls, GPU from the same NVML reading the GPU page uses. Both are sampled on the 2 s
-  tick that already fetches the temperatures.
-- GPU usage reads `--` while the dGPU is in D3, because Nitrous will not wake it to take a
-  measurement; the GPU page's Deep GPU Telemetry switch still decides whether NVML is polled.
-
-## 0.12.0-test.1 - 2026-11-10
+- **CPU and GPU usage** now sit beside the fan speed on the two cards: CPU from the idle/total time
+  between polls, GPU from the same NVML reading the GPU page uses. GPU usage reads `--` while the
+  dGPU is in D3, because Nitrous will not wake it to take a measurement.
+- **A two-minute history** under the cards: 60 samples at one per 2 s poll, 20-100 C, right-aligned
+  so the newest sample is at the edge. A sleeping dGPU leaves a gap rather than a drop to zero.
+- The history also reports the **peak** in its window - highest CPU and GPU temperature, highest fan
+  speed and highest usage - reset as the window rolls.
 
 ### Setup
 
@@ -116,17 +25,34 @@ published from the matching section of this file.
 - The write is a file on the EFI system partition, not a BIOS change: temp file, flush, rename,
   read-back hash check and a free-space guard, and the firmware switch is remembered so REMOVE puts
   it back. Wiping or reinstalling the OS removes the picture with the partition.
-- Diagnostics record the model's answer (record 0x0D, switch state, picture in use).
+- **Battery health**: design capacity, what the pack holds now and the cycle count, in the same card
+  as the 80 % charge limit. Read once when the dashboard opens, from the battery's WMI classes, with
+  `powercfg /batteryreport /xml` as the fallback for drivers whose `BatteryStaticData` class fails to
+  instantiate (the AN16S-61 is one).
+- The page reads as sections now: one spacing rule for the labels, one gap between cards, and the
+  battery rows are a single block. `EXPORT DIAGNOSTICS` became `EXPORT ZIP`, which is what it does
+  and no longer clips its own label.
 
 ### Lighting
 
-- **The Fn-brightness hint no longer comes back after the slider is moved.** On models with the
-  lighting controller the brightness sliders write the controller, while the Fn keys write a
-  separate EC register, so moving a slider left the register untouched and the hint reappeared on
-  the next open. A slider move now applies its level to that register as well - snapped to the
-  register's five steps and debounced, because each write opens the EC HID.
-- The hint compares the two levels on the same five steps, so a 43% slider counts as applied once
-  the register holds 50% instead of reporting a difference forever.
+- **The saved lighting is re-applied after a power-mode change**, two seconds later so Acer's
+  acknowledgement has finished. The firmware lights the keyboard on a mode change even when the
+  saved state is off, and on models with a controller the flash left its colour behind; until now
+  nothing put the preset back until the next manual edit. The same restore runs at startup.
+- **The Fn-brightness hint no longer returns after a slider is moved.** The sliders write the
+  lighting controller while the Fn keys write a separate EC register, so moving a slider left the
+  register untouched and the hint reappeared on the next open. A slider move now applies its level
+  to that register too - snapped to its five steps and debounced, because each write opens the EC
+  HID - and both sides are compared on those same five steps.
+
+### Diagnostics
+
+- **EC probe version 13** asks the firmware about CoolBoost the way Acer's own software does:
+  APGeAction function 7's marker (1 = CoolBoost, 6 = the operating mode) and, when it is CoolBoost,
+  sub-function 2's state. Both answers and a verdict go into the JSON and the text report.
+- The boot-logo preview no longer throws when the EFI partition cannot be read, which happens on a
+  dashboard opened without elevation; it shows no preview and logs the reason instead.
+
 
 ## 0.11.0 - 2026-11-09
 <!-- release-name: Total Lightning Control -->
