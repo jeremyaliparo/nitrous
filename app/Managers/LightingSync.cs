@@ -114,8 +114,15 @@ internal static class LightingSync
             : "Lighting sync: suspended for Area.");
     }
 
-    /// <summary>Re-applies the saved preset immediately, for a hotkey outside the dashboard.</summary>
-    public static void ReapplySavedPreset() => RestoreSavedPreset();
+    /// <summary>
+    /// Re-applies the saved preset immediately, for a hotkey outside the dashboard. Skipped while a
+    /// sync session owns the LEDs, since the worker is writing them every frame anyway.
+    /// </summary>
+    public static void ReapplySavedPreset()
+    {
+        if (_running) return;
+        RestoreSavedPreset();
+    }
 
     /// <summary>
     /// Skips frames while the firmware plays an acknowledgement, so sync doesn't erase it. The
@@ -621,7 +628,10 @@ internal static class LightingSync
         {
             if (!AcerKeyboard.IsAvailable())
             {
-                if (_brightnessOnly) RestoreBrightness();
+                // A five-step backlight has no controller to restore: the EC level is the lighting.
+                // This runs without the sync worker (a mode change or startup), so the worker's own
+                // _brightnessOnly flag is not set yet and cannot be used as the gate here.
+                RestoreBrightness();
                 return;
             }
 

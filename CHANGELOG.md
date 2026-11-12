@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.0-test.11 - 2026-11-13
+
+### Lighting
+
+- **The saved lighting is re-applied after a power-mode change**, two seconds later so Acer's
+  acknowledgement has finished. The firmware lights the keyboard on a mode change even when the
+  saved state is off (reported on an ANV16-41, BIOS V1.04), and the flash left its colour behind on
+  models that have one; until now nothing put the preset back until the next manual edit.
+- The same restore runs at startup, because the tray applies the saved mode then.
+- On a five-step backlight the restore no longer depends on the sync worker having started: it
+  writes the saved EC level directly, which is what makes the startup case work.
+- Skipped while lighting sync runs, since the worker owns the LEDs.
+
 ## 0.12.0-test.10 - 2026-11-11
 
 ### Diagnostics

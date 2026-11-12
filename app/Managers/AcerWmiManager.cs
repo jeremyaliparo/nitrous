@@ -127,6 +127,17 @@ public static class AcerWmiManager
             // offers its WhisperMode controls. It does not move the power cap: the EC owns that.
             WhisperMode.Apply(profile == PowerProfile.Quiet);
 
+            // The firmware lights the keyboard when the mode changes, even when the saved state is
+            // off (reported on an ANV16-41, BIOS V1.04), and on models with a controller the
+            // acknowledgement flash leaves its colour behind. Re-apply the saved lighting once that
+            // has settled. Detached: a mode change must not wait two seconds for cosmetics.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2000).ConfigureAwait(false);
+                Logger.Info($"Lighting: re-applying the saved preset after the mode change to {profile}.");
+                LightingSync.ReapplySavedPreset();
+            });
+
             // The acknowledgement flash the OEM software plays on a mode change. Cosmetic only, so
             // it is skipped when the mode did not actually move (the view model re-applies a mode
             // on profile clicks and the tray re-applies on AC/DC changes).
