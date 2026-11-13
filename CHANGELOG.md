@@ -3,54 +3,27 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.12.1-test.5 - 2026-11-13
+## 0.13.0 - 2026-11-13
 
 ### Appearance
 
-- **The Font list only offers what this machine has.** It is built at startup from the families
-  Windows reports, so a font that is not installed never appears - before, a missing family would
-  have sat in the list and quietly fallen back to Segoe UI. A saved choice that has since been
-  removed falls back to Windows default, and the log says which font was asked for and which one
-  was used.
-- **Code fonts.** Cascadia Code, Cascadia Mono, Consolas, JetBrains Mono, Iosevka NF and Fira Code
-  join the list whenever they are installed, alongside Inter. Two layout fixes make them usable:
-  the subtitle under the header now wraps instead of being cut, and the fan card's caption row has
-  its own column instead of running under the CURVE EDITOR and UNIFIED controls. Consolas was held
-  back in the previous build for exactly that clipping; it fits now.
-
-## 0.12.1-test.4 - 2026-11-13
-
-### Appearance
-
-- **Font.** A third list in SETUP > APPEARANCE sets the UI font: **Windows default**, **Segoe UI**,
-  **Bahnschrift**, **Calibri**, **Tahoma** or **Trebuchet MS**. It applies to the dashboard and the
-  fan-curve window alike and changes in place. Every icon is a vector path, so a font cannot break
-  them, and a family that is missing falls back to the Windows UI font rather than letting WPF
-  substitute something else. Consolas was measured and left out: it is wide enough to clip the
-  subtitle and the fan-card captions at these fixed sizes.
-
-## 0.12.1-test.3 - 2026-11-13
-
-### Appearance
-
-- **More backgrounds, and a separate card colour.** The Background list gains **Graphite**, **Slate**
-  and **Navy** beside Midnight and Black, and a new **Sections** list sets the card surface on its
-  own: **Default** keeps the card that belongs to the chosen background, or pick Black, Graphite or
-  Slate. The hover, border, grid, toggle and divider shades are lifted from whichever card is chosen,
-  so a section colour never leaves its controls without an edge. Both choices are stored separately
-  and restored at startup.
-
-## 0.12.1-test.2 - 2026-11-13
-
-### Appearance
-
-- **Background presets.** SETUP > APPEARANCE gains a Background list with **Midnight** (the shipped
-  dark grey) and **Black**. Black sets the window to pure black and rebuilds the card, hover, border
-  and toggle surfaces around it, so text contrast only improves; the accent is untouched. Presets
-  rather than a colour picker because those surfaces are built to match the window colour, and an
-  arbitrary pick could leave the labels unreadable.
-
-## 0.12.1-test.1 - 2026-11-13
+- **Background presets.** SETUP > APPEARANCE gains a Background list: **Midnight** (the shipped dark
+  grey), **Black**, **Graphite**, **Slate** and **Navy**. Each preset rebuilds the card, hover,
+  border, grid and toggle shades around the window colour, so text contrast holds and nothing loses
+  its edge. Presets rather than a colour picker because those surfaces are built to match the window
+  colour, and an arbitrary pick could leave the labels unreadable.
+- **Sections.** A second list sets the card surface on its own: **Default** keeps the card that
+  belongs to the chosen background, or pick Black, Graphite or Slate. The shades that sit on the card
+  are lifted from it, so a section colour never leaves its controls without an edge. Background and
+  Sections are stored separately and both are restored at startup.
+- **Font.** A third list sets the UI font, applied to the dashboard and the fan-curve window alike.
+  It is built from the fonts this machine actually has: Windows default, Segoe UI, Bahnschrift,
+  Calibri, Tahoma, Trebuchet MS and Inter, plus Cascadia Code, Cascadia Mono, Consolas, JetBrains
+  Mono, Iosevka NF and Fira Code as code faces when they are installed. A family that is not
+  installed is not offered, and a saved choice that has since been removed falls back to the Windows
+  font and says so in the log.
+- The header subtitle now wraps instead of being cut at the card edge, and the fan card's caption row
+  has its own column, so a wide or monospaced font no longer clips either.
 
 ### Cooling
 
@@ -66,6 +39,7 @@ published from the matching section of this file.
 
 - The README claimed compatibility with 2021+ models; a 2019 **AN517-51** runs it, added to the
   confirmed list. The compatibility text now says the protocol decides, not the year.
+
 
 ## 0.12.0 - 2026-11-13
 
