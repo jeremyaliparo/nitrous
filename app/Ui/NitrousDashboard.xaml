@@ -1226,6 +1226,22 @@
 								<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed">
 									<ComboBoxItem Content="Midnight"/>
 									<ComboBoxItem Content="Black"/>
+									<ComboBoxItem Content="Graphite"/>
+									<ComboBoxItem Content="Slate"/>
+									<ComboBoxItem Content="Navy"/>
+								</ComboBox>
+							</Grid>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="Sections" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<ComboBox Grid.Column="1" x:Name="SectionsBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Sections_Changed">
+									<ComboBoxItem Content="Default"/>
+									<ComboBoxItem Content="Black"/>
+									<ComboBoxItem Content="Graphite"/>
+									<ComboBoxItem Content="Slate"/>
 								</ComboBox>
 							</Grid>
 						</StackPanel>

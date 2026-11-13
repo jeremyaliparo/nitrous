@@ -54,9 +54,9 @@ internal static class ThemePalette
     private const double MaxAccentLuminance = 0.70;
 
     /// <summary>
-    /// The dark surfaces the accent is read against. Two presets rather than a colour picker: the
-    /// text, border and hover shades all have to be built around whatever the window colour is, and
-    /// an arbitrary pick could not keep them readable.
+    /// The window background. Presets rather than a colour picker: the text, border and hover
+    /// shades have to be built around whatever the window colour is, and an arbitrary pick could
+    /// not keep them readable.
     /// </summary>
     public enum ThemeSurface
     {
@@ -64,7 +64,31 @@ internal static class ThemePalette
         Midnight,
 
         /// <summary>Pure black, for OLED panels and anyone who wants the window to vanish.</summary>
-        Black
+        Black,
+
+        /// <summary>A lighter charcoal, between midnight and the cards of the shipped palette.</summary>
+        Graphite,
+
+        /// <summary>Cool blue-grey.</summary>
+        Slate,
+
+        /// <summary>Deep blue.</summary>
+        Navy
+    }
+
+    /// <summary>
+    /// The card surface - the "sections" - chosen separately from the window. <see cref="Default"/>
+    /// keeps each window preset's tuned card; anything else lifts the hover, border and toggle
+    /// shades off the chosen card so the controls stay visible against it.
+    /// </summary>
+    public enum ThemeCard
+    {
+        /// <summary>The card colour that belongs to the window preset.</summary>
+        Default,
+
+        Black,
+        Graphite,
+        Slate
     }
 
     private readonly record struct ChromeColors(
@@ -86,16 +110,63 @@ internal static class ThemePalette
             Parse("#000000"), Parse("#050506"), Parse("#08080A"), Parse("#0B0B0D"),
             Parse("#101012"), Parse("#141417"), Parse("#19191C"), Parse("#1F1F23"),
             Parse("#17171A"), Parse("#2A2A2F"), Parse("#3A3A40")),
+        ThemeSurface.Graphite => new ChromeColors(
+            Parse("#1A1A1D"), Parse("#1C1C1F"), Parse("#202024"), Parse("#242428"),
+            Parse("#2A2A2F"), Parse("#2E2E33"), Parse("#35353B"), Parse("#333339"),
+            Parse("#2C2C32"), Parse("#3E3E45"), Parse("#4E4E57")),
+        ThemeSurface.Slate => new ChromeColors(
+            Parse("#191C21"), Parse("#1B1E24"), Parse("#1F2329"), Parse("#23272E"),
+            Parse("#292E36"), Parse("#2D323A"), Parse("#343A43"), Parse("#32373F"),
+            Parse("#2B2F36"), Parse("#3C424C"), Parse("#4C535F")),
+        ThemeSurface.Navy => new ChromeColors(
+            Parse("#101828"), Parse("#121A2C"), Parse("#151E32"), Parse("#172033"),
+            Parse("#1D273B"), Parse("#212C41"), Parse("#283349"), Parse("#263044"),
+            Parse("#1E273A"), Parse("#303C54"), Parse("#414D67")),
         _ => new ChromeColors(
             WindowBg, PanelDeep, Parse("#17171A"), Parse("#1C1C1F"),
             Parse("#222226"), Parse("#26262A"), Parse("#2D2D32"), Parse("#2A2A30"),
             Parse("#232328"), Parse("#35353A"), Parse("#45454D"))
     };
 
-    public static ResourceDictionary Build(Color requestedAccent, ThemeSurface surface = ThemeSurface.Midnight)
+    /// <summary>Replaces the card surface and re-derives the shades that sit on it.</summary>
+    private static ChromeColors WithCard(ChromeColors chrome, ThemeCard card)
+    {
+        var colour = card switch
+        {
+            ThemeCard.Black => Parse("#0B0B0D"),
+            ThemeCard.Graphite => Parse("#242428"),
+            ThemeCard.Slate => Parse("#23272E"),
+            _ => chrome.Card
+        };
+
+        if (card == ThemeCard.Default)
+            return chrome;
+
+        return chrome with
+        {
+            Card = colour,
+            SurfaceHover = Lift(colour, 7),
+            SurfaceRaised = Lift(colour, 11),
+            SurfaceActive = Lift(colour, 18),
+            Border = Lift(colour, 16),
+            Grid = Lift(colour, 8),
+            Toggle = Lift(colour, 27),
+            Divider = Lift(colour, 44)
+        };
+    }
+
+    private static Color Lift(Color colour, int amount) => Color.FromRgb(
+        (byte)Math.Min(255, colour.R + amount),
+        (byte)Math.Min(255, colour.G + amount),
+        (byte)Math.Min(255, colour.B + amount));
+
+    public static ResourceDictionary Build(
+        Color requestedAccent,
+        ThemeSurface surface = ThemeSurface.Midnight,
+        ThemeCard card = ThemeCard.Default)
     {
         var accent = ClampLuminance(requestedAccent, MinAccentLuminance, MaxAccentLuminance);
-        var chrome = Chrome(surface);
+        var chrome = WithCard(Chrome(surface), card);
 
         // The deeper accent is used as text (hotkey box) and as a fill, so it has to stay legible
         // on the card surface as well.

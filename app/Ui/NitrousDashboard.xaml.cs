@@ -536,26 +536,38 @@ public partial class NitrousDashboard : Window
             ring.BorderBrush = active ? selected : Brushes.Transparent;
         }
 
-        _backgroundLoading = true;
+        _appearanceLoading = true;
         try
         {
-            BackgroundBox.SelectedIndex =
-                ThemeManager.Surface == ThemePalette.ThemeSurface.Black ? 1 : 0;
+            BackgroundBox.SelectedIndex = IndexOfSurface(ThemeManager.Surface);
+            SectionsBox.SelectedIndex = IndexOfCard(ThemeManager.Card);
         }
         finally
         {
-            _backgroundLoading = false;
+            _appearanceLoading = false;
         }
     }
 
+    private static int IndexOfSurface(ThemePalette.ThemeSurface surface) =>
+        Math.Max(0, Array.FindIndex(ThemeManager.Surfaces, s => s.Surface == surface));
+
+    private static int IndexOfCard(ThemePalette.ThemeCard card) =>
+        Math.Max(0, Array.FindIndex(ThemeManager.Cards, c => c.Card == card));
+
     private void Background_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (_backgroundLoading || BackgroundBox.SelectedIndex < 0) return;
+        if (_appearanceLoading || BackgroundBox.SelectedIndex < 0) return;
 
-        ThemeManager.SetBackground(System.Windows.Application.Current,
-            BackgroundBox.SelectedIndex == 1
-                ? ThemePalette.ThemeSurface.Black
-                : ThemePalette.ThemeSurface.Midnight);
+        var index = Math.Min(BackgroundBox.SelectedIndex, ThemeManager.Surfaces.Length - 1);
+        ThemeManager.SetBackground(System.Windows.Application.Current, ThemeManager.Surfaces[index].Surface);
+    }
+
+    private void Sections_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appearanceLoading || SectionsBox.SelectedIndex < 0) return;
+
+        var index = Math.Min(SectionsBox.SelectedIndex, ThemeManager.Cards.Length - 1);
+        ThemeManager.SetSections(System.Windows.Application.Current, ThemeManager.Cards[index].Card);
     }
 
     private void OnThemeChanged()
@@ -1030,7 +1042,7 @@ public partial class NitrousDashboard : Window
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
     private bool _screenPulse;
-    private bool _backgroundLoading;
+    private bool _appearanceLoading;
     private bool _coolBoostAvailable;
     private bool _coolBoostLoading;
 

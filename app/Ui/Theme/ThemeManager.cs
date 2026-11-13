@@ -20,6 +20,7 @@ internal static class ThemeManager
 {
     private const string ChoiceKey = "AccentChoice";
     private const string SurfaceKey = "BackgroundChoice";
+    private const string CardKey = "SectionsChoice";
     public const string Auto = "auto";
 
     /// <summary>
@@ -32,12 +33,25 @@ internal static class ThemeManager
     private static string _choice = DefaultChoice;
     private static Color _accent = ThemePalette.DefaultAccent;
     private static ThemePalette.ThemeSurface _surface = ThemePalette.ThemeSurface.Midnight;
+    private static ThemePalette.ThemeCard _card = ThemePalette.ThemeCard.Default;
 
     /// <summary>The window background presets, in the order the SETUP list shows them.</summary>
     public static readonly (string Name, ThemePalette.ThemeSurface Surface)[] Surfaces =
     [
         ("Midnight", ThemePalette.ThemeSurface.Midnight),
-        ("Black", ThemePalette.ThemeSurface.Black)
+        ("Black", ThemePalette.ThemeSurface.Black),
+        ("Graphite", ThemePalette.ThemeSurface.Graphite),
+        ("Slate", ThemePalette.ThemeSurface.Slate),
+        ("Navy", ThemePalette.ThemeSurface.Navy)
+    ];
+
+    /// <summary>The card ("sections") presets, in the order the SETUP list shows them.</summary>
+    public static readonly (string Name, ThemePalette.ThemeCard Card)[] Cards =
+    [
+        ("Default", ThemePalette.ThemeCard.Default),
+        ("Black", ThemePalette.ThemeCard.Black),
+        ("Graphite", ThemePalette.ThemeCard.Graphite),
+        ("Slate", ThemePalette.ThemeCard.Slate)
     ];
 
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
@@ -48,6 +62,8 @@ internal static class ThemeManager
     public static Color Accent => _accent;
 
     public static ThemePalette.ThemeSurface Surface => _surface;
+
+    public static ThemePalette.ThemeCard Card => _card;
 
     /// <summary>Hex strings for the view-model properties that bind directly to a brush.</summary>
     public static string AccentHex => ThemePalette.Hex(_accent);
@@ -69,6 +85,7 @@ internal static class ThemeManager
     {
         var saved = SettingsManager.Get(ChoiceKey, DefaultChoice);
         _surface = ReadSurface(SettingsManager.Get(SurfaceKey, nameof(ThemePalette.ThemeSurface.Midnight)));
+        _card = ReadCard(SettingsManager.Get(CardKey, nameof(ThemePalette.ThemeCard.Default)));
         Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
 
         // The user can change the Windows accent while Nitrous is open.
@@ -94,7 +111,7 @@ internal static class ThemeManager
         Changed?.Invoke();
     }
 
-    /// <summary>Switches the window background preset and keeps the accent.</summary>
+    /// <summary>Switches the window background preset and keeps everything else.</summary>
     public static void SetBackground(Application? app, ThemePalette.ThemeSurface surface)
     {
         if (app is null)
@@ -106,10 +123,27 @@ internal static class ThemeManager
         Changed?.Invoke();
     }
 
+    /// <summary>Switches the card ("sections") preset and keeps everything else.</summary>
+    public static void SetSections(Application? app, ThemePalette.ThemeCard card)
+    {
+        if (app is null)
+            return;
+
+        _card = card;
+        Install(app, _choice);
+        SettingsManager.Save(CardKey, card.ToString());
+        Changed?.Invoke();
+    }
+
     private static ThemePalette.ThemeSurface ReadSurface(string? saved) =>
         Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface)
             ? surface
             : ThemePalette.ThemeSurface.Midnight;
+
+    private static ThemePalette.ThemeCard ReadCard(string? saved) =>
+        Enum.TryParse<ThemePalette.ThemeCard>(saved, ignoreCase: true, out var card)
+            ? card
+            : ThemePalette.ThemeCard.Default;
 
     /// <summary>The accent a choice resolves to right now.</summary>
     public static Color Resolve(string choice)
@@ -162,7 +196,7 @@ internal static class ThemeManager
         _choice = MatchChoice(choice);
         _accent = accent;
 
-        var next = ThemePalette.Build(accent, _surface);
+        var next = ThemePalette.Build(accent, _surface, _card);
         var merged = app.Resources.MergedDictionaries;
 
         if (_installed is not null)

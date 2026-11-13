@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.1-test.3 - 2026-11-13
+
+### Appearance
+
+- **More backgrounds, and a separate card colour.** The Background list gains **Graphite**, **Slate**
+  and **Navy** beside Midnight and Black, and a new **Sections** list sets the card surface on its
+  own: **Default** keeps the card that belongs to the chosen background, or pick Black, Graphite or
+  Slate. The hover, border, grid, toggle and divider shades are lifted from whichever card is chosen,
+  so a section colour never leaves its controls without an edge. Both choices are stored separately
+  and restored at startup.
+
 ## 0.12.1-test.2 - 2026-11-13
 
 ### Appearance
