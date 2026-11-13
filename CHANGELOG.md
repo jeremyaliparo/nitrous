@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.1-test.5 - 2026-11-13
+
+### Appearance
+
+- **The Font list only offers what this machine has.** It is built at startup from the families
+  Windows reports, so a font that is not installed never appears - before, a missing family would
+  have sat in the list and quietly fallen back to Segoe UI. A saved choice that has since been
+  removed falls back to Windows default, and the log says which font was asked for and which one
+  was used.
+- **Code fonts.** Cascadia Code, Cascadia Mono, Consolas, JetBrains Mono, Iosevka NF and Fira Code
+  join the list whenever they are installed, alongside Inter. Two layout fixes make them usable:
+  the subtitle under the header now wraps instead of being cut, and the fan card's caption row has
+  its own column instead of running under the CURVE EDITOR and UNIFIED controls. Consolas was held
+  back in the previous build for exactly that clipping; it fits now.
+
 ## 0.12.1-test.4 - 2026-11-13
 
 ### Appearance

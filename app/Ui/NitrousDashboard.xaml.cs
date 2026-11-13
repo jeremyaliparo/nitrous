@@ -17,6 +17,7 @@ using Nitrous.Ui.Theme;
 
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
+using FontFamily = System.Windows.Media.FontFamily;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Button = System.Windows.Controls.Button;
@@ -48,6 +49,7 @@ public partial class NitrousDashboard : Window
         ThemeManager.Changed += OnThemeChanged;
         Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
         BuildAppearanceSwatches();
+        BuildFontChoices();
 
         DataContext = new DashboardViewModel();
 
@@ -510,6 +512,35 @@ public partial class NitrousDashboard : Window
         // Appearance only: this writes a preference, never a hardware setting.
         button.Click += (_, _) => ThemeManager.Set(System.Windows.Application.Current, choice);
         return button;
+    }
+
+    /// <summary>
+    /// Fills the Font list with the families this machine reports. Built here rather than in XAML
+    /// because the list depends on what is installed: offering a family that is not present would
+    /// show Segoe UI and look like the choice did nothing.
+    /// </summary>
+    private void BuildFontChoices()
+    {
+        _appearanceLoading = true;
+        try
+        {
+            FontBox.Items.Clear();
+
+            foreach (var (name, family) in ThemeManager.FontFamilies)
+            {
+                // Each entry previews its own face in the drop-down; the closed box shows the
+                // selected one through the window's inherited font.
+                var item = new ComboBoxItem { Content = name, Tag = family };
+                if (family != ThemeManager.AutoFont)
+                    item.FontFamily = new FontFamily(family);
+
+                FontBox.Items.Add(item);
+            }
+        }
+        finally
+        {
+            _appearanceLoading = false;
+        }
     }
 
     private void RefreshAppearanceSelection()

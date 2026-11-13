@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using Nitrous.Diagnostics;
 using Nitrous.Managers;
 
 using Color = System.Windows.Media.Color;
@@ -62,22 +63,36 @@ internal static class ThemeManager
     ];
 
     /// <summary>
-    /// The font list, in the order the SETUP list shows them. Curated rather than every installed
-    /// family: these are the ones that ship with Windows 10 and 11, so the choice is one that can
-    /// actually be tested. Icons are vector paths, so nothing here can break the glyphs.
+    /// Font candidates, in display order, split into UI faces and code faces. Only the ones this
+    /// machine actually has are offered - see <see cref="FontFamilies"/> - so the list can never
+    /// show a choice that would quietly fall back to the Windows font.
     ///
-    /// Consolas was measured and left out: its digits are wider at these sizes than the pixel-tuned
-    /// layout allows, and it clipped the subtitle and the fan-card captions.
+    /// Icons are vector paths, so no family can break the glyphs; the reason to curate rather than
+    /// list every installed family is that a decorative or symbol font would still be offered.
     /// </summary>
-    public static readonly (string Name, string Family)[] FontFamilies =
+    private static readonly (string Name, string Family)[] FontCandidates =
     [
-        ("Windows default", AutoFont),
         ("Segoe UI", "Segoe UI"),
         ("Bahnschrift", "Bahnschrift"),
         ("Calibri", "Calibri"),
         ("Tahoma", "Tahoma"),
-        ("Trebuchet MS", "Trebuchet MS")
+        ("Trebuchet MS", "Trebuchet MS"),
+        ("Inter", "Inter"),
+
+        // Code faces. Wider than the UI faces at the same size, so they look best in the SETUP
+        // list rather than on the dense fan cards.
+        ("Cascadia Code", "Cascadia Code"),
+        ("Cascadia Mono", "Cascadia Mono"),
+        ("Consolas", "Consolas"),
+        ("JetBrains Mono", "JetBrains Mono"),
+        ("Iosevka NF", "Iosevka NF"),
+        ("Fira Code", "Fira Code")
     ];
+
+    private static (string Name, string Family)[]? _fonts;
+
+    /// <summary>Windows default, then every candidate family this machine has installed.</summary>
+    public static (string Name, string Family)[] FontFamilies => _fonts ??= BuildFonts();
 
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
     public static event Action? Changed;
@@ -118,6 +133,11 @@ internal static class ThemeManager
         _card = ReadCard(SettingsManager.Get(CardKey, nameof(ThemePalette.ThemeCard.Default)));
         _font = ReadFont(SettingsManager.Get(FontKey, AutoFont));
         Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
+
+        // Diagnostics answer "why don't I see Inter?" without a round trip: it lists what this
+        // machine offered and what the saved choice resolved to.
+        Logger.Info($"Font: saved '{_font}' resolved to '{FontFamily.Source}'; " +
+                    $"{FontFamilies.Length - 1} of {FontCandidates.Length} candidate families installed.");
 
         // The user can change the Windows accent while Nitrous is open.
         SystemParameters.StaticPropertyChanged += (_, e) =>
@@ -207,8 +227,27 @@ internal static class ThemeManager
         return SystemFonts.MessageFontFamily;
     }
 
-    private static bool IsInstalled(string family) =>
-        Fonts.SystemFontFamilies.Any(f => string.Equals(f.Source, family, StringComparison.OrdinalIgnoreCase));
+    private static HashSet<string>? _installedFamilies;
+
+    /// <summary>Every family WPF reports, read once per process.</summary>
+    private static HashSet<string> InstalledFamilies =>
+        _installedFamilies ??= new HashSet<string>(
+            Fonts.SystemFontFamilies.Select(f => f.Source), StringComparer.OrdinalIgnoreCase);
+
+    private static (string Name, string Family)[] BuildFonts()
+    {
+        var list = new List<(string Name, string Family)> { ("Windows default", AutoFont) };
+
+        foreach (var candidate in FontCandidates)
+        {
+            if (InstalledFamilies.Contains(candidate.Family))
+                list.Add(candidate);
+        }
+
+        return [.. list];
+    }
+
+    private static bool IsInstalled(string family) => InstalledFamilies.Contains(family);
 
     private static ThemePalette.ThemeSurface ReadSurface(string? saved) =>
         Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface)

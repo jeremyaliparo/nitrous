@@ -637,7 +637,7 @@
 							</Border>
 							<StackPanel VerticalAlignment="Center">
 								<TextBlock x:Name="DashVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -784,8 +784,12 @@
 						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="12,12,12,16">
 							<StackPanel>
 								<Grid Margin="0,0,0,12">
-                                    <TextBlock Text="CUSTOM FAN SPEED" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="Auto"/>
+									</Grid.ColumnDefinitions>
+                                    <TextBlock Text="CUSTOM FAN SPEED" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" TextTrimming="CharacterEllipsis" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                                         <!-- Button to open Fan Curve Editor Window -->
                                         <Button Content="CURVE EDITOR"
                                                 Click="OpenCurveEditor_Click"
@@ -862,7 +866,7 @@
 							</Border>
 							<StackPanel VerticalAlignment="Center">
 								<TextBlock x:Name="SettingsVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -1251,14 +1255,7 @@
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
 								<TextBlock Text="Font" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}">
-									<ComboBoxItem Content="Windows default"/>
-									<ComboBoxItem Content="Segoe UI"/>
-									<ComboBoxItem Content="Bahnschrift"/>
-									<ComboBoxItem Content="Calibri"/>
-									<ComboBoxItem Content="Tahoma"/>
-									<ComboBoxItem Content="Trebuchet MS"/>
-								</ComboBox>
+								<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}"/>
 							</Grid>
 						</StackPanel>
 					</Border>
@@ -1343,7 +1340,7 @@
 							</Border>
 							<StackPanel VerticalAlignment="Center">
 								<TextBlock x:Name="GpuVersionText" Text="Nitrous Tuning" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -1482,7 +1479,7 @@
 							</Border>
 							<StackPanel VerticalAlignment="Center">
 								<TextBlock x:Name="KeyboardVersionText" Text="Nitrous" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="14"/>
-								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+								<TextBlock Text="Pure hardware control for Acer Nitro laptops." Foreground="{DynamicResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" MaxWidth="250" Margin="0,2,0,0"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
