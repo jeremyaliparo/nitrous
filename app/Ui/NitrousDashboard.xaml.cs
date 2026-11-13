@@ -535,6 +535,27 @@ public partial class NitrousDashboard : Window
 
             ring.BorderBrush = active ? selected : Brushes.Transparent;
         }
+
+        _backgroundLoading = true;
+        try
+        {
+            BackgroundBox.SelectedIndex =
+                ThemeManager.Surface == ThemePalette.ThemeSurface.Black ? 1 : 0;
+        }
+        finally
+        {
+            _backgroundLoading = false;
+        }
+    }
+
+    private void Background_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_backgroundLoading || BackgroundBox.SelectedIndex < 0) return;
+
+        ThemeManager.SetBackground(System.Windows.Application.Current,
+            BackgroundBox.SelectedIndex == 1
+                ? ThemePalette.ThemeSurface.Black
+                : ThemePalette.ThemeSurface.Midnight);
     }
 
     private void OnThemeChanged()
@@ -1009,6 +1030,7 @@ public partial class NitrousDashboard : Window
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
     private bool _screenPulse;
+    private bool _backgroundLoading;
     private bool _coolBoostAvailable;
     private bool _coolBoostLoading;
 

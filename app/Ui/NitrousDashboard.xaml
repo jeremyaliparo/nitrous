@@ -1217,6 +1217,17 @@
 							</StackPanel>
 							<TextBlock Text="Nitrous violet by default. Pick a preset, choose your own colour, or follow Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 							<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
+							<Grid Margin="0,12,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="Background" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed">
+									<ComboBoxItem Content="Midnight"/>
+									<ComboBoxItem Content="Black"/>
+								</ComboBox>
+							</Grid>
 						</StackPanel>
 					</Border>
 

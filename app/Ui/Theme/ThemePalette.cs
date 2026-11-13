@@ -53,9 +53,49 @@ internal static class ThemePalette
     /// <summary>Cap so an almost-white accent does not wash out the surfaces it sits on.</summary>
     private const double MaxAccentLuminance = 0.70;
 
-    public static ResourceDictionary Build(Color requestedAccent)
+    /// <summary>
+    /// The dark surfaces the accent is read against. Two presets rather than a colour picker: the
+    /// text, border and hover shades all have to be built around whatever the window colour is, and
+    /// an arbitrary pick could not keep them readable.
+    /// </summary>
+    public enum ThemeSurface
+    {
+        /// <summary>The shipped dark grey.</summary>
+        Midnight,
+
+        /// <summary>Pure black, for OLED panels and anyone who wants the window to vanish.</summary>
+        Black
+    }
+
+    private readonly record struct ChromeColors(
+        Color Window,
+        Color Panel,
+        Color RailHover,
+        Color Card,
+        Color SurfaceHover,
+        Color SurfaceRaised,
+        Color SurfaceActive,
+        Color Border,
+        Color Grid,
+        Color Toggle,
+        Color Divider);
+
+    private static ChromeColors Chrome(ThemeSurface surface) => surface switch
+    {
+        ThemeSurface.Black => new ChromeColors(
+            Parse("#000000"), Parse("#050506"), Parse("#08080A"), Parse("#0B0B0D"),
+            Parse("#101012"), Parse("#141417"), Parse("#19191C"), Parse("#1F1F23"),
+            Parse("#17171A"), Parse("#2A2A2F"), Parse("#3A3A40")),
+        _ => new ChromeColors(
+            WindowBg, PanelDeep, Parse("#17171A"), Parse("#1C1C1F"),
+            Parse("#222226"), Parse("#26262A"), Parse("#2D2D32"), Parse("#2A2A30"),
+            Parse("#232328"), Parse("#35353A"), Parse("#45454D"))
+    };
+
+    public static ResourceDictionary Build(Color requestedAccent, ThemeSurface surface = ThemeSurface.Midnight)
     {
         var accent = ClampLuminance(requestedAccent, MinAccentLuminance, MaxAccentLuminance);
+        var chrome = Chrome(surface);
 
         // The deeper accent is used as text (hotkey box) and as a fill, so it has to stay legible
         // on the card surface as well.
@@ -73,17 +113,17 @@ internal static class ThemePalette
         var d = new ResourceDictionary();
 
         // --- chrome -------------------------------------------------------------------------
-        Add(d, "WindowBgBrush", WindowBg);
-        Add(d, "PanelDeepBrush", PanelDeep);
-        Add(d, "RailHoverBrush", Parse("#17171A"));
-        Add(d, "CardBgBrush", Parse("#1C1C1F"));
-        Add(d, "SurfaceHoverBrush", Parse("#222226"));
-        Add(d, "SurfaceRaisedBrush", Parse("#26262A"));
-        Add(d, "SurfaceActiveBrush", Parse("#2D2D32"));
-        Add(d, "BorderSubtleBrush", Parse("#2A2A30"));
-        Add(d, "GridLineBrush", Parse("#232328"));
-        Add(d, "ToggleTrackBrush", Parse("#35353A"));
-        Add(d, "DividerBrush", Parse("#45454D"));
+        Add(d, "WindowBgBrush", chrome.Window);
+        Add(d, "PanelDeepBrush", chrome.Panel);
+        Add(d, "RailHoverBrush", chrome.RailHover);
+        Add(d, "CardBgBrush", chrome.Card);
+        Add(d, "SurfaceHoverBrush", chrome.SurfaceHover);
+        Add(d, "SurfaceRaisedBrush", chrome.SurfaceRaised);
+        Add(d, "SurfaceActiveBrush", chrome.SurfaceActive);
+        Add(d, "BorderSubtleBrush", chrome.Border);
+        Add(d, "GridLineBrush", chrome.Grid);
+        Add(d, "ToggleTrackBrush", chrome.Toggle);
+        Add(d, "DividerBrush", chrome.Divider);
 
         // --- text ---------------------------------------------------------------------------
         Add(d, "TextPrimaryBrush", TextPrimary);

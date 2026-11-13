@@ -19,6 +19,7 @@ namespace Nitrous.Ui.Theme;
 internal static class ThemeManager
 {
     private const string ChoiceKey = "AccentChoice";
+    private const string SurfaceKey = "BackgroundChoice";
     public const string Auto = "auto";
 
     /// <summary>
@@ -30,6 +31,14 @@ internal static class ThemeManager
     private static ResourceDictionary? _installed;
     private static string _choice = DefaultChoice;
     private static Color _accent = ThemePalette.DefaultAccent;
+    private static ThemePalette.ThemeSurface _surface = ThemePalette.ThemeSurface.Midnight;
+
+    /// <summary>The window background presets, in the order the SETUP list shows them.</summary>
+    public static readonly (string Name, ThemePalette.ThemeSurface Surface)[] Surfaces =
+    [
+        ("Midnight", ThemePalette.ThemeSurface.Midnight),
+        ("Black", ThemePalette.ThemeSurface.Black)
+    ];
 
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
     public static event Action? Changed;
@@ -37,6 +46,8 @@ internal static class ThemeManager
     public static string Choice => _choice;
 
     public static Color Accent => _accent;
+
+    public static ThemePalette.ThemeSurface Surface => _surface;
 
     /// <summary>Hex strings for the view-model properties that bind directly to a brush.</summary>
     public static string AccentHex => ThemePalette.Hex(_accent);
@@ -57,6 +68,7 @@ internal static class ThemeManager
     public static void Initialise(Application app)
     {
         var saved = SettingsManager.Get(ChoiceKey, DefaultChoice);
+        _surface = ReadSurface(SettingsManager.Get(SurfaceKey, nameof(ThemePalette.ThemeSurface.Midnight)));
         Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
 
         // The user can change the Windows accent while Nitrous is open.
@@ -81,6 +93,23 @@ internal static class ThemeManager
         SettingsManager.Save(ChoiceKey, _choice);
         Changed?.Invoke();
     }
+
+    /// <summary>Switches the window background preset and keeps the accent.</summary>
+    public static void SetBackground(Application? app, ThemePalette.ThemeSurface surface)
+    {
+        if (app is null)
+            return;
+
+        _surface = surface;
+        Install(app, _choice);
+        SettingsManager.Save(SurfaceKey, surface.ToString());
+        Changed?.Invoke();
+    }
+
+    private static ThemePalette.ThemeSurface ReadSurface(string? saved) =>
+        Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface)
+            ? surface
+            : ThemePalette.ThemeSurface.Midnight;
 
     /// <summary>The accent a choice resolves to right now.</summary>
     public static Color Resolve(string choice)
@@ -133,7 +162,7 @@ internal static class ThemeManager
         _choice = MatchChoice(choice);
         _accent = accent;
 
-        var next = ThemePalette.Build(accent);
+        var next = ThemePalette.Build(accent, _surface);
         var merged = app.Resources.MergedDictionaries;
 
         if (_installed is not null)

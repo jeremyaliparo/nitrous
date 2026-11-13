@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.1-test.2 - 2026-11-13
+
+### Appearance
+
+- **Background presets.** SETUP > APPEARANCE gains a Background list with **Midnight** (the shipped
+  dark grey) and **Black**. Black sets the window to pure black and rebuilds the card, hover, border
+  and toggle surfaces around it, so text contrast only improves; the accent is untouched. Presets
+  rather than a colour picker because those surfaces are built to match the window colour, and an
+  arbitrary pick could leave the labels unreadable.
+
 ## 0.12.1-test.1 - 2026-11-13
 
 ### Cooling
