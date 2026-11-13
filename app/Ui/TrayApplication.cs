@@ -1071,7 +1071,7 @@ public class TrayApplication : ApplicationContext
         }
 
         trayIcon.Visible = false;
-        trayIcon.Dispose();
+        SafeDispose(trayIcon, "tray icon");
 
         lock (_dashboardGate)
         {
@@ -1079,14 +1079,31 @@ public class TrayApplication : ApplicationContext
             _dashboardProcess = null;
         }
 
-        _hotkeys.Dispose();
-        _hotkeyChanged.Dispose();
-        _osd?.Dispose();
-        _uiInvoker.Dispose();
-        _gpuManager.Dispose();
+        SafeDispose(_hotkeys, "hotkey registration");
+        SafeDispose(_hotkeyChanged, "hotkey change event");
+        SafeDispose(_osd, "on-screen display");
+        SafeDispose(_uiInvoker, "UI invoker");
+        SafeDispose(_gpuManager, "GPU manager");
     }
 
-    private static void KillOtherInstances()
+    /// <summary>
+    /// Disposes one shutdown resource, and never lets a failure escape. After the updater has
+    /// renamed the running bundle, anything this process had not loaded yet can no longer be
+    /// resolved - which is exactly how shutdown used to die on GPU clock management being off.
+    /// </summary>
+    private static void SafeDispose(IDisposable? resource, string what)
+    {
+        try
+        {
+            resource?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Shutdown: could not dispose the {what}.", ex);
+        }
+    }
+
+    internal static void KillOtherInstances()
     {
         try
         {
@@ -1116,11 +1133,29 @@ public class TrayApplication : ApplicationContext
 
     private void Restart(object? sender, EventArgs e)
     {
-        CleanupResources(killUiProcesses: true);
+        try
+        {
+            CleanupResources(killUiProcesses: true);
+        }
+        catch (Exception ex)
+        {
+            // Same reasoning as ExitCore: a failed teardown must not cancel the restart.
+            Logger.Warn("Restart: cleanup failed; starting the new instance anyway.", ex);
+        }
 
-        // The old process still owns the single-instance mutex until it exits. Start the new
-        // instance with --updated so it waits for us instead of silently quitting.
-        Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--updated") { UseShellExecute = true });
+        try
+        {
+            // The old process still owns the single-instance mutex until it exits. Start the new
+            // instance with --updated so it waits for us instead of silently quitting.
+            Process.Start(new ProcessStartInfo(Application.ExecutablePath, "--updated") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            // Never exit into nothing: if the replacement cannot start, keep this instance alive.
+            Logger.Error("Restart: could not start the new instance; staying open.", ex);
+            return;
+        }
+
         Application.Exit();
     }
 
@@ -1128,7 +1163,20 @@ public class TrayApplication : ApplicationContext
 
     private void ExitCore(bool killUiProcesses)
     {
-        CleanupResources(killUiProcesses);
-        Application.Exit();
+        try
+        {
+            CleanupResources(killUiProcesses);
+        }
+        catch (Exception ex)
+        {
+            // Exiting matters more than a tidy teardown. This process holds the single-instance
+            // mutex, and after an update the replacement waits on it: staying alive is what left
+            // Nitrous sitting in Task Manager with no tray icon.
+            Logger.Error("Shutdown: cleanup failed; exiting anyway.", ex);
+        }
+        finally
+        {
+            Application.Exit();
+        }
     }
 }

@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.13.1-test.1 - 2026-11-13
+
+### Update
+
+- **An update no longer leaves Nitrous stuck in Task Manager.** The updater replaces the running
+  executable by renaming it, and a single-file app reads its assemblies from that file, so anything
+  the old process had not loaded yet becomes unloadable. With GPU clock management off (the default)
+  the first such load was the GPU manager during shutdown: teardown threw, the final `Exit` was
+  skipped, and the process stayed alive holding the single-instance lock. The replacement then waited
+  a minute and gave up, leaving a tray-less `Nitrous.exe` and a relaunch that refused to start until
+  it was killed by hand.
+- Shutdown now exits whatever happens, every disposal is guarded, and a restart that cannot spawn its
+  replacement stays open instead of exiting into nothing.
+- A replacement that has waited 30 s for the instance it is replacing now ends that instance and
+  takes over, so machines already on 0.13.0 recover on their next update instead of needing a manual
+  close.
+
 ## 0.13.0 - 2026-11-13
 
 ### Appearance

@@ -94,6 +94,11 @@ static class Program
         GC.KeepAlive(mutex);
     }
 
+    /// <summary>
+    /// Takes the single-instance mutex. A normal launch gives up immediately; an update launch
+    /// (<c>--updated</c>) waits for the instance it is replacing, and takes over if that instance
+    /// never finishes exiting.
+    /// </summary>
     private static bool AcquireSingleInstance(bool waitForPrevious)
     {
         mutex = new Mutex(false, MutexName);
@@ -101,24 +106,44 @@ static class Program
         var attempts = waitForPrevious ? 30 : 1;
         for (var attempt = 0; attempt < attempts; attempt++)
         {
-            try
+            if (TryTakeMutex(waitForPrevious ? 1000 : 0))
+                return true;
+        }
+
+        // Only reachable for an update launch: the instance being replaced still holds the mutex
+        // after half a minute, so it is stuck in its own shutdown rather than busy. It has already
+        // done its hardware teardown by then - 0.13.0 and earlier hung later than that, disposing
+        // the GPU manager after the updater had replaced the bundle - so ending it is better than
+        // leaving the user with no Nitrous at all.
+        if (waitForPrevious)
+        {
+            Logger.Warn($"The previous instance still holds the mutex after {attempts} s; taking over.");
+            TrayApplication.KillOtherInstances();
+
+            if (TryTakeMutex(5000))
             {
-                if (mutex.WaitOne(waitForPrevious ? 1000 : 0))
-                    return true;
-            }
-            catch (AbandonedMutexException)
-            {
-                // A previous instance crashed; we now own the mutex.
+                Logger.Info("Took over from the stalled previous instance.");
                 return true;
             }
-
-            if (attempt < attempts - 1) Thread.Sleep(1000);
         }
 
         Logger.Info("Another Nitrous instance is already running; exiting.");
         mutex.Dispose();
         mutex = null;
         return false;
+    }
+
+    private static bool TryTakeMutex(int millisecondsTimeout)
+    {
+        try
+        {
+            return mutex!.WaitOne(millisecondsTimeout);
+        }
+        catch (AbandonedMutexException)
+        {
+            // A previous instance died or was terminated; this process now owns the mutex.
+            return true;
+        }
     }
 
     /// <summary>
