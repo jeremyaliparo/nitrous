@@ -3,7 +3,7 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
-## 0.13.1-test.1 - 2026-11-13
+## 0.13.1 - 2026-11-13
 
 ### Update
 
@@ -17,8 +17,9 @@ published from the matching section of this file.
 - Shutdown now exits whatever happens, every disposal is guarded, and a restart that cannot spawn its
   replacement stays open instead of exiting into nothing.
 - A replacement that has waited 30 s for the instance it is replacing now ends that instance and
-  takes over, so machines already on 0.13.0 recover on their next update instead of needing a manual
-  close.
+  takes over. **Updating from 0.13.0 therefore pauses for about 30 seconds after the download**, with
+  no tray icon, while that happens; it is the handover, not a freeze. From 0.13.1 onwards the update
+  is immediate again.
 
 ## 0.13.0 - 2026-11-13
 
