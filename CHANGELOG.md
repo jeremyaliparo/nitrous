@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.1-test.4 - 2026-11-13
+
+### Appearance
+
+- **Font.** A third list in SETUP > APPEARANCE sets the UI font: **Windows default**, **Segoe UI**,
+  **Bahnschrift**, **Calibri**, **Tahoma** or **Trebuchet MS**. It applies to the dashboard and the
+  fan-curve window alike and changes in place. Every icon is a vector path, so a font cannot break
+  them, and a family that is missing falls back to the Windows UI font rather than letting WPF
+  substitute something else. Consolas was measured and left out: it is wide enough to clip the
+  subtitle and the fan-card captions at these fixed sizes.
+
 ## 0.12.1-test.3 - 2026-11-13
 
 ### Appearance

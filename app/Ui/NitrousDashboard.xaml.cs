@@ -541,6 +541,7 @@ public partial class NitrousDashboard : Window
         {
             BackgroundBox.SelectedIndex = IndexOfSurface(ThemeManager.Surface);
             SectionsBox.SelectedIndex = IndexOfCard(ThemeManager.Card);
+            FontBox.SelectedIndex = IndexOfFont(ThemeManager.FontChoice);
         }
         finally
         {
@@ -553,6 +554,10 @@ public partial class NitrousDashboard : Window
 
     private static int IndexOfCard(ThemePalette.ThemeCard card) =>
         Math.Max(0, Array.FindIndex(ThemeManager.Cards, c => c.Card == card));
+
+    private static int IndexOfFont(string family) =>
+        Math.Max(0, Array.FindIndex(ThemeManager.FontFamilies,
+            f => string.Equals(f.Family, family, StringComparison.OrdinalIgnoreCase)));
 
     private void Background_Changed(object sender, SelectionChangedEventArgs e)
     {
@@ -568,6 +573,14 @@ public partial class NitrousDashboard : Window
 
         var index = Math.Min(SectionsBox.SelectedIndex, ThemeManager.Cards.Length - 1);
         ThemeManager.SetSections(System.Windows.Application.Current, ThemeManager.Cards[index].Card);
+    }
+
+    private void Font_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appearanceLoading || FontBox.SelectedIndex < 0) return;
+
+        var index = Math.Min(FontBox.SelectedIndex, ThemeManager.FontFamilies.Length - 1);
+        ThemeManager.SetFont(System.Windows.Application.Current, ThemeManager.FontFamilies[index].Family);
     }
 
     private void OnThemeChanged()

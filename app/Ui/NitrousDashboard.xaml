@@ -7,6 +7,7 @@
         IsVisibleChanged="Window_IsVisibleChanged"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
+        FontFamily="{DynamicResource AppFontFamily}"
         RenderOptions.ClearTypeHint="Enabled"
         Deactivated="Window_Deactivated" Activated="Window_Activated">
 	<Window.Resources>
@@ -1242,6 +1243,21 @@
 									<ComboBoxItem Content="Black"/>
 									<ComboBoxItem Content="Graphite"/>
 									<ComboBoxItem Content="Slate"/>
+								</ComboBox>
+							</Grid>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="Font" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}">
+									<ComboBoxItem Content="Windows default"/>
+									<ComboBoxItem Content="Segoe UI"/>
+									<ComboBoxItem Content="Bahnschrift"/>
+									<ComboBoxItem Content="Calibri"/>
+									<ComboBoxItem Content="Tahoma"/>
+									<ComboBoxItem Content="Trebuchet MS"/>
 								</ComboBox>
 							</Grid>
 						</StackPanel>

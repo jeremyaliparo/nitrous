@@ -4,6 +4,8 @@ using System.Windows.Media.Effects;
 using Nitrous.Managers;
 
 using Color = System.Windows.Media.Color;
+using FontFamily = System.Windows.Media.FontFamily;
+using SystemFonts = System.Windows.SystemFonts;
 using Application = System.Windows.Application;
 using Brush = System.Windows.Media.Brush;
 
@@ -21,7 +23,11 @@ internal static class ThemeManager
     private const string ChoiceKey = "AccentChoice";
     private const string SurfaceKey = "BackgroundChoice";
     private const string CardKey = "SectionsChoice";
+    private const string FontKey = "FontChoice";
     public const string Auto = "auto";
+
+    /// <summary>Stored when the font should be whatever Windows uses for its own UI text.</summary>
+    public const string AutoFont = "auto";
 
     /// <summary>
     /// What a machine with no saved choice gets. Nitrous is violet: following the Windows accent is
@@ -34,6 +40,7 @@ internal static class ThemeManager
     private static Color _accent = ThemePalette.DefaultAccent;
     private static ThemePalette.ThemeSurface _surface = ThemePalette.ThemeSurface.Midnight;
     private static ThemePalette.ThemeCard _card = ThemePalette.ThemeCard.Default;
+    private static string _font = AutoFont;
 
     /// <summary>The window background presets, in the order the SETUP list shows them.</summary>
     public static readonly (string Name, ThemePalette.ThemeSurface Surface)[] Surfaces =
@@ -54,6 +61,24 @@ internal static class ThemeManager
         ("Slate", ThemePalette.ThemeCard.Slate)
     ];
 
+    /// <summary>
+    /// The font list, in the order the SETUP list shows them. Curated rather than every installed
+    /// family: these are the ones that ship with Windows 10 and 11, so the choice is one that can
+    /// actually be tested. Icons are vector paths, so nothing here can break the glyphs.
+    ///
+    /// Consolas was measured and left out: its digits are wider at these sizes than the pixel-tuned
+    /// layout allows, and it clipped the subtitle and the fan-card captions.
+    /// </summary>
+    public static readonly (string Name, string Family)[] FontFamilies =
+    [
+        ("Windows default", AutoFont),
+        ("Segoe UI", "Segoe UI"),
+        ("Bahnschrift", "Bahnschrift"),
+        ("Calibri", "Calibri"),
+        ("Tahoma", "Tahoma"),
+        ("Trebuchet MS", "Trebuchet MS")
+    ];
+
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
     public static event Action? Changed;
 
@@ -64,6 +89,11 @@ internal static class ThemeManager
     public static ThemePalette.ThemeSurface Surface => _surface;
 
     public static ThemePalette.ThemeCard Card => _card;
+
+    public static string FontChoice => _font;
+
+    /// <summary>The family the windows inherit. Resolved on every install, never cached.</summary>
+    public static FontFamily FontFamily => ResolveFont(_font);
 
     /// <summary>Hex strings for the view-model properties that bind directly to a brush.</summary>
     public static string AccentHex => ThemePalette.Hex(_accent);
@@ -86,6 +116,7 @@ internal static class ThemeManager
         var saved = SettingsManager.Get(ChoiceKey, DefaultChoice);
         _surface = ReadSurface(SettingsManager.Get(SurfaceKey, nameof(ThemePalette.ThemeSurface.Midnight)));
         _card = ReadCard(SettingsManager.Get(CardKey, nameof(ThemePalette.ThemeCard.Default)));
+        _font = ReadFont(SettingsManager.Get(FontKey, AutoFont));
         Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
 
         // The user can change the Windows accent while Nitrous is open.
@@ -134,6 +165,50 @@ internal static class ThemeManager
         SettingsManager.Save(CardKey, card.ToString());
         Changed?.Invoke();
     }
+
+    /// <summary>Switches the UI font family and keeps everything else.</summary>
+    public static void SetFont(Application? app, string family)
+    {
+        if (app is null)
+            return;
+
+        _font = ReadFont(family);
+        Install(app, _choice);
+        SettingsManager.Save(FontKey, _font);
+        Changed?.Invoke();
+    }
+
+    private static string ReadFont(string? saved)
+    {
+        if (string.IsNullOrWhiteSpace(saved) ||
+            string.Equals(saved, AutoFont, StringComparison.OrdinalIgnoreCase))
+            return AutoFont;
+
+        // Only a curated family is accepted, so a stale or hand-edited settings value cannot put
+        // the UI on a font that was never tested.
+        foreach (var (_, family) in FontFamilies)
+        {
+            if (string.Equals(family, saved, StringComparison.OrdinalIgnoreCase))
+                return family;
+        }
+
+        return AutoFont;
+    }
+
+    /// <summary>
+    /// The family for a choice. Anything that is not installed falls back to the Windows UI font
+    /// rather than letting WPF substitute a random one.
+    /// </summary>
+    private static FontFamily ResolveFont(string choice)
+    {
+        if (choice != AutoFont && IsInstalled(choice))
+            return new FontFamily(choice);
+
+        return SystemFonts.MessageFontFamily;
+    }
+
+    private static bool IsInstalled(string family) =>
+        Fonts.SystemFontFamilies.Any(f => string.Equals(f.Source, family, StringComparison.OrdinalIgnoreCase));
 
     private static ThemePalette.ThemeSurface ReadSurface(string? saved) =>
         Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface)
@@ -201,6 +276,9 @@ internal static class ThemeManager
 
         if (_installed is not null)
             merged.Remove(_installed);
+
+        // Inherited by every control in the window, and by the fan-curve window too.
+        next["AppFontFamily"] = ResolveFont(_font);
 
         merged.Add(next);
         _installed = next;

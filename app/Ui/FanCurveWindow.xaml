@@ -4,6 +4,7 @@
         Title="Custom Fan Curve" Height="660" Width="880"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         TextOptions.TextFormattingMode="Display"
+        FontFamily="{DynamicResource AppFontFamily}"
         RenderOptions.ClearTypeHint="Enabled">
 
     <Window.Resources>
