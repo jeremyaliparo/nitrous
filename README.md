@@ -39,7 +39,7 @@ OEM control centers install heavy background service stacks, telemetry daemons, 
 
 | Subsystem | Capabilities |
 | :--- | :--- |
-| **Cooling** | • **Granular Fan Control:** Per-profile custom fan curves, manual control (**1% to 100%**), Auto, and Max.<br>• **Ramp Shaping:** Fans spin up instantly under load but step down gradually so short CPU bursts don't cause annoying revving. |
+| **Cooling** | • **Granular Fan Control:** Per-profile custom fan curves, manual control (**1% to 100%**), Auto, and Max.<br>• **Ramp Shaping:** Fans spin up instantly under load but step down gradually so short CPU bursts don't cause annoying revving.<br>• **CoolBoost:** where the firmware has it, one switch raises its own fan speeds - shown in Auto and Custom, hidden in Max, which is already full speed. |
 | **Power & EC** | • **Firmware Profiles:** Quiet, Balanced, Performance, and Turbo applied directly through the EC so enforced GPU power limits follow.<br>• **CPU Tuning:** Per-profile CPU min/max limits and processor boost modes with automatic baseline backup and restore.<br>• **Battery Health:** Battery charge limiter and USB power delivery while the laptop is powered off.<br>• **AC/DC Memory:** Optional separate power and fan modes for AC and battery, applied when the charger changes. |
 | **GPU** | • **Clock Offsets:** Core and memory frequency offsets with live clocks, utilization, and thermal readouts.<br>• **Opt-In Ownership:** Clock writes are **off by default** so external tools (like MSI Afterburner) are never overwritten unexpectedly. When enabled, a background watchdog automatically repairs driver clock drift. |
 | **Display** | • **Dynamic Refresh Rate:** Switch to any refresh rate the panel advertises. `Auto` uses your chosen rate on AC and 60 Hz on battery.<br>• **LCD Overdrive:** Panel response overdrive where the display reports support for it. |
@@ -57,7 +57,7 @@ OEM control centers install heavy background service stacks, telemetry daemons, 
 | **OS** | Windows 10 or Windows 11 (x64) |
 | **Runtime** | [**.NET 10 Desktop Runtime (x64)**](https://dotnet.microsoft.com/download/dotnet/10.0) *(Required — the app will not start without it)* |
 | **Privileges** | Administrator (requested automatically via app manifest) |
-| **Hardware** | Modern Acer Nitro laptop (probes SMBIOS tables and Acer WMI classes at startup) |
+| **Hardware** | Acer Nitro laptop with the gaming WMI interface (probed at startup; 2019 models confirmed) |
 
 ### 2. Download & Verify
 
@@ -77,9 +77,10 @@ Nitrous is completely portable and requires no installer.
 
 ## Compatibility
 
-Designed for modern Acer Nitro laptops (2021+) that expose the Acer gaming WMI classes and, on some models, an embedded-controller HID interface.
+Designed for Acer Nitro laptops that expose the gaming WMI classes and, on some models, an embedded-controller HID interface. The year does not decide it: a 2019 AN517-51 runs Nitrous the same way a 2025 16S does, and a feature the firmware does not answer simply stays hidden.
 
 **Confirmed Models:**
+- **Acer Nitro 5** (`AN517-51`, 2019)
 - **Acer Nitro 16S** (`AN16S-61`)
 - **Acer Nitro V 15** (`ANV15-41`<!--, `ANV15-52` — *Thanks [@Baymax0251](https://github.com/Baymax0251) for testing!* -->)
 
@@ -158,6 +159,7 @@ Nitrous disables controls when your firmware does not respond to them rather tha
 - **Cover Logo:** Confirmed once with a test colour on the first visit. If the lid's "N" did not light up, the effect controls are replaced by an explanation and nothing further is written to that device.
 - **Keyboard Auto-Off:** Requires the embedded-controller interface and now lives in **Setup → KEYBOARD**. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
 - **USB Charging While Off:** Requires an Acer WMI class that is only partially implemented on certain BIOS versions.
+- **CoolBoost:** Offered only where the firmware itself says APGeAction function 7 is CoolBoost. On firmware that uses that function for the power mode the switch stays hidden, because writing it would change the mode.
 
 **LCD Overdrive** is the exception: it is a panel property, so where the display reports no support the control is hidden entirely rather than greyed out, and the refresh list fills the row.
 </details>

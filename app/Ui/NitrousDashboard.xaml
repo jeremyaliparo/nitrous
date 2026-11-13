@@ -765,6 +765,20 @@
 							<RadioButton x:Name="BtnFanCustom" TabIndex="1" GroupName="Fans" Uid="Medium" Tag="M3,7V9H13V7H3M15,11H17V9H21V7H17V5H15V11ZM3,15V17H9V15H3M13,19V17H21V15H13V13H11V19H13Z" Content="Custom" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Medium"/>
 						</UniformGrid>
 					</Border>
+					<!-- CoolBoost, where APGeAction function 7 is it (AN517-51 and the AN515-45/57). -->
+					<Border x:Name="CoolBoostCard" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" Visibility="Collapsed">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+								<TextBlock Text="CoolBoost" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+								<TextBlock Text="Raises the firmware's own fan speeds. Max already runs them flat out." Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap"/>
+							</StackPanel>
+							<CheckBox Grid.Column="1" x:Name="TogCoolBoost" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Checked="CoolBoost_Toggled" Unchecked="CoolBoost_Toggled"/>
+						</Grid>
+					</Border>
 					<StackPanel x:Name="CustomFanSection" Opacity="{Binding CustomFanOpacity}">
 						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="12,12,12,16">
 							<StackPanel>

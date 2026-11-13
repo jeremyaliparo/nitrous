@@ -72,6 +72,7 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
+        InitializeCoolBoost();
 
         if (DataContext is DashboardViewModel batteryVm)
             _ = batteryVm.LoadBatteryHealthAsync();
@@ -630,9 +631,16 @@ public partial class NitrousDashboard : Window
             TxtHkEffect.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_NextEffect", ""));
         }
 
+        var profileChanged =
+            activeMode != _lastSyncedPowerMode || activeFan != _lastSyncedFanMode;
+
         _lastSyncedPowerMode = activeMode;
         _lastSyncedFanMode = activeFan;
         _lastSyncedRefreshMode = activeRefresh;
+
+        // CoolBoost hides in Max, and a mode change can reset it, so show what the firmware holds.
+        UpdateCoolBoostVisibility();
+        if (_coolBoostAvailable && profileChanged) RefreshCoolBoost();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -1001,6 +1009,8 @@ public partial class NitrousDashboard : Window
     private string _syncTarget = LightingSync.TargetBoth;
     private bool _syncToggleUpdating;
     private bool _screenPulse;
+    private bool _coolBoostAvailable;
+    private bool _coolBoostLoading;
 
     private KeyboardEffect _logoEffect = KeyboardEffect.Static;
     private KeyboardColor _logoColor = KeyboardColor.FromHex("#B388FF");
@@ -2455,6 +2465,62 @@ public partial class NitrousDashboard : Window
             }
             catch (InvalidOperationException) { }
         });
+    }
+
+    /// <summary>
+    /// CoolBoost, the fan switch Acer's software offers on some models. It appears only where
+    /// APGeAction function 7 says that function is CoolBoost, and hides in Max, which already runs
+    /// the fans at full speed.
+    /// </summary>
+    private void InitializeCoolBoost()
+    {
+        _coolBoostAvailable = AcerWmiManager.CoolBoostSupported;
+        if (!_coolBoostAvailable) return;
+
+        RefreshCoolBoost();
+        UpdateCoolBoostVisibility();
+    }
+
+    private void RefreshCoolBoost()
+    {
+        if (!_coolBoostAvailable) return;
+
+        var state = AcerWmiManager.GetCoolBoost();
+        if (state is null)
+        {
+            _coolBoostAvailable = false;
+            UpdateCoolBoostVisibility();
+            return;
+        }
+
+        _coolBoostLoading = true;
+        try
+        {
+            TogCoolBoost.IsChecked = state;
+        }
+        finally
+        {
+            _coolBoostLoading = false;
+        }
+    }
+
+    private void UpdateCoolBoostVisibility()
+    {
+        CoolBoostCard.Visibility = _coolBoostAvailable && BtnFanMax.IsChecked != true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void CoolBoost_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_coolBoostAvailable || _coolBoostLoading) return;
+
+        var on = TogCoolBoost.IsChecked == true;
+        if (AcerWmiManager.SetCoolBoost(on)) return;
+
+        // Show what the firmware actually kept rather than a state it refused.
+        Logger.Warn($"CoolBoost: the firmware refused to turn it {(on ? "on" : "off")}.");
+        RefreshCoolBoost();
     }
 
     private void RefreshBootLogo()

@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.12.1-test.1 - 2026-11-13
+
+### Cooling
+
+- **CoolBoost, where the firmware has it.** A switch on the DASH fan card raises Acer's own fan
+  speeds. It appears only when APGeAction function 7's marker says that function is CoolBoost (the
+  AN517-51 answers 1, the 16S and the ANV15 line answer 0). On firmware that uses that function for
+  the operating mode the control stays hidden, because writing it there would change the mode.
+- The switch hides in Max, which already runs the fans at full speed, and the state is read back
+  from the firmware after every write and every profile change, so it cannot show a state the
+  firmware refused.
+
+### Docs
+
+- The README claimed compatibility with 2021+ models; a 2019 **AN517-51** runs it, added to the
+  confirmed list. The compatibility text now says the protocol decides, not the year.
+
 ## 0.12.0 - 2026-11-13
 
 ### Dashboard

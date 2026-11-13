@@ -32,6 +32,12 @@ internal static class AcerWmiProtocol
 
     // GetGamingMiscSetting(0x0A) returns the supported-profiles bitmap.
     public const uint SupportedProfilesSetting = 0x0A;
+
+    // CoolBoost, where APGeAction function 7 is it (marker 1): sub-function 2 reads the state from
+    // byte 1, and a set carries it in byte 2.
+    public const uint CoolBoostRead = 0x0207;
+
+    public static ulong CoolBoostWrite(bool on) => 0x07UL | ((on ? 1UL : 0UL) << 16);
     public const int TurboProfileBit = 5;
 
     // SetGamingFanBehavior payloads.

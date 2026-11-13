@@ -156,6 +156,45 @@ public static class AcerWmiManager
 
     private static PowerProfile? _lastBlinkedMode;
 
+    /// <summary>
+    /// CoolBoost is offered only where APGeAction function 7's own marker says that function is
+    /// CoolBoost. On firmware where it is the operating mode instead, writing CoolBoost would
+    /// change the power mode, so the capability is the gate and an unknown answer means no.
+    /// </summary>
+    public static bool CoolBoostSupported =>
+        AcerCapabilitiesProvider.Current.Wmi.ActionFunction == AcerActionFunction.CoolBoost;
+
+    /// <summary>CoolBoost as the firmware holds it; null when this model does not have it.</summary>
+    public static bool? GetCoolBoost()
+    {
+        if (!CoolBoostSupported) return null;
+        if (!TryReadActionFunction(AcerWmiProtocol.CoolBoostRead, out var raw)) return null;
+
+        return ((raw >> 8) & 0xFF) == 1;
+    }
+
+    /// <summary>
+    /// Turns CoolBoost on or off and confirms what the firmware kept. A write that reports success
+    /// but leaves the state unchanged is treated as a refusal, so the UI can revert truthfully.
+    /// </summary>
+    public static bool SetCoolBoost(bool on)
+    {
+        if (!CoolBoostSupported) return false;
+
+        if (!TryWriteActionFunction(AcerWmiProtocol.CoolBoostWrite(on)))
+        {
+            Logger.Warn($"WMI: the CoolBoost write for {(on ? "on" : "off")} failed.");
+            return false;
+        }
+
+        var now = GetCoolBoost();
+        if (now is null) return true;
+        if (now == on) return true;
+
+        Logger.Warn($"WMI: CoolBoost accepted the write but still reads {(now == true ? "on" : "off")}.");
+        return false;
+    }
+
     private static readonly object FlashGate = new();
 
     /// <summary>
