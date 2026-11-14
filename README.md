@@ -232,6 +232,14 @@ Before replacing the executable during an auto-update, Nitrous enforces a strict
 
 ---
 
+## Licence
+
+Nitrous is MIT licensed. Third-party components — the LGPL-3.0 NVIDIA API wrapper it ships, its
+.NET dependencies and the site's fonts — are listed with their licence texts in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+---
+
 <div align="center">
 <sub>Unofficial open-source utility. Not affiliated with or endorsed by Acer Inc. Use at your own risk.</sub>
 </div>

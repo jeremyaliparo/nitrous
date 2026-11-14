@@ -123,6 +123,7 @@ jobs:
             '- Requires the [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0).',
             "- ``SHA256: $hash`` (also published in ``SHA256SUMS`` and ``Nitrous.exe.sha256``).",
             '- The executable is not code-signed; the checksums are published so the updater can verify an automatic update and so users can verify a manual download.'
+            "- Third-party notices: https://github.com/jeremyaliparo/nitrous/blob/master/THIRD-PARTY-NOTICES.md"
           ) -join "`n"
 
           $notes = $section + "`n" + $footer
