@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.3 - 2026-11-14
+
+### GPU
+
+- **The NVIDIA hotkey registers on every machine now.** Its registration had been placed inside the
+  lighting branch, which only runs on four-zone keyboards, so a single-colour keyboard (lori's
+  AN517-51) never bound it - which is why the button worked while the hotkey did nothing: the
+  dashboard finds the Control Panel on its own.
+- **A failed detection is no longer remembered for the session.** The tray starts at logon, when the
+  Start apps list can still be empty; caching that miss kept the hotkey and the tray entry away until
+  the next restart. Only a hit is cached now, and a press retries the search.
+- Every hotkey logs `Hotkey: <name> bound to <binding>.` when it registers, so a binding that does
+  nothing is visible in the log instead of silent.
+
 ## 0.14.0-test.2 - 2026-11-14
 
 ### GPU

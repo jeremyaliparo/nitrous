@@ -500,12 +500,15 @@ public class TrayApplication : ApplicationContext
         RegisterSavedHotkey("Hotkey_CyclePower", HK_CYCLE_POWER);
         RegisterSavedHotkey("Hotkey_Dashboard", HK_DASHBOARD);
         RegisterSavedHotkey("Hotkey_CycleFan", HK_CYCLE_FAN);
+        RegisterSavedHotkey("Hotkey_NvidiaApp", HK_NVIDIA_APP);
+        // Registered whether or not a vendor tool was found: detection can fail at logon, when the
+        // Start apps list is not populated yet, and the press resolves it then. It also must not
+        // live inside a lighting branch - a single-colour keyboard has no zones and would skip it.
 
         if (LightingZoned())
         {
             RegisterSavedHotkey("Hotkey_ScreenSync", HK_SCREEN_SYNC);
             RegisterSavedHotkey("Hotkey_NextEffect", HK_NEXT_EFFECT);
-        if (NvidiaTools.Find() is not null) RegisterSavedHotkey("Hotkey_NvidiaApp", HK_NVIDIA_APP);
         }
 
         if (SoundSyncAvailable())
@@ -544,6 +547,8 @@ public class TrayApplication : ApplicationContext
 
         if (!_hotkeys.Register(id, modifiers, virtualKey))
             Logger.Warn($"Hotkey: registration failed for {settingKey} ({HotkeyBinding.Format(saved)}).");
+        else
+            Logger.Info($"Hotkey: {settingKey} bound to {HotkeyBinding.Format(saved)}.");
     }
 
     private void OnCustomHotkeyPressed(int id)

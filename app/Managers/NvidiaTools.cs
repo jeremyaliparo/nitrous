@@ -38,22 +38,23 @@ public static class NvidiaTools
 
     private static readonly object Gate = new();
     private static Target? _target;
-    private static bool _searched;
 
     /// <summary>The vendor tool on this machine, or null when there is none. Searched once.</summary>
     public static Target? Find()
     {
         lock (Gate)
         {
-            if (_searched) return _target;
+            // Only a hit is cached. A miss has to be retried: the tray starts at logon, when the
+            // Start apps list can still be empty, and caching that would leave the entry missing for
+            // the whole session.
+            if (_target is { } cached) return cached;
 
-            _searched = true;
             _target = SearchInstall() ?? SearchVendorFolder() ?? SearchStartMenu() ?? SearchStartApps();
 
             if (_target is { } found)
                 Logger.Info($"NVIDIA: using {found.Label} ({found.Path}).");
             else
-                Logger.Info("NVIDIA: no NVIDIA App or Control Panel found.");
+                Logger.Info("NVIDIA: no NVIDIA App or Control Panel found; will retry on the next request.");
 
             return _target;
         }
