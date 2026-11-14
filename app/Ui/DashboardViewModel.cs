@@ -330,6 +330,33 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private bool _isTurboSupported = true;
     public bool IsTurboSupported { get => _isTurboSupported; set => SetProperty(ref _isTurboSupported, value); }
 
+    /// <summary>Whether a vendor GPU tool was found; the GPU page hides its entry when not.</summary>
+    private bool _isNvidiaToolAvailable;
+    public bool IsNvidiaToolAvailable
+    {
+        get => _isNvidiaToolAvailable;
+        set => SetProperty(ref _isNvidiaToolAvailable, value);
+    }
+
+    /// <summary>"NVIDIA App" or "NVIDIA Control Panel", whatever is installed.</summary>
+    private string _nvidiaToolLabel = "NVIDIA App";
+    public string NvidiaToolLabel
+    {
+        get => _nvidiaToolLabel;
+        set => SetProperty(ref _nvidiaToolLabel, value);
+    }
+
+    /// <summary>Formatted binding, empty when none is set, for the hint under the button.</summary>
+    private string _nvidiaHotkeyText = "";
+    public string NvidiaHotkeyText
+    {
+        get => _nvidiaHotkeyText;
+        set => SetProperty(ref _nvidiaHotkeyText, value);
+    }
+
+    /// <summary>Opens the vendor tool; the dashboard never writes driver settings itself.</summary>
+    public RelayCommand OpenNvidiaToolCommand { get; }
+
     /// <summary>
     /// True when Nitrous has asked nvtopps for WhisperMode, which is what makes the NVIDIA App offer
     /// its WhisperMode controls. Read from settings rather than this process's own call, because the
@@ -515,6 +542,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
         Task.Run(() =>
         {
             var isTurbo = AcerWmiManager.IsTurboModeSupported();
+            var nvidia = NvidiaTools.Find();
             var isTaskEnabled = StartupManager.CheckStartupTask();
             var hasClocks = _gpuManager.TryGetClocks(out var core, out var memory, out var clockError);
             if (!hasClocks && !string.IsNullOrEmpty(clockError))
@@ -523,6 +551,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
             System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
             {
                 IsTurboSupported = isTurbo;
+
+                IsNvidiaToolAvailable = nvidia is not null;
+                if (nvidia is { } vendorTool) NvidiaToolLabel = vendorTool.Label;
 
                 _runOnStartup = isTaskEnabled;
                 OnPropertyChanged(nameof(RunOnStartup));
@@ -534,6 +565,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 }
             });
         });
+
+        // Vendor GPU software is launched, never reimplemented.
+        OpenNvidiaToolCommand = new RelayCommand(_ => NvidiaTools.Open());
 
         // Setup commands.
         SetPowerCommand = new RelayCommand(async param =>

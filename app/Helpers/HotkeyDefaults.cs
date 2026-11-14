@@ -17,15 +17,23 @@ namespace Nitrous.Helpers;
 public static class HotkeyDefaults
 {
     private const string RevisionKey = "HotkeyDefaultsRevision";
-    private const int CurrentRevision = 1;
+    private const int CurrentRevision = 2;
 
     private const string DashboardKey = "Hotkey_Dashboard";
+    private const string NvidiaKey = "Hotkey_NvidiaApp";
 
     /// <summary>VK_HOME.</summary>
     private const uint VkHome = 0x24;
 
+    /// <summary>VK_N.</summary>
+    private const uint VkN = 0x4E;
+
     /// <summary>The shipped dashboard binding: Ctrl + Home.</summary>
     public static string DashboardHotkey => HotkeyBinding.Create(HotkeyBinding.ModControl, VkHome);
+
+    /// <summary>Opening the vendor GPU app: Ctrl + Alt + N.</summary>
+    public static string NvidiaHotkey =>
+        HotkeyBinding.Create(HotkeyBinding.ModControl | HotkeyBinding.ModAlt, VkN);
 
     public static void EnsureSeeded()
     {
@@ -34,11 +42,15 @@ public static class HotkeyDefaults
 
         // Presence, not emptiness. A value that exists but is empty was cleared on purpose, so it
         // is left alone; only a machine that has never stored one gets the default.
-        var alreadySet = SettingsManager.GetValueNames()
-            .Any(name => string.Equals(name, DashboardKey, StringComparison.OrdinalIgnoreCase));
+        var set = SettingsManager.GetValueNames().ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (!alreadySet)
+        if (!set.Contains(DashboardKey))
             SettingsManager.Save(DashboardKey, DashboardHotkey);
+
+        // Revision 2 added the NVIDIA shortcut. Unlike cycling the power mode, opening a settings
+        // window is harmless, so it can ship bound and still be cleared with Escape.
+        if (!set.Contains(NvidiaKey))
+            SettingsManager.Save(NvidiaKey, NvidiaHotkey);
 
         SettingsManager.Save(RevisionKey, CurrentRevision);
     }

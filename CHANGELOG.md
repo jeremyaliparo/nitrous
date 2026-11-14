@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.1 - 2026-11-14
+
+### GPU
+
+- **Open the NVIDIA App from Nitrous.** A card at the bottom of the GPU page opens the NVIDIA App,
+  or the older NVIDIA Control Panel on machines that still have it, with a rebindable hotkey
+  (**Ctrl + Alt + N** by default). The card, the tray entry and the hotkey only exist when the
+  software is actually found: the App's install path first, then the Start Menu shortcuts, which also
+  cover the packaged Control Panel. Nitrous launches it and stays out of the way - driver settings
+  remain the vendor's business.
+
 ## 0.13.1 - 2026-11-13
 
 ### Update

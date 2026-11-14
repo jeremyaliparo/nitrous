@@ -84,6 +84,7 @@ public class TrayApplication : ApplicationContext
     private const int HK_SCREEN_SYNC = 3;
     private const int HK_SOUND_SYNC = 4;
     private const int HK_NEXT_EFFECT = 5;
+    private const int HK_NVIDIA_APP = 6;
     private const int HK_DASHBOARD = 99;
 
     private static readonly (string Name, KeyboardEffect Effect)[] GlobalEffectCycle =
@@ -195,6 +196,8 @@ public class TrayApplication : ApplicationContext
     {
         var menu = new ContextMenuStrip { ShowImageMargin = false, ShowCheckMargin = false };
         menu.Items.Add("Open Nitrous", null, (s, e) => ShowDashboard());
+        if (NvidiaTools.Find() is { } vendorTool)
+            menu.Items.Add($"Open {vendorTool.Label}", null, (s, e) => NvidiaTools.Open());
         menu.Items.Add("Reset Dashboard Position", null, (s, e) => ResetDashboardPosition());
         menu.Items.Add("Check for Updates...", null, async (s, e) => await UpdateManager.CheckForUpdatesAsync(false, ExitFromAnyThread));
         menu.Items.Add(new ToolStripSeparator());
@@ -502,6 +505,7 @@ public class TrayApplication : ApplicationContext
         {
             RegisterSavedHotkey("Hotkey_ScreenSync", HK_SCREEN_SYNC);
             RegisterSavedHotkey("Hotkey_NextEffect", HK_NEXT_EFFECT);
+        if (NvidiaTools.Find() is not null) RegisterSavedHotkey("Hotkey_NvidiaApp", HK_NVIDIA_APP);
         }
 
         if (SoundSyncAvailable())
@@ -563,6 +567,9 @@ public class TrayApplication : ApplicationContext
                 break;
             case HK_DASHBOARD:
                 ShowDashboard();
+                break;
+            case HK_NVIDIA_APP:
+                NvidiaTools.Open();
                 break;
         }
     }

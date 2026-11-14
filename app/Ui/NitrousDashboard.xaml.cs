@@ -706,6 +706,15 @@ public partial class NitrousDashboard : Window
             TxtHkScreenSync.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_ScreenSync", ""));
             TxtHkSoundSync.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_SoundSync", ""));
             TxtHkEffect.Text = HotkeyBinding.Format(SettingsManager.Get("Hotkey_NextEffect", ""));
+
+            var nvidiaBinding = SettingsManager.Get("Hotkey_NvidiaApp", "");
+            TxtHkNvidia.Text = HotkeyBinding.Format(nvidiaBinding);
+
+            // The GPU page shows the same binding next to its OPEN button.
+            if (DataContext is DashboardViewModel hotkeys)
+                hotkeys.NvidiaHotkeyText = string.IsNullOrWhiteSpace(nvidiaBinding)
+                    ? string.Empty
+                    : $"Hotkey: {HotkeyBinding.Format(nvidiaBinding)}";
         }
 
         var profileChanged =
