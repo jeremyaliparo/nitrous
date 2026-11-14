@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/nitrous-hero.jpg" alt="Nitrous" width="600">
+<img src="assets/nitrous-hero.jpg" alt="Nitrous" width="800">
 
 ### Pure hardware control for Acer Nitro laptops.
 *No OEM service stack. No telemetry daemon. Just the firmware.*
