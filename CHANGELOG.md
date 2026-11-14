@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.2 - 2026-11-14
+
+### GPU
+
+- **The NVIDIA Control Panel is found on machines that only have the Store build.** lori's laptop has
+  no NVIDIA App, and its Control Panel is the packaged version: no exe under Program Files and no
+  Start Menu shortcut, so the GPU card never appeared. Detection now also searches the vendor folder
+  for `nvcplui.exe` by name and, as a last resort, asks the Start apps list - the only place a
+  packaged app appears - then launches it through `shell:AppsFolder`. The log records what was found
+  and which route found it.
+
 ## 0.14.0-test.1 - 2026-11-14
 
 ### GPU
