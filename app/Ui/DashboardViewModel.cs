@@ -1589,7 +1589,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
                                 driverGpuTemp = fallback.CoreTemp;
                         }
 
-                        if (telemetry.GpuTemp == 0 && driverGpuTemp > 0 && !_gpuTempFromDriverLogged)
+                        // Only meaningful when the EC is answering at all: an unelevated or failed
+                        // read returns 0 for the CPU too, and that is not this model`s quirk.
+                        if (telemetry.GpuTemp == 0 && telemetry.CpuTemp > 0 && driverGpuTemp > 0 &&
+                            !_gpuTempFromDriverLogged)
                         {
                             // One line per session: if this model always needs it, the number is
                             // coming from the driver and a diagnostics bundle should say so.

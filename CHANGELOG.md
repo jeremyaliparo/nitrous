@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.5 - 2026-11-14
+
+### Dashboard
+
+- The `GPU temp: the EC reports 0` line now only appears when the EC is demonstrably answering, with
+  a CPU temperature in the same read. An unelevated or failed read returns zero for every sensor, and
+  that is not the quirk the line is meant to report - it misled one diagnosis already.
+
 ## 0.14.0-test.4 - 2026-11-14
 
 ### Dashboard
