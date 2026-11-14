@@ -27,6 +27,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private CancellationTokenSource? _pollingCts;
     private volatile bool _telemetryEnabled = true;
     private volatile bool _gpuTelemetryActive;
+    private bool _gpuTempFromDriverLogged;
     private bool _telemetryErrorLogged;
 
     // CPU usage is the idle/total delta between two polls; the first poll only records a baseline.
@@ -1576,14 +1577,24 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         _telemetryErrorLogged = false;
 
                         // The EC reports 0 for the dGPU on some models, and while it sits in a low
-                        // power state. Ask the driver instead, but only when the GPU is already
-                        // awake, so this never wakes it just to draw a number.
-                        var driverGpuTemp = 0;
-                        if (telemetry.GpuTemp == 0 && smi == null && _gpuManager.IsGpuAwake)
+                        // power state. Prefer whatever the driver already answered this tick, and
+                        // only ask NVML for a second reading when it was not polled at all - the
+                        // earlier order meant an enabled Deep GPU Telemetry suppressed the fallback
+                        // it was meant to feed, leaving the dashboard on "-- C".
+                        var driverGpuTemp = smi is { HasData: true, CoreTemp: > 0 } ? smi.CoreTemp : 0;
+                        if (telemetry.GpuTemp == 0 && driverGpuTemp == 0 && _gpuManager.IsGpuAwake)
                         {
                             var fallback = await _gpuManager.GetNvmlTelemetryAsync(token);
                             if (fallback is { HasData: true, CoreTemp: > 0 })
                                 driverGpuTemp = fallback.CoreTemp;
+                        }
+
+                        if (telemetry.GpuTemp == 0 && driverGpuTemp > 0 && !_gpuTempFromDriverLogged)
+                        {
+                            // One line per session: if this model always needs it, the number is
+                            // coming from the driver and a diagnostics bundle should say so.
+                            _gpuTempFromDriverLogged = true;
+                            Logger.Info($"GPU temp: the EC reports 0; using the driver's {driverGpuTemp} C.");
                         }
 
                         var chartCpuTemp = telemetry.CpuTemp;

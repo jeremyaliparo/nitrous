@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.4 - 2026-11-14
+
+### Dashboard
+
+- **GPU temperature shows on the DASH again when the EC reports 0.** pr4u's ANV15-52 shows a live GPU
+  usage next to `-- C`: his EC answers 0 for the dGPU temperature, and the NVML fallback only ran when
+  NVML had *not* been polled that tick. With Deep GPU Telemetry on, the usage number itself is an NVML
+  reading, so the fallback was skipped and the zero stood. The dashboard now uses the driver's core
+  temperature whenever the EC has none, and only asks NVML for a second reading if it wasn't polled
+  at all. The history chart gains the same value.
+- The log records it once per session: `GPU temp: the EC reports 0; using the driver's 42 C.`
+
 ## 0.14.0-test.3 - 2026-11-14
 
 ### GPU
