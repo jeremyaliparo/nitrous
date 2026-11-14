@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/nitrous-hero.gif" alt="The Nitrous logo and wordmark above a fan-curve trace, with the background glow pulsing slowly" width="800">
+<img src="assets/nitrous-hero.gif" alt="The Nitrous logo and wordmark inside a faint gauge bezel, with the background glow pulsing slowly" width="800">
 
 ### Pure hardware control for Acer Nitro laptops.
 *No OEM service stack. No telemetry daemon. Just the firmware.*
