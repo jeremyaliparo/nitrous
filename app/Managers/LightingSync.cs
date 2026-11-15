@@ -42,6 +42,7 @@ internal static class LightingSync
     private static bool _brightnessOnly;
     private static bool _brightnessWarned;
     private static int _brightnessWrites;
+    private static int _brightnessFloorMs;
     private static int _brightnessFailures;
     private static bool _brightnessUnavailable;
     private static int _lastBrightness = -1;
@@ -85,6 +86,7 @@ internal static class LightingSync
             _writeWarned = false;
             _brightnessWarned = false;
         _brightnessWrites = 0;
+        _brightnessFloorMs = 0;
         _brightnessFailures = 0;
         _brightnessUnavailable = false;
             _logoAvailable = true;
@@ -664,6 +666,22 @@ internal static class LightingSync
         return Math.Clamp(step, 0, 100);
     }
 
+    /// <summary>
+    /// How often the beat may set a level. The EC HID path is a cheap feature report; the WMI path is
+    /// an ACPI method call, and on at least one model (ANV15-51) sustained ACPI traffic starves the
+    /// audio driver - a read-only EC probe reproduces the same crackle without writing anything, so
+    /// the calls themselves are the problem, not what they carry.
+    /// </summary>
+    private static int BrightnessFloorMs()
+    {
+        if (_brightnessFloorMs > 0) return _brightnessFloorMs;
+
+        var path = AcerWmiManager.GetKeyboardBacklightPath();
+        _brightnessFloorMs = path == AcerWmiManager.KeyboardBacklightPath.Wmi ? 500 : 150;
+        Logger.Info($"Lighting sync: beat writes every {_brightnessFloorMs} ms ({path} backlight).");
+        return _brightnessFloorMs;
+    }
+
     private static void WriteBrightness(int raw)
     {
         if (_brightnessUnavailable) return;
@@ -672,9 +690,7 @@ internal static class LightingSync
         if (level == _lastBrightness) return;
 
         var now = DateTime.UtcNow;
-        // The firmware keeps five levels, so anything faster than ~7 steps a second is invisible
-        // while still costing an ACPI round-trip per step. The old floor was 70 ms.
-        if ((now - _lastBrightnessWrite).TotalMilliseconds < 150) return;
+        if ((now - _lastBrightnessWrite).TotalMilliseconds < BrightnessFloorMs()) return;
 
         // Verify every eighth write instead of all of them: the read-back is a third ACPI call, and
         // a refused level is still noticed within about a second.

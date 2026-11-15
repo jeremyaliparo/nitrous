@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.7 - 2026-11-15
+
+### Lighting
+
+- **The beat effect steps half as often when the backlight is driven through ACPI.** The audio latency
+  survived the previous cut, and running the read-only EC probe produces the same crackle in music -
+  so on that platform the ACPI calls themselves starve the audio driver, not the value they carry.
+  Five-step keyboards now step every 500 ms; EC HID keyboards keep 150 ms, where a write is a feature
+  report rather than an ACPI method. The log records which floor was chosen.
+
 ## 0.14.0-test.6 - 2026-11-15
 
 ### Lighting
