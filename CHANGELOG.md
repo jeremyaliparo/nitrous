@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.6 - 2026-11-15
+
+### Lighting
+
+- **Sound sync no longer floods the firmware with backlight writes.** On a five-step backlight the
+  beat effect runs a 50 Hz loop and set the level through `APGeAction`, and each write cost four ACPI
+  round-trips: read the OEM hotkey byte from the registry, read the timeout, write the level, read it
+  back. The hotkey and timeout are cached now, the write is verified every eighth step instead of
+  every step, and the step floor went from 70 ms to 150 ms - about 42 calls per second down to
+  roughly 7. Five firmware levels cannot show more than that anyway.
+- **A model that refuses the write stops being asked.** After three consecutive refusals the effect
+  turns itself off for the session and says so, instead of retrying at full rate forever.
+
+Reported as audio latency (LatencyMon) while Nitrous was running, on an ANV15-51.
+
 ## 0.14.0-test.5 - 2026-11-14
 
 ### Dashboard

@@ -41,6 +41,9 @@ internal static class LightingSync
     private static bool _logoAvailable = true;
     private static bool _brightnessOnly;
     private static bool _brightnessWarned;
+    private static int _brightnessWrites;
+    private static int _brightnessFailures;
+    private static bool _brightnessUnavailable;
     private static int _lastBrightness = -1;
     private static DateTime _lastBrightnessWrite = DateTime.MinValue;
 
@@ -81,6 +84,9 @@ internal static class LightingSync
             _brightnessOnly = !hasLighting;
             _writeWarned = false;
             _brightnessWarned = false;
+        _brightnessWrites = 0;
+        _brightnessFailures = 0;
+        _brightnessUnavailable = false;
             _logoAvailable = true;
             _lastBrightness = -1;
             _lastBrightnessWrite = DateTime.MinValue;
@@ -660,22 +666,39 @@ internal static class LightingSync
 
     private static void WriteBrightness(int raw)
     {
+        if (_brightnessUnavailable) return;
+
         var level = SnapBrightness(raw);
         if (level == _lastBrightness) return;
 
         var now = DateTime.UtcNow;
-        if ((now - _lastBrightnessWrite).TotalMilliseconds < 70) return;
+        // The firmware keeps five levels, so anything faster than ~7 steps a second is invisible
+        // while still costing an ACPI round-trip per step. The old floor was 70 ms.
+        if ((now - _lastBrightnessWrite).TotalMilliseconds < 150) return;
 
-        if (!AcerWmiManager.SetKeyboardBrightness(level))
+        // Verify every eighth write instead of all of them: the read-back is a third ACPI call, and
+        // a refused level is still noticed within about a second.
+        var verify = ++_brightnessWrites % 8 == 0;
+
+        if (!AcerWmiManager.SetKeyboardBrightness(level, verify))
         {
-            if (!_brightnessWarned)
+            if (++_brightnessFailures >= 3)
+            {
+                // A model that refuses this write should stop being asked: every retry is three
+                // ACPI calls a second that cannot succeed.
+                _brightnessUnavailable = true;
+                Logger.Warn("Sound sync: the backlight refused the level repeatedly; the beat effect is off until the next start.");
+            }
+            else if (!_brightnessWarned)
             {
                 Logger.Warn("Sound sync: the backlight refused a level; keeping the last one.");
                 _brightnessWarned = true;
             }
+
             return;
         }
 
+        _brightnessFailures = 0;
         _lastBrightness = level;
         _lastBrightnessWrite = now;
 

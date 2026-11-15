@@ -430,16 +430,24 @@ public static class AcerWmiManager
     /// Sets the brightness through <c>APGeAction</c>, keeping the timeout it reports, and verifies the
     /// level by reading it back.
     /// </summary>
-    public static bool SetWmiKeyboardBrightness(int brightness)
+    public static bool SetWmiKeyboardBrightness(int brightness, bool verify = true)
     {
         var hotkey = KeyboardAutoOffHotkey();
         var level = NearestKeyboardBrightness(brightness);
-        var timeout = GetWmiKeyboardBacklight()?.TimeoutSeconds ?? 0;
+        var timeout = CachedBacklightTimeout();
 
         var value = ((ulong)level << 32) | ((ulong)hotkey << 8) | ((ulong)timeout << 40)
                     | KeyboardAutoOffFlags;
 
-        if (!TryWriteActionFunction(value)) return false;
+        if (!TryWriteActionFunction(value))
+        {
+            _backlightTimeoutCache = null;
+            return false;
+        }
+
+        // The read-back is a third ACPI round-trip. Callers driving an animation at several levels
+        // per second can skip it; a level the firmware refused is corrected by the next step.
+        if (!verify) return true;
 
         return GetWmiKeyboardBacklight() is { } after && after.Brightness == level;
     }
@@ -448,7 +456,7 @@ public static class AcerWmiManager
     /// Sets the keyboard brightness on whichever path this model has: the EC HID interface first,
     /// then <c>APGeAction</c>. The level is snapped to what the firmware keeps.
     /// </summary>
-    public static bool SetKeyboardBrightness(int brightness)
+    public static bool SetKeyboardBrightness(int brightness, bool verify = true)
     {
         var level = NearestKeyboardBrightness(brightness);
 
@@ -468,7 +476,7 @@ public static class AcerWmiManager
             AcerCapabilitiesProvider.Invalidate();
         }
 
-        return SetWmiKeyboardBrightness(level);
+        return SetWmiKeyboardBrightness(level, verify);
     }
 
     private const ulong KeyboardAutoOffFlags = 0x00080002;
@@ -477,22 +485,48 @@ public static class AcerWmiManager
     /// The second byte of the command. Acer keeps it in the registry and both machines tested use
     /// 132; the constant is the fallback when the key is absent.
     /// </summary>
+    private static int? _autoOffHotkeyCache;
+
     private static int KeyboardAutoOffHotkey()
     {
+        // Read once: sound sync calls this on every brightness step, and opening the registry key
+        // per step was pure overhead next to the ACPI work it was feeding.
+        if (_autoOffHotkeyCache is { } cached) return cached;
+
+        var hotkey = 132;
         try
         {
             using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
                 @"SOFTWARE\OEM\AcerAgentService");
 
             if (key?.GetValue("BK_Hotkey_Number") is int value && value > 0 && value <= 0xFF)
-                return value;
+                hotkey = value;
         }
         catch
         {
             // Not fatal: the default is what both machines report.
         }
 
-        return 132;
+        _autoOffHotkeyCache = hotkey;
+        return hotkey;
+    }
+
+    /// <summary>
+    /// The timeout the firmware reports, cached for a few seconds. Every brightness write carries it,
+    /// so reading it per write doubled the ACPI traffic of the sync effect; a short lifetime keeps a
+    /// value changed elsewhere (the OEM tool) from being written back for long.
+    /// </summary>
+    private static (int Seconds, DateTime ReadAt)? _backlightTimeoutCache;
+
+    private static int CachedBacklightTimeout()
+    {
+        var now = DateTime.UtcNow;
+        if (_backlightTimeoutCache is { } cached && (now - cached.ReadAt).TotalSeconds < 10)
+            return cached.Seconds;
+
+        var seconds = GetWmiKeyboardBacklight()?.TimeoutSeconds ?? 0;
+        _backlightTimeoutCache = (seconds, now);
+        return seconds;
     }
 
     private static bool TryReadActionFunction(uint input, out ulong value)
