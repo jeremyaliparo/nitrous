@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.8 - 2026-11-16
+
+### Lighting
+
+- **Diagnostic modes for the audio-latency report.** Two test values on `KbSyncDiagnostic` split the
+  effect in half: `writes` drives the backlight from a synthetic pattern with no audio client in the
+  process, and `capture` runs the audio client but never touches the backlight. Which half reproduces
+  the latency decides whether this is the ACPI calls or the loopback capture - the ordinary feature is
+  unchanged when the value is absent or unrecognised.
+
 ## 0.14.0-test.7 - 2026-11-15
 
 ### Lighting

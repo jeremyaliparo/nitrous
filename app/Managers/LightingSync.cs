@@ -43,6 +43,7 @@ internal static class LightingSync
     private static bool _brightnessWarned;
     private static int _brightnessWrites;
     private static int _brightnessFloorMs;
+    private static string _diagnostic = "";
     private static int _brightnessFailures;
     private static bool _brightnessUnavailable;
     private static int _lastBrightness = -1;
@@ -83,6 +84,7 @@ internal static class LightingSync
 
             _source = normalized;
             _brightnessOnly = !hasLighting;
+        _diagnostic = SettingsManager.Get("KbSyncDiagnostic", "").Trim().ToLowerInvariant();
             _writeWarned = false;
             _brightnessWarned = false;
         _brightnessWrites = 0;
@@ -100,6 +102,8 @@ internal static class LightingSync
             };
             _thread.Start();
             Logger.Info($"Lighting sync: started ({normalized}).");
+        if (_diagnostic is "capture" or "writes")
+            Logger.Info($"Lighting sync: diagnostic '{_diagnostic}' - {( _diagnostic == "capture" ? "audio in, no backlight writes" : "backlight writes, no audio")}.");
         }
     }
 
@@ -265,6 +269,15 @@ internal static class LightingSync
                     continue;
                 }
 
+                if (_diagnostic == "writes")
+                {
+                    // Diagnostic: reproduce the write cadence with no audio client in the process,
+                    // so a latency report can be attributed to the ACPI calls alone.
+                    WriteBrightness(Environment.TickCount64 / 250 % 2 == 0 ? 100 : 0);
+                    Thread.Sleep(20);
+                    continue;
+                }
+
                 var wanted = SettingsManager.Get("KbScreenPulse", 0) == 1;
                 if (wanted && spectrum == null && !sourceWarned)
                 {
@@ -359,6 +372,15 @@ internal static class LightingSync
                 if (Paused())
                 {
                     Thread.Sleep(50);
+                    continue;
+                }
+
+                if (_diagnostic == "writes")
+                {
+                    // Diagnostic: reproduce the write cadence with no audio client in the process,
+                    // so a latency report can be attributed to the ACPI calls alone.
+                    WriteBrightness(Environment.TickCount64 / 250 % 2 == 0 ? 100 : 0);
+                    Thread.Sleep(20);
                     continue;
                 }
 
@@ -499,7 +521,16 @@ internal static class LightingSync
 
                 if (_brightnessOnly)
                 {
-                    WriteBrightness(levels.Max());
+                    if (_diagnostic == "capture")
+                    {
+                        // Diagnostic: the audio client runs, the backlight is untouched.
+                        if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
+                            Logger.Info($"Sound sync (diagnostic capture): level={levels.Max()} (not written)");
+                    }
+                    else
+                    {
+                        WriteBrightness(levels.Max());
+                    }
                 }
                 else
                 {
