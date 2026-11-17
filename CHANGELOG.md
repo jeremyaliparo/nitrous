@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.10 - 2026-11-17
+
+### Lighting
+
+- **A HID five-step keyboard keeps its original beat rate.** test.6 lowered the step floor to 150 ms
+  for every five-step backlight and test.7 took the ACPI path down to 500 ms. Only the ACPI path has
+  evidence against it - the EC HID path was slowed without cause - so it is back at the original
+  70 ms. The ACPI path stays at 500 ms, and RGB keyboards were never affected.
+
 ## 0.14.0-test.9 - 2026-11-17
 
 ### Lighting

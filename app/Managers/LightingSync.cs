@@ -708,7 +708,9 @@ internal static class LightingSync
         if (_brightnessFloorMs > 0) return _brightnessFloorMs;
 
         var path = AcerWmiManager.GetKeyboardBacklightPath();
-        _brightnessFloorMs = path == AcerWmiManager.KeyboardBacklightPath.Wmi ? 500 : 150;
+        // Only the ACPI path has evidence against it. A HID five-step keyboard keeps the original
+        // 70 ms, so nothing about its effect changes.
+        _brightnessFloorMs = path == AcerWmiManager.KeyboardBacklightPath.Wmi ? 500 : 70;
         Logger.Info($"Lighting sync: beat writes every {_brightnessFloorMs} ms ({path} backlight).");
         return _brightnessFloorMs;
     }
