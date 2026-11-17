@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.11 - 2026-11-17
+
+### Setup
+
+- **Battery card reordered.** Battery Health now leads the card, with the battery icon beside it, and
+  the 80% Battery Limit switch sits below with its description; USB Charging While Off follows. Layout
+  only - nothing about what the switches do.
+
 ## 0.14.0-test.10 - 2026-11-17
 
 ### Lighting
