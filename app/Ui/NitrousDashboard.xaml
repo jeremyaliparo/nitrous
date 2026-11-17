@@ -1160,6 +1160,8 @@
 									</StackPanel>
 									<TextBlock Text="Pulses the backlight with the system audio. Uses the five brightness steps; no colour control on this keyboard." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
 									<TextBlock x:Name="BrightnessSyncStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
+									<TextBlock x:Name="BrightnessSyncLatencyHint" Foreground="{DynamicResource WarnBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"
+									           Text="Drives the backlight through the firmware: on some Acer laptops that traffic causes audio crackle. Leave it off if you hear it."/>
 								</StackPanel>
 								<CheckBox x:Name="TogBrightnessSync" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="BrightnessSync_Toggled" Unchecked="BrightnessSync_Toggled"/>
 							</Grid>

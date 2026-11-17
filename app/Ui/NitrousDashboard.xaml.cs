@@ -2324,6 +2324,15 @@ public partial class NitrousDashboard : Window
         SettingsManager.Save("KbSoundSensitivity", value);
     }
 
+    /// <summary>
+    /// Whether the five-step backlight is driven by ACPI rather than the EC HID. Cached: the probe
+    /// opens the HID device and asks the firmware, which is not something to repeat per repaint.
+    /// </summary>
+    private bool? _brightnessBacklightIsAcpi;
+
+    private bool BrightnessBacklightIsAcpi() => _brightnessBacklightIsAcpi ??=
+        AcerWmiManager.GetKeyboardBacklightPath() == AcerWmiManager.KeyboardBacklightPath.Wmi;
+
     private void UpdateBrightnessSyncUi()
     {
         var on = _keyboardBrightnessAvailable && TogBrightnessSync.IsChecked == true;
@@ -2333,6 +2342,13 @@ public partial class NitrousDashboard : Window
         BrightnessSyncStatus.Text = on
             ? "The tray is pulsing the backlight with the system audio."
             : string.Empty;
+
+        // Ace Knight, ANV15-51: ten of ten LatencyMon runs flagged audio latency with this effect
+        // on, one or two of ten without it. The firmware traffic is the trigger there, so the
+        // toggle says so instead of being a trap.
+        BrightnessSyncLatencyHint.Visibility = BrightnessBacklightIsAcpi()
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private async void KeyboardTimeout_Changed(object sender, SelectionChangedEventArgs e)

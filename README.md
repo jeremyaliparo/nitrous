@@ -166,6 +166,14 @@ Nitrous disables controls when your firmware does not respond to them rather tha
 </details>
 
 <details>
+<summary><b>Audio crackles, or LatencyMon reports DPC/ISR spikes, while sound sync is on</b></summary>
+
+- **On a five-step backlight** (a keyboard with no lighting controller) the beat effect changes the backlight through the firmware's ACPI interface. On some Acer laptops that firmware traffic starves the audio driver: measured on an ANV15-51, LatencyMon flagged audio latency in **10 of 10** runs with the effect on, and in 1-2 of 10 with it off.
+- **Pulse with sound** is off by default. The LIGHT page marks this on those keyboards; leave it off if you hear crackle. Nothing else in Nitrous uses that path continuously.
+- Keyboards with a lighting controller are unaffected: those steps are HID feature reports, not ACPI calls.
+</details>
+
+<details>
 <summary><b>Auto-update says "manual download required"</b></summary>
 
 - The release did not publish a GitHub asset digest or checksum file. Visit the Releases page and download the update manually after checking the hash.

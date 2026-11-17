@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.9 - 2026-11-17
+
+### Lighting
+
+- **"Pulse with sound" warns when the backlight is driven through ACPI.** Ace Knight reinstalled Windows
+  and measured it: LatencyMon flagged audio latency in **10 of 10** runs with the effect on, and in 1-2
+  of 10 with it off. On those keyboards the toggle now carries a line saying so, because the firmware
+  traffic is the trigger and the option should not be a trap. EC HID keyboards, where a step is a HID
+  feature report, keep it without a warning. The README has a troubleshooting entry.
+
 ## 0.14.0-test.8 - 2026-11-16
 
 ### Lighting
