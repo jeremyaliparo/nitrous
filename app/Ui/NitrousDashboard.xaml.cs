@@ -74,6 +74,7 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
+        InitializeCpuPowerLimits();
         InitializeCoolBoost();
 
         if (DataContext is DashboardViewModel batteryVm)
@@ -1220,6 +1221,29 @@ public partial class NitrousDashboard : Window
     /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
     /// separate HID device; models without it keep the card visible but disabled.
     /// </summary>
+    /// <summary>
+    /// Reads PL1/PL2 once, when PawnIO is installed. Read-only on purpose: the card shows what the
+    /// firmware is enforcing, and nothing in Nitrous writes MSR 0x610.
+    /// </summary>
+    private void InitializeCpuPowerLimits()
+    {
+        _ = Task.Run(() =>
+        {
+            var limits = CpuPowerLimits.Read();
+            if (limits is null) return;
+
+            var reading = limits.Value;
+            Logger.Info($"CPU power limits: PL1 {reading.Pl1Watts:0} W, PL2 {reading.Pl2Watts:0} W " +
+                        $"(MSR 0x610{(reading.Locked ? ", locked" : "")}).");
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                CpuPowerLimitsText.Text =
+                    $"PL1 {reading.Pl1Watts:0} W sustained · PL2 {reading.Pl2Watts:0} W peak";
+                CpuPowerLimitsCard.Visibility = Visibility.Visible;
+            });
+        });
+    }
     private void InitializeKeyboardLighting()
     {
         // The old red test was ambiguous with the Performance mode. A Yes from it is cleared once;

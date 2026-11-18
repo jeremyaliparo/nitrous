@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.13 - 2026-11-18
+
+### CPU
+
+- **The CPU's package power limits are shown, when PawnIO is installed.** PL1 and PL2 come from
+  MSR `0x610`, which Windows exposes no API for, so the app reads it through the PawnIO driver's
+  device interface with PawnIO's own IntelMSR module (embedded unmodified, LGPL-2.1 - see
+  `THIRD-PARTY-NOTICES.md`). The card appears on SETUP only when the driver is already installed and
+  the CPU is Intel, because the module does not load on AMD. Nothing is installed, started or written.
+- The limits are **reported, not changed**. No part of Nitrous writes MSR `0x610`: there is no
+  verified source for a safe upper bound on a given model, and raising a package limit past the
+  firmware's own is exactly how a laptop is made to exceed its power budget. A write control needs a
+  clamp proven on real hardware first.
+
 ## 0.14.0-test.12 - 2026-11-18
 
 ### Lighting

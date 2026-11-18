@@ -22,6 +22,24 @@ served alongside, the published build and this site, under their own terms.
 Copyright © .NET Foundation and Contributors. Full text:
 [licences/MIT-dotnet.txt](licences/MIT-dotnet.txt).
 
+## PawnIO modules — IntelMSR — LGPL-2.1-or-later
+
+- `assets/pawnio/IntelMSR.bin` is the **IntelMSR** module from
+  [PawnIO.Modules](https://github.com/namazso/PawnIO.Modules) 0.2.12, by namazso, shipped
+  **unmodified** and embedded in the binary as a resource.
+- Licensed under the **GNU Lesser General Public License, version 2.1 or later**:
+  [licences/LGPL-2.1.txt](licences/LGPL-2.1.txt), with the module's own copy in
+  `assets/pawnio/COPYING`.
+- Source for this exact module version:
+  <https://github.com/namazso/PawnIO.Modules/blob/master/IntelMSR.p>. To substitute it, replace the
+  embedded resource with a module you built; PawnIO loads whatever bytecode it is handed.
+- The module is only loaded when the **PawnIO** driver (<https://pawnio.eu>) is already installed,
+  and only on Intel CPUs. Nitrous never installs, ships or starts that driver. PawnIO's licence
+  exception permits independent programs to talk to the driver through its device interface, which
+  is the only interface used here — no PawnIO code is linked.
+- Used for one thing: reading MSR `0x610` to display the CPU package power limits. Nitrous does not
+  write to that register.
+
 ## Fonts served by the site
 
 Both are shipped as Latin subsets in `docs/assets/fonts`, unmodified apart from the subset.
