@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.14 - 2026-11-18
+
+### CPU
+
+- The PL1/PL2 card follows the power mode. Switching Quiet, Balanced or Performance re-reads the
+  register once the EC has applied the mode, so the card shows the limits actually in force rather
+  than whichever mode was selected at start-up, and the log line names the mode.
+
 ## 0.14.0-test.13 - 2026-11-18
 
 ### CPU

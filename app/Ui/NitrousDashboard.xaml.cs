@@ -41,6 +41,7 @@ public partial class NitrousDashboard : Window
     private KeyboardEffect? _lastSyncedGlobalEffect;
     private string _lastSyncedAreaStyle = "";
     private KeyboardEffect? _lastSyncedAreaEffect;
+    private PowerProfile? _powerLimitsMode;
 
     public NitrousDashboard()
     {
@@ -74,7 +75,7 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
-        InitializeCpuPowerLimits();
+        RefreshCpuPowerLimits((PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance));
         InitializeCoolBoost();
 
         if (DataContext is DashboardViewModel batteryVm)
@@ -156,6 +157,7 @@ public partial class NitrousDashboard : Window
             DisplayManager.GetCurrentRefreshRate() == _lastSyncedRefreshHz)
             return;
 
+        RefreshCpuPowerLimits(activeMode);
         RefreshDashboardState();
     }
 
@@ -1225,25 +1227,33 @@ public partial class NitrousDashboard : Window
     /// Reads PL1/PL2 once, when PawnIO is installed. Read-only on purpose: the card shows what the
     /// firmware is enforcing, and nothing in Nitrous writes MSR 0x610.
     /// </summary>
-    private void InitializeCpuPowerLimits()
+    private void RefreshCpuPowerLimits(PowerProfile mode)
     {
-        _ = Task.Run(() =>
+        if (_powerLimitsMode == mode) return;
+        _powerLimitsMode = mode;
+
+        _ = Task.Run(async () =>
         {
+            // The EC applies a mode a moment after the request, so read after it settles rather
+            // than catching the previous mode's limits.
+            await Task.Delay(1500);
+
             var limits = CpuPowerLimits.Read();
             if (limits is null) return;
 
             var reading = limits.Value;
             Logger.Info($"CPU power limits: PL1 {reading.Pl1Watts:0} W, PL2 {reading.Pl2Watts:0} W " +
-                        $"(MSR 0x610{(reading.Locked ? ", locked" : "")}).");
+                        $"(MSR 0x610, {mode} mode{(reading.Locked ? ", locked" : "")}).");
 
-            Dispatcher.InvokeAsync(() =>
+            await Dispatcher.InvokeAsync(() =>
             {
                 CpuPowerLimitsText.Text =
-                    $"PL1 {reading.Pl1Watts:0} W sustained · PL2 {reading.Pl2Watts:0} W peak";
+                    $"PL1 {reading.Pl1Watts:0} W sustained · PL2 {reading.Pl2Watts:0} W peak · {mode} mode";
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
             });
         });
     }
+
     private void InitializeKeyboardLighting()
     {
         // The old red test was ambiguous with the Performance mode. A Yes from it is cleared once;
