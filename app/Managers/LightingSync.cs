@@ -84,6 +84,9 @@ internal static class LightingSync
 
             _source = normalized;
             _brightnessOnly = !hasLighting;
+        // The dashboard probes the steps and saves them; the tray reads that list rather than
+        // writing levels the firmware refuses.
+        AcerWmiManager.LoadKeyboardBrightnessLevels();
         _diagnostic = SettingsManager.Get("KbSyncDiagnostic", "").Trim().ToLowerInvariant();
             _writeWarned = false;
             _brightnessWarned = false;
@@ -691,11 +694,8 @@ internal static class LightingSync
     /// hits: pr4u reported that stopping at 25% made the beat read as a level change rather than
     /// a pulse. The saved level is restored when sync stops.
     /// </summary>
-    private static int SnapBrightness(int raw)
-    {
-        var step = (int)Math.Round(Math.Clamp(raw, 0, 100) / 25.0) * 25;
-        return Math.Clamp(step, 0, 100);
-    }
+    private static int SnapBrightness(int raw) =>
+        AcerWmiManager.NearestKeyboardBrightness(Math.Clamp(raw, 0, 100));
 
     /// <summary>
     /// How often the beat may set a level. The EC HID path is a cheap feature report; the WMI path is

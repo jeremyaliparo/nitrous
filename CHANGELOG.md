@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.12 - 2026-11-18
+
+### Lighting
+
+- **The brightness steps are learned from the keyboard, not assumed.** Five were hardcoded
+  (0/25/50/75/100), but henry's ANV15-41 keeps only off, 50 and 100: the dropdown offered steps that
+  did nothing, a saved `25` could never be restored, and the beat effect wrote levels the firmware
+  refused, retrying each one. On a WMI backlight the app now writes each candidate once, keeps the ones
+  that read back, restores the level it started on and saves the list; the dropdown, the restore and the
+  beat effect all use it. One visible sweep on the first run, then nothing.
+- The beat effect snaps to that list instead of the 25 % grid, so a three-step keyboard pulses
+  0/50/100 rather than fighting the firmware.
+
 ## 0.14.0-test.11 - 2026-11-17
 
 ### Setup

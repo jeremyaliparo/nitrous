@@ -395,11 +395,86 @@ public static class AcerWmiManager
     }
 
     /// <summary>The firmware's keyboard brightness steps; 0 is off.</summary>
-    public static IReadOnlyList<int> KeyboardBrightnessLevels { get; } = [0, 25, 50, 75, 100];
+    /// <summary>What the five-step backlight offers on a machine that has every step.</summary>
+    public static readonly int[] DefaultKeyboardBrightnessLevels = [0, 25, 50, 75, 100];
+
+    private static IReadOnlyList<int> _keyboardBrightnessLevels = DefaultKeyboardBrightnessLevels;
+    private static bool _keyboardBrightnessLevelsProbed;
+
+    /// <summary>
+    /// The steps this keyboard actually keeps. Not every five-step model has five: henry's ANV15-41
+    /// takes off, 50 and 100 and refuses 25 and 75, which made the box offer values that silently
+    /// did nothing and made sound sync write levels the firmware rejected.
+    /// </summary>
+    public static IReadOnlyList<int> KeyboardBrightnessLevels => _keyboardBrightnessLevels;
 
     /// <summary>The nearest level the firmware keeps; anything else is discarded or coerced.</summary>
     public static int NearestKeyboardBrightness(int percent) =>
         KeyboardBrightnessLevels.MinBy(level => Math.Abs(level - percent));
+
+    /// <summary>
+    /// Reads the levels learned on a previous run. Cheap and write-free, so the tray can call it
+    /// before starting the beat effect without touching the backlight.
+    /// </summary>
+    public static IReadOnlyList<int> LoadKeyboardBrightnessLevels()
+    {
+        if (_keyboardBrightnessLevelsProbed) return _keyboardBrightnessLevels;
+
+        var saved = SettingsManager.Get("KbBrightnessLevels", "");
+        var parsed = saved.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => int.TryParse(part, out var value) ? value : -1)
+            .Where(value => value is >= 0 and <= 100)
+            .Distinct()
+            .OrderBy(value => value)
+            .ToArray();
+
+        if (parsed.Length >= 2)
+        {
+            _keyboardBrightnessLevels = parsed;
+            _keyboardBrightnessLevelsProbed = true;
+        }
+
+        return _keyboardBrightnessLevels;
+    }
+
+    /// <summary>
+    /// Writes each candidate step once and keeps the ones the firmware reads back, then restores the
+    /// level it started on. One-time sweep: the result is saved, so the backlight only cycles on the
+    /// first run after an update. Returns the levels in use; the default list when nothing answers,
+    /// so a model where writes are refused keeps offering the full range instead of nothing.
+    /// </summary>
+    public static IReadOnlyList<int> ProbeKeyboardBrightnessLevels()
+    {
+        LoadKeyboardBrightnessLevels();
+        if (_keyboardBrightnessLevelsProbed)
+            return _keyboardBrightnessLevels;
+
+        var original = GetWmiKeyboardBacklight()?.Brightness;
+        var accepted = new List<int>();
+
+        foreach (var candidate in DefaultKeyboardBrightnessLevels)
+        {
+            if (SetWmiKeyboardBrightness(candidate, verify: true))
+                accepted.Add(candidate);
+        }
+
+        if (original is { } restore)
+            SetWmiKeyboardBrightness(restore, verify: false);
+
+        // One sweep per process even when it finds nothing, so a refused model is not swept again
+        // every time the dashboard opens.
+        _keyboardBrightnessLevelsProbed = true;
+
+        if (accepted.Count >= 2)
+        {
+            _keyboardBrightnessLevels = accepted;
+            _keyboardBrightnessLevelsProbed = true;
+            SettingsManager.Save("KbBrightnessLevels", string.Join(",", accepted));
+            Logger.Info($"Keyboard: brightness steps are [{string.Join(", ", accepted)}].");
+        }
+
+        return _keyboardBrightnessLevels;
+    }
 
     /// <summary>Where the backlight brightness can be set on this model.</summary>
     public enum KeyboardBacklightPath

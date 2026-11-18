@@ -1431,6 +1431,11 @@ public partial class NitrousDashboard : Window
         _keyboardBrightnessAvailable = !_keyboardAvailable &&
             (_keyboardTimeoutAvailable || _keyboardBrightnessViaWmi);
 
+        // Learn which steps this keyboard keeps, once. henry's ANV15-41 takes off, 50 and 100 and
+        // refuses 25 and 75, so the box and the beat effect were writing levels it discards.
+        if (_keyboardBrightnessViaWmi)
+            AcerWmiManager.ProbeKeyboardBrightnessLevels();
+
         var savedBrightness = SettingsManager.Get("KbBrightLevel", 100);
         if (_keyboardBrightnessViaWmi && wmiBrightness is { } wmiReported &&
             AcerWmiManager.KeyboardBrightnessLevels.Contains(wmiReported.Brightness))
