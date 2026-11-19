@@ -5,10 +5,11 @@
 ### Pure hardware control for Acer Nitro laptops.
 *No OEM service stack. No telemetry daemon. Just the firmware.*
 
-[![Latest Release](https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Download%20Latest&color=e60012&include_prereleases)](https://github.com/jeremyaliparo/nitrous/releases/latest)
-[![GitHub Stars](https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=for-the-badge&logo=github&label=Star%20Nitrous&color=ffb703)](https://github.com/jeremyaliparo/nitrous/stargazers)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/PGWzb3mHbG)
-[![Website](https://img.shields.io/badge/Website-nitrous-e60012?style=for-the-badge&logo=githubpages&logoColor=white)](https://jeremyaliparo.github.io/nitrous/)
+<a href="https://github.com/jeremyaliparo/nitrous/releases/latest"><img src="https://img.shields.io/github/v/release/jeremyaliparo/nitrous?style=flat-square&logo=github&label=Download%20Latest&color=e60012&include_prereleases" alt="Latest Release"></a>
+<a href="https://github.com/jeremyaliparo/nitrous/releases/latest"><img src="https://img.shields.io/github/downloads/jeremyaliparo/nitrous/total?style=flat-square&logo=github&label=Downloads&color=e60012" alt="Downloads"></a>
+<a href="https://github.com/jeremyaliparo/nitrous/stargazers"><img src="https://img.shields.io/github/stars/jeremyaliparo/nitrous?style=flat-square&logo=github&label=Star%20Nitrous&color=ffb703" alt="GitHub Stars"></a>
+<a href="https://discord.gg/PGWzb3mHbG"><img src="https://img.shields.io/badge/Discord-Join%20Chat-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
+<a href="https://jeremyaliparo.github.io/nitrous/"><img src="https://img.shields.io/badge/Website-nitrous-e60012?style=flat-square&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxsaW5lIHgxPSIyIiB5MT0iMTIiIHgyPSIyMiIgeTI9IjEyIi8%2BPHBhdGggZD0iTTEyIDJhMTUuMyAxNS4zIDAgMCAxIDQgMTAgMTUuMyAxNS4zIDAgMCAxLTQgMTAgMTUuMyAxNS4zIDAgMCAxLTQtMTAgMTUuMyAxNS4zIDAgMCAxIDQtMTB6Ii8%2BPC9zdmc%2B" alt="Website"></a>
 
 [**Features**](#key-features) • [**Quick Start**](#quick-start) • [**Compatibility**](#compatibility) • [**Safety & Design**](#safety--non-destructive-design) • [**Troubleshooting**](#troubleshooting) • [**Build**](#building-from-source)
 
