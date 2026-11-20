@@ -524,7 +524,14 @@ public static class AcerWmiManager
         // per second can skip it; a level the firmware refused is corrected by the next step.
         if (!verify) return true;
 
-        return GetWmiKeyboardBacklight() is { } after && after.Brightness == level;
+        var after = GetWmiKeyboardBacklight();
+        if (after is { } report && report.Brightness == level) return true;
+
+        // Say which way it failed: a firmware that accepts the write but reports a different level is
+        // a different problem from one that refuses the call outright.
+        Logger.Warn($"WMI: the backlight was set to {level}% but reads back " +
+                    $"{(after is { } seen ? $"{seen.Brightness}%" : "nothing")}.");
+        return false;
     }
 
     /// <summary>

@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.33 - 2026-11-20
+
+### Lighting
+
+- A backlight write that the firmware accepts but reports back at a different level now logs both
+  numbers instead of a bare failure, so a refused call and a firmware that never reports its level can
+  be told apart. Senpai's ANV15-52 records brightness `0` with the timeout correct, which is the
+  second case or an unlit keyboard - the log line will say which on the next bundle.
+
 ## 0.14.0-test.32 - 2026-11-20
 
 ### Setup
