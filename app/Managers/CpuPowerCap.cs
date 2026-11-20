@@ -36,16 +36,41 @@ internal static class CpuPowerCap
     /// <summary>The register as it was before the first write, while that state still exists.</summary>
     private static ulong? _original;
 
+    /// <summary>Whether a write of ours may have moved the MCHBAR copy since the firmware last wrote it.</summary>
+    private static bool _moved;
+
+    /// <summary>The last MCHBAR PL1 read while the copy was still the firmware's.</summary>
+    private static int? _pristine;
+
     public readonly record struct Result(bool Ok, string Message);
 
     /// <summary>The cap the user asked for, or zero for none.</summary>
     public static int SavedWatts => Math.Max(0, SettingsManager.Get(WattsKey, 0));
 
-    /// <summary>The current mode's own PL1: the highest a cap may be set to.</summary>
+    /// <summary>
+    /// The firmware's own PL1 for this mode. Writing 0x610 was measured moving the MCHBAR copy, so once
+    /// a cap is in place the copy is no longer the firmware's number: the last reading taken while it
+    /// was untouched is used until the firmware rewrites it (a mode apply, or a resume).
+    /// </summary>
     public static int? Ceiling()
     {
         var firmware = CpuPowerLimits.ReadFirmware();
-        return firmware is { Pl1Watts: > 0 } mode ? (int)Math.Round(mode.Pl1Watts) : null;
+        var live = firmware is { Pl1Watts: > 0 } mode ? (int?)Math.Round(mode.Pl1Watts) : null;
+
+        if (_moved) return _pristine ?? live;
+
+        _pristine = live;
+        return live;
+    }
+
+    /// <summary>The firmware has rewritten MCHBAR, so the copy can be trusted again.</summary>
+    public static void NoteFirmwareRewrite()
+    {
+        lock (Gate)
+        {
+            _moved = false;
+            _pristine = null;
+        }
     }
 
     /// <summary>Whether the register may be written right now.</summary>
@@ -95,6 +120,7 @@ internal static class CpuPowerCap
             }
 
             SettingsManager.Save(WattsKey, target);
+            _moved = true;
 
             Logger.Info($"CPU power cap: {target} W sustained (this mode asks {ceiling} W).");
             return new Result(true, $"Capped to {target} W.");
@@ -119,6 +145,10 @@ internal static class CpuPowerCap
 
             _original = null;
             PersistOriginal();
+
+            // Writing the firmware's own value back also resyncs the MCHBAR copy.
+            _moved = false;
+            _pristine = null;
 
             Logger.Info("CPU power cap: cleared, the firmware's own value is back.");
             return new Result(true, "The firmware's value is back.");
@@ -148,6 +178,10 @@ internal static class CpuPowerCap
         {
             _original = null;
             PersistOriginal();
+
+            // The firmware rewrote the register and the MCHBAR copy, so both are fresh.
+            _moved = false;
+            _pristine = null;
         }
     }
 

@@ -157,11 +157,17 @@ public partial class NitrousDashboard : Window
 
         SyncLightingFromSettings();
 
-        if (activeMode == _lastSyncedPowerMode &&
+        var modeChanged = activeMode != _lastSyncedPowerMode;
+
+        if (!modeChanged &&
             activeFan == _lastSyncedFanMode &&
             activeRefresh == _lastSyncedRefreshMode &&
             DisplayManager.GetCurrentRefreshRate() == _lastSyncedRefreshHz)
             return;
+
+        // A mode apply is what rewrites MCHBAR, so a cap written earlier can no longer be trusted to
+        // be the firmware's number until this happens.
+        if (modeChanged) CpuPowerCap.NoteFirmwareRewrite();
 
         RefreshCpuPowerLimits(activeMode);
         RefreshDashboardState();
@@ -1250,7 +1256,9 @@ public partial class NitrousDashboard : Window
 
             // Read here rather than on the UI thread: every one of these goes through the driver.
             var writable = CpuPowerCap.IsWritable();
-            var ceiling = firmware is { } modeLimit ? (int)Math.Round(modeLimit.Pl1Watts) : 0;
+            // The trusted ceiling, not the live MCHBAR reading: after a cap is written that copy can
+            // read higher than the mode actually asks for.
+            var ceiling = CpuPowerCap.Ceiling() ?? 0;
 
             var source = onBattery ? "on battery" : "on AC";
             var detail = $"CPU power limits: {mode} mode {source}";
@@ -1280,7 +1288,10 @@ public partial class NitrousDashboard : Window
                 else
                 {
                     if (firmware is { } asking)
-                        text += $" · asks {asking.Pl1Watts:0} W / {asking.Pl2Watts:0} W";
+                    {
+                        var askPl1 = ceiling > 0 ? ceiling : (int)Math.Round(asking.Pl1Watts);
+                        text += $" · asks {askPl1} W / {asking.Pl2Watts:0} W";
+                    }
                     if (register is { } holding)
                         text += $" · register {holding.Pl1Watts:0} W / {holding.Pl2Watts:0} W";
                 }

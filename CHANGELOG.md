@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.19 - 2026-11-20
+
+### CPU
+
+- The cap list is built from the firmware's own request, not from the live MCHBAR copy. Once a cap is
+  written that copy can read higher than the mode actually asks for, so the last reading taken while
+  the firmware still owned it is used, refreshed whenever a mode is applied or the machine resumes.
+  Without this the list could have offered a value above what the mode asks for, which the cap is not
+  supposed to allow.
+
 ## 0.14.0-test.18 - 2026-11-20
 
 ### CPU
