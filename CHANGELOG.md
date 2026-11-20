@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.21 - 2026-11-20
+
+### CPU
+
+- Every refusal on the power cap now leaves a line in the log, and clearing it logs what the register
+  held before the write. The previous round came down to a log that showed a cap line and nothing else:
+  a write that never happened was invisible, so the cause had to be inferred rather than read.
+
 ## 0.14.0-test.20 - 2026-11-20
 
 ### CPU

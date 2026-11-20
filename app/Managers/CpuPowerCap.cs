@@ -44,6 +44,12 @@ internal static class CpuPowerCap
 
     public readonly record struct Result(bool Ok, string Message);
 
+    private static Result Fail(string message)
+    {
+        Logger.Warn($"CPU power cap: {message}");
+        return new Result(false, message);
+    }
+
     /// <summary>The cap the user asked for, or zero for none.</summary>
     public static int SavedWatts => Math.Max(0, SettingsManager.Get(WattsKey, 0));
 
@@ -84,13 +90,13 @@ internal static class CpuPowerCap
         lock (Gate)
         {
             if (Ceiling() is not { } ceiling)
-                return new Result(false, "This mode does not report a sustained limit.");
+                return Fail("this mode does not report a sustained limit.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
-                return new Result(false, "MSR 0x610 could not be read.");
+                return Fail("MSR 0x610 could not be read.");
 
             if ((raw & LockBit) != 0)
-                return new Result(false, "The firmware has locked this until the next reboot.");
+                return Fail("the firmware has locked this until the next reboot.");
 
             var target = Math.Clamp(watts, FloorWatts, ceiling);
             var value = (raw & ~Pl1Mask) | ((ulong)target * 8 & Pl1Mask);
@@ -98,15 +104,15 @@ internal static class CpuPowerCap
             // Only the PL1 field may differ, so the lock bit, PL2 and the time windows are provably
             // untouched by this write.
             if ((value & ~Pl1Mask) != (raw & ~Pl1Mask))
-                return new Result(false, "The new value would have changed another field.");
+                return Fail("the new value would have changed another field; nothing written.");
 
             if (!PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, value))
-                return new Result(false, "The register refused the value.");
+                return Fail("the register refused the value.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Pl1Mask) != (value & Pl1Mask))
             {
                 PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, raw);
-                return new Result(false, "The register did not keep the value; the old one is back.");
+                return Fail("the register did not keep the value; the old one is back.");
             }
 
             _moved = true;
@@ -129,21 +135,24 @@ internal static class CpuPowerCap
         lock (Gate)
         {
             if (Ceiling() is not { } ceiling)
-                return new Result(false, "This mode does not report a sustained limit.");
+                return Fail("this mode does not report a sustained limit.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
-                return new Result(false, "MSR 0x610 could not be read.");
+                return Fail("MSR 0x610 could not be read.");
 
             if ((raw & LockBit) != 0)
-                return new Result(false, "The firmware has locked this until the next reboot.");
+                return Fail("the firmware has locked this until the next reboot.");
+
+            Logger.Info($"CPU power cap: clearing, this mode asks {ceiling} W, register holds " +
+                        $"{Math.Round((raw & Pl1Mask) * 0.125)} W.");
 
             var value = (raw & ~Pl1Mask) | ((ulong)ceiling * 8 & Pl1Mask);
 
             if (!PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, value))
-                return new Result(false, "The register refused the value.");
+                return Fail("the register refused the value.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Pl1Mask) != (value & Pl1Mask))
-                return new Result(false, "The value did not stick; the register may be locked.");
+                return Fail("the value did not stick; the register may be locked.");
 
             SettingsManager.Save(WattsKey, 0);
 
