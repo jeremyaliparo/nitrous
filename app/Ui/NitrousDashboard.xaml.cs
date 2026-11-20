@@ -43,6 +43,7 @@ public partial class NitrousDashboard : Window
     private KeyboardEffect? _lastSyncedAreaEffect;
     private (PowerProfile Mode, bool OnBattery)? _powerLimitsKey;
     private bool _cpuPowerCapUpdating;
+    private string? _cpuPowerCapMessage;
 
     public NitrousDashboard()
     {
@@ -76,6 +77,10 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
+
+        // A cap may have been applied by the tray or by an earlier dashboard process; pick up the
+        // ceiling that bounds it.
+        CpuPowerCap.Load();
         RefreshCpuPowerLimits((PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance));
         InitializeCoolBoost();
 
@@ -1336,9 +1341,11 @@ public partial class NitrousDashboard : Window
             CpuPowerCapBox.SelectedIndex = index >= 0 ? index : 0;
             CpuPowerCapBox.IsEnabled = writable;
 
-            CpuPowerCapHint.Text = writable
+            // A result from the last change outranks the standing explanation, otherwise every refresh
+            // would wipe the message before it could be read.
+            CpuPowerCapHint.Text = _cpuPowerCapMessage ?? (writable
                 ? "Lowering this writes MSR 0x610. Nitrous re-applies it after sleep and never sets it above the mode's request."
-                : "The firmware has locked the power limit until the next reboot.";
+                : "The firmware has locked the power limit until the next reboot.");
         }
         finally
         {
@@ -1356,6 +1363,7 @@ public partial class NitrousDashboard : Window
         var result = await Task.Run(() =>
             option.Watts == 0 ? CpuPowerCap.Reset() : CpuPowerCap.Apply(option.Watts));
 
+        _cpuPowerCapMessage = result.Message;
         CpuPowerCapHint.Text = result.Message;
 
         // The register line on the card changed with the write; rebuild it instead of leaving the

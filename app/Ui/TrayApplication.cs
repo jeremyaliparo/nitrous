@@ -375,7 +375,7 @@ public class TrayApplication : ApplicationContext
 
             // The firmware restores its own PL1 and clears the clamp bits across sleep, so the value
             // captured before the first write is no longer what the register holds.
-            CpuPowerCap.ForgetOriginal();
+            CpuPowerCap.NoteFirmwareRewrite();
 
             ResetFanRamp();
             await ApplyPowerSettingsAsync(isStartup: false, force: true);

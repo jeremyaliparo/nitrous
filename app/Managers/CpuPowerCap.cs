@@ -5,18 +5,21 @@ namespace Nitrous.Managers;
 /// <summary>
 /// A sustained (PL1) power cap written to MSR 0x610.
 ///
-/// Lower-only by construction: the cap is clamped to the current mode's own request, read from
-/// MCHBAR 0x59A0, so nothing here can ask the package for more power than the firmware already asked
-/// for. Measured on pr4u's ANV15-52: a lower PL1 takes effect immediately, is accepted well below the
-/// mode's value, and the CPU honours it over the mode's request.
+/// Lower-only by construction: the cap is clamped to the current mode's own request, so nothing here
+/// can ask the package for more power than the firmware already asked for. Measured on pr4u's
+/// ANV15-52: a lower PL1 takes effect immediately, is accepted well below the mode's value, and the
+/// CPU honours it over the mode's request.
 ///
-/// Two behaviours belong to the firmware and are worked around rather than assumed away:
-/// - sleep/resume restores its own value and clears the clamp bits, so the tray re-applies the cap;
-/// - writing 0x610 also moves the MCHBAR copy, so <see cref="Reset"/> restores the register value
-///   captured before the first write instead of re-reading MCHBAR, which would be the moved value.
+/// "Off" writes the mode's own request back rather than replaying a captured value. Replaying a
+/// snapshot looked right but was wrong twice over: it restored whatever the register held before this
+/// process wrote - another tool's cap, if one was running - and there was no snapshot to replay at all
+/// when the cap had been applied by the tray or by an earlier dashboard process.
 ///
-/// Bit 63 (the lock) is never touched: writing it would make the register refuse changes until the
-/// next boot, so a locked register is reported instead of written.
+/// The firmware's request is read from MCHBAR 0x59A0, which a write to 0x610 has been reported moving.
+/// So once a cap is written the live copy is not trusted on its own: the last reading taken while the
+/// firmware owned it is kept, and the smaller of the two is used.
+///
+/// Bit 63 (the lock) is never written: that would make the register refuse changes until the next boot.
 /// </summary>
 internal static class CpuPowerCap
 {
@@ -26,15 +29,12 @@ internal static class CpuPowerCap
     public const int FloorWatts = 10;
 
     private const string WattsKey = "CpuPowerCapWatts";
-    private const string OriginalKey = "CpuPowerCapOriginal";
+    private const string CeilingKey = "CpuPowerCapCeiling";
 
     private const ulong Pl1Mask = 0x7FFF;
     private const ulong LockBit = 1UL << 63;
 
     private static readonly object Gate = new();
-
-    /// <summary>The register as it was before the first write, while that state still exists.</summary>
-    private static ulong? _original;
 
     /// <summary>Whether a write of ours may have moved the MCHBAR copy since the firmware last wrote it.</summary>
     private static bool _moved;
@@ -48,29 +48,27 @@ internal static class CpuPowerCap
     public static int SavedWatts => Math.Max(0, SettingsManager.Get(WattsKey, 0));
 
     /// <summary>
-    /// The firmware's own PL1 for this mode. Writing 0x610 was measured moving the MCHBAR copy, so once
-    /// a cap is in place the copy is no longer the firmware's number: the last reading taken while it
-    /// was untouched is used until the firmware rewrites it (a mode apply, or a resume).
+    /// The firmware's own PL1 for this mode: the highest a cap may be set to. While a cap may have
+    /// moved the copy, the smaller of the remembered and the live reading is used, so a stale value can
+    /// only ever make this more conservative.
     /// </summary>
     public static int? Ceiling()
     {
         var firmware = CpuPowerLimits.ReadFirmware();
         var live = firmware is { Pl1Watts: > 0 } mode ? (int?)Math.Round(mode.Pl1Watts) : null;
 
-        if (_moved) return _pristine ?? live;
-
-        _pristine = live;
-        return live;
-    }
-
-    /// <summary>The firmware has rewritten MCHBAR, so the copy can be trusted again.</summary>
-    public static void NoteFirmwareRewrite()
-    {
-        lock (Gate)
+        if (!_moved)
         {
-            _moved = false;
-            _pristine = null;
+            _pristine = live;
+            return live;
         }
+
+        return (_pristine, live) switch
+        {
+            ({ } remembered, { } seen) => Math.Min(remembered, seen),
+            ({ } remembered, null) => remembered,
+            _ => live
+        };
     }
 
     /// <summary>Whether the register may be written right now.</summary>
@@ -85,10 +83,8 @@ internal static class CpuPowerCap
     {
         lock (Gate)
         {
-            if (CpuPowerLimits.ReadFirmware() is not { Pl1Watts: > 0 } mode)
+            if (Ceiling() is not { } ceiling)
                 return new Result(false, "This mode does not report a sustained limit.");
-
-            var ceiling = (int)Math.Round(mode.Pl1Watts);
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
                 return new Result(false, "MSR 0x610 could not be read.");
@@ -104,12 +100,6 @@ internal static class CpuPowerCap
             if ((value & ~Pl1Mask) != (raw & ~Pl1Mask))
                 return new Result(false, "The new value would have changed another field.");
 
-            if (_original is null)
-            {
-                _original = raw;
-                PersistOriginal();
-            }
-
             if (!PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, value))
                 return new Result(false, "The register refused the value.");
 
@@ -119,39 +109,51 @@ internal static class CpuPowerCap
                 return new Result(false, "The register did not keep the value; the old one is back.");
             }
 
-            SettingsManager.Save(WattsKey, target);
             _moved = true;
+            _pristine = ceiling;
+
+            SettingsManager.Save(WattsKey, target);
+            SettingsManager.Save(CeilingKey, ceiling);
 
             Logger.Info($"CPU power cap: {target} W sustained (this mode asks {ceiling} W).");
             return new Result(true, $"Capped to {target} W.");
         }
     }
 
-    /// <summary>Puts back the register value captured before the first write.</summary>
+    /// <summary>
+    /// Puts the mode's own request back. That is the definition of "no cap", and because the ceiling is
+    /// the firmware's own number it can never raise the limit above what the mode asked for.
+    /// </summary>
     public static Result Reset()
     {
         lock (Gate)
         {
+            if (Ceiling() is not { } ceiling)
+                return new Result(false, "This mode does not report a sustained limit.");
+
+            if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
+                return new Result(false, "MSR 0x610 could not be read.");
+
+            if ((raw & LockBit) != 0)
+                return new Result(false, "The firmware has locked this until the next reboot.");
+
+            var value = (raw & ~Pl1Mask) | ((ulong)ceiling * 8 & Pl1Mask);
+
+            if (!PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, value))
+                return new Result(false, "The register refused the value.");
+
+            if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Pl1Mask) != (value & Pl1Mask))
+                return new Result(false, "The value did not stick; the register may be locked.");
+
             SettingsManager.Save(WattsKey, 0);
 
-            if (_original is not { } before)
-                return new Result(true, "No cap is set.");
+            // The register now holds the firmware's number, but the write may have moved the MCHBAR
+            // copy, so keep that number as the trusted ceiling until the firmware rewrites it.
+            _moved = true;
+            _pristine = ceiling;
 
-            if (!PawnIo.WriteMsr(CpuPowerLimits.PackagePowerLimit, before))
-                return new Result(false, "The register refused the original value.");
-
-            if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Pl1Mask) != (before & Pl1Mask))
-                return new Result(false, "The original value did not stick; reboot to clear the cap.");
-
-            _original = null;
-            PersistOriginal();
-
-            // Writing the firmware's own value back also resyncs the MCHBAR copy.
-            _moved = false;
-            _pristine = null;
-
-            Logger.Info("CPU power cap: cleared, the firmware's own value is back.");
-            return new Result(true, "The firmware's value is back.");
+            Logger.Info($"CPU power cap: cleared, back to the mode's {ceiling} W.");
+            return new Result(true, $"Back to {ceiling} W, the mode's own limit.");
         }
     }
 
@@ -166,50 +168,40 @@ internal static class CpuPowerCap
 
         if (Ceiling() is not { } ceiling) return;
 
-        // A mode change can put the ceiling under an existing cap; never leave the register above
-        // what the current mode asks for.
         Apply(Math.Min(saved, ceiling));
     }
 
-    /// <summary>Drops the captured value after the firmware re-seeded the register (resume).</summary>
-    public static void ForgetOriginal()
+    /// <summary>
+    /// The firmware has rewritten MCHBAR - a mode was applied, or the machine resumed - so the copy can
+    /// be trusted again.
+    /// </summary>
+    public static void NoteFirmwareRewrite()
     {
         lock (Gate)
         {
-            _original = null;
-            PersistOriginal();
-
-            // The firmware rewrote the register and the MCHBAR copy, so both are fresh.
             _moved = false;
             _pristine = null;
         }
     }
 
     /// <summary>
-    /// Adopts a captured value from an earlier run only when the register still holds our cap. After a
-    /// reboot the firmware has put its own value back, so an older capture describes a state that no
-    /// longer exists and must not be written.
+    /// Picks up the remembered ceiling in a process that did not perform the write, so a cap applied by
+    /// the tray or by an earlier dashboard is still bounded correctly.
     /// </summary>
     internal static void Load()
     {
         lock (Gate)
         {
-            _original = null;
+            _moved = false;
+            _pristine = null;
 
-            var saved = SavedWatts;
-            if (saved <= 0) return;
-            if (CpuPowerLimits.ReadRegisterRaw() is not { } raw) return;
+            if (SavedWatts <= 0) return;
 
-            var held = Math.Round((raw & Pl1Mask) * 0.125);
-            if (Math.Abs(held - saved) > 1) return;
+            var remembered = SettingsManager.Get(CeilingKey, 0);
+            if (remembered <= 0) return;
 
-            if (!ulong.TryParse(SettingsManager.Get(OriginalKey, ""), out var stored)) return;
-            if ((stored & Pl1Mask) < (raw & Pl1Mask)) return;
-
-            _original = stored;
+            _moved = true;
+            _pristine = remembered;
         }
     }
-
-    private static void PersistOriginal() =>
-        SettingsManager.Save(OriginalKey, _original is { } value ? value.ToString() : "");
 }

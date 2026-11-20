@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.20 - 2026-11-20
+
+### CPU
+
+- **Off now restores the mode's own limit.** pr4u's first run showed it plainly: choosing Off left the
+  register untouched. The reset replayed a value captured before the first write, and a fresh dashboard
+  process had captured nothing - the cap had been applied by an earlier process - so there was nothing
+  to replay and the reset did nothing.
+- Off now writes the mode's own request back, which is what "no cap" means and cannot exceed it.
+- The result of a change is no longer wiped before it can be read: the card used to replace it with the
+  standing explanation on the next refresh.
+
 ## 0.14.0-test.19 - 2026-11-20
 
 ### CPU
