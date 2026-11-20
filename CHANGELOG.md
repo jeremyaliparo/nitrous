@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.28 - 2026-11-20
+
+### CPU
+
+- The log now tells a clamp from a choice: an automatic hold reads `held at 45 W sustained / 115 W burst to
+  stay inside this mode`, where a value the user picked reads `capped to ...`. Both used to read the same,
+  which made a mode change look like someone touching the control.
+
 ## 0.14.0-test.27 - 2026-11-20
 
 ### CPU

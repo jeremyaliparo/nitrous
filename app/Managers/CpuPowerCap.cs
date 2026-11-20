@@ -149,8 +149,11 @@ internal static class CpuPowerCap
             SettingsManager.Save(Pl1CeilingKey, mode.Pl1);
             SettingsManager.Save(Pl2CeilingKey, mode.Pl2);
 
-            Logger.Info($"CPU power cap: {pl1} W sustained / {pl2} W burst " +
-                        $"(this mode asks {mode.Pl1}/{mode.Pl2}).");
+            // A clamp and a user choice are different events; the log should not read the same for both.
+            Logger.Info(persist
+                ? $"CPU power cap: {pl1} W sustained / {pl2} W burst (this mode asks {mode.Pl1}/{mode.Pl2})."
+                : $"CPU power cap: held at {pl1} W sustained / {pl2} W burst to stay inside this mode " +
+                  $"(asks {mode.Pl1}/{mode.Pl2}).");
             return new Result(true, $"Capped to {pl1} W sustained / {pl2} W burst.");
         }
     }
