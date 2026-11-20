@@ -156,6 +156,7 @@ public class TrayApplication : ApplicationContext
             await Task.Delay(8000);
             if (_shuttingDown) return;
 
+            CpuPowerCap.Load();
             await ApplyPowerSettingsAsync(isStartup: true, force: true);
             if (_shuttingDown) return;
 
@@ -372,6 +373,10 @@ public class TrayApplication : ApplicationContext
             await Task.Delay(6000);
             if (_shuttingDown) return;
 
+            // The firmware restores its own PL1 and clears the clamp bits across sleep, so the value
+            // captured before the first write is no longer what the register holds.
+            CpuPowerCap.ForgetOriginal();
+
             ResetFanRamp();
             await ApplyPowerSettingsAsync(isStartup: false, force: true);
             if (_shuttingDown) return;
@@ -479,6 +484,16 @@ public class TrayApplication : ApplicationContext
                 allowStockReset: true,
                 source: isStartup ? "startup-apply" : "acdc");
             ResetFanRamp();
+
+            // The cap is bounded by the mode's own request, so it is applied only after the mode and
+            // the EC's limits have settled - and re-applied here on every startup, resume and
+            // adapter change, because the firmware puts its own value back on resume.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1500);
+                if (_shuttingDown) return;
+                CpuPowerCap.Reassert();
+            });
         }
         catch (Exception ex)
         {

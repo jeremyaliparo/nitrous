@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.18 - 2026-11-20
+
+### CPU
+
+- **Sustained power limit control, on Intel Nitro models that already have PawnIO installed.** The CPU
+  card now offers a limit at or below the one the current power mode asks for. Choosing a value writes
+  PL1 in MSR `0x610`, reads it back, and puts the previous value back if the write does not stick.
+  Lower-only by construction: the list is built from the mode's own request, so nothing here can ask
+  the package for more power than the firmware already did, and the register's lock bit is never
+  written.
+- The cap is re-applied after sleep and after a charger change, because the firmware restores its own
+  value and clears the clamp bits across a resume. Switching to a mode with a lower limit brings the
+  cap down with it.
+- Choosing **Off** restores the value captured before the first write rather than re-reading MCHBAR:
+  writing `0x610` was measured moving the MCHBAR copy, so a fresh read there would restore a number
+  that is no longer the mode's.
+
 ## 0.14.0-test.17 - 2026-11-20
 
 ### CPU

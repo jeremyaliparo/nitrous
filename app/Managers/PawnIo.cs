@@ -61,25 +61,30 @@ internal static class PawnIo
     }
 
     /// <summary>MSR_PKG_POWER_LIMIT and anything else the IntelMSR module allows.</summary>
-    public static ulong? ReadMsr(uint register) => Execute(Msr, "ioctl_read_msr", register);
+    public static ulong? ReadMsr(uint register) => Execute(Msr, "ioctl_read_msr", 1, register);
+
+    /// <summary>Writes an MSR. Only <see cref="CpuPowerCap"/> calls this.</summary>
+    public static bool WriteMsr(uint register, ulong value) =>
+        Execute(Msr, "ioctl_write_msr", 0, register, value) is not null;
 
     /// <summary>A 64-bit MCHBAR word, such as the firmware's copy of the power limit at 0x59A0.</summary>
-    public static ulong? ReadMchbar(ulong offset) => Execute(Mchbar, "ioctl_read_qword", offset);
+    public static ulong? ReadMchbar(ulong offset) => Execute(Mchbar, "ioctl_read_qword", 1, offset);
 
-    private static ulong? Execute(Channel channel, string function, ulong argument)
+    private static ulong? Execute(Channel channel, string function, int outputCells, params ulong[] arguments)
     {
         lock (Gate)
         {
             if (!IsInstalled || !IsIntelCpu()) return null;
             if (!channel.EnsureOpen()) return null;
 
-            var input = new byte[FunctionNameLength + sizeof(ulong)];
+            var input = new byte[FunctionNameLength + sizeof(ulong) * arguments.Length];
             Encoding.ASCII.GetBytes(function).CopyTo(input, 0);
-            BitConverter.GetBytes(argument).CopyTo(input, FunctionNameLength);
+            for (var i = 0; i < arguments.Length; i++)
+                BitConverter.GetBytes(arguments[i]).CopyTo(input, FunctionNameLength + sizeof(ulong) * i);
 
-            var output = new byte[sizeof(ulong)];
+            var output = new byte[sizeof(ulong) * outputCells];
             if (!DeviceIoControl(channel.Device!, IoctlExecute, input, input.Length,
-                    output, output.Length, out var written, IntPtr.Zero))
+                    output.Length == 0 ? null : output, output.Length, out var written, IntPtr.Zero))
             {
                 // A stopped or restarted driver leaves this handle stale. Drop it so the next read
                 // opens a fresh one instead of failing for the rest of the session.
@@ -89,7 +94,8 @@ internal static class PawnIo
                 return null;
             }
 
-            return written >= sizeof(ulong) ? BitConverter.ToUInt64(output, 0) : null;
+            if (outputCells == 0) return 0;
+            return written >= output.Length ? BitConverter.ToUInt64(output, 0) : null;
         }
     }
 

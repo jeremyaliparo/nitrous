@@ -35,7 +35,7 @@ internal static class CpuPowerLimits
     /// </summary>
     public static Reading? ReadFirmware()
     {
-        if (PawnIo.ReadMchbar(FirmwarePowerLimit) is not { } raw)
+        if (ReadFirmwareRaw() is not { } raw)
             return null;
 
         var reading = Decode(raw);
@@ -44,6 +44,9 @@ internal static class CpuPowerLimits
         return reading.Pl1Watts <= 0 && reading.Pl2Watts <= 0 ? null : reading;
     }
 
+    /// <summary>The raw MCHBAR word, for callers that need the bits around the fields.</summary>
+    public static ulong? ReadFirmwareRaw() => PawnIo.ReadMchbar(FirmwarePowerLimit);
+
     /// <summary>
     /// What the CPU is actually enforcing, read from MSR 0x610. Differs from
     /// <see cref="ReadFirmware"/> when a driver has set the limits itself, or simply because the
@@ -51,12 +54,15 @@ internal static class CpuPowerLimits
     /// </summary>
     public static Reading? ReadRegister()
     {
-        if (PawnIo.ReadMsr(PackagePowerLimit) is not { } raw)
+        if (ReadRegisterRaw() is not { } raw)
             return null;
 
         var reading = Decode(raw);
         return reading.Pl1Watts <= 0 && reading.Pl2Watts <= 0 ? null : reading;
     }
+
+    /// <summary>The raw MSR word, for <see cref="CpuPowerCap"/>, which preserves the other bits.</summary>
+    public static ulong? ReadRegisterRaw() => PawnIo.ReadMsr(PackagePowerLimit);
 
     private static Reading Decode(ulong raw) => new(
         (raw & 0x7FFF) * PowerUnitWatts,

@@ -42,6 +42,7 @@ public partial class NitrousDashboard : Window
     private string _lastSyncedAreaStyle = "";
     private KeyboardEffect? _lastSyncedAreaEffect;
     private (PowerProfile Mode, bool OnBattery)? _powerLimitsKey;
+    private bool _cpuPowerCapUpdating;
 
     public NitrousDashboard()
     {
@@ -114,7 +115,12 @@ public partial class NitrousDashboard : Window
         System.Threading.Tasks.Task.Delay(5500).ContinueWith(_ =>
         {
             if (Dispatcher.HasShutdownStarted) return;
-            Dispatcher.InvokeAsync(RefreshDashboardState);
+            Dispatcher.InvokeAsync(() =>
+            {
+                RefreshDashboardState();
+                // The tray re-applies a saved power cap after resume; re-read once it has.
+                if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
+            });
         });
     }
 
@@ -1223,13 +1229,13 @@ public partial class NitrousDashboard : Window
     /// Reads both copies of the package power limit when PawnIO is installed. Read-only on purpose:
     /// nothing in Nitrous writes MSR 0x610 or MCHBAR.
     /// </summary>
-    private void RefreshCpuPowerLimits(PowerProfile mode)
+    private void RefreshCpuPowerLimits(PowerProfile mode, bool force = false)
     {
         // Keyed on the power source as well as the mode: Acer re-applies the limits when the adapter
         // comes out, and a write to 0x610 has been measured moving 0x59A0.
         var onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus !=
                         System.Windows.Forms.PowerLineStatus.Online;
-        if (_powerLimitsKey == (mode, onBattery)) return;
+        if (!force && _powerLimitsKey == (mode, onBattery)) return;
         _powerLimitsKey = (mode, onBattery);
 
         _ = Task.Run(async () =>
@@ -1241,6 +1247,10 @@ public partial class NitrousDashboard : Window
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
             if (firmware is null && register is null) return;
+
+            // Read here rather than on the UI thread: every one of these goes through the driver.
+            var writable = CpuPowerCap.IsWritable();
+            var ceiling = firmware is { } modeLimit ? (int)Math.Round(modeLimit.Pl1Watts) : 0;
 
             var source = onBattery ? "on battery" : "on AC";
             var detail = $"CPU power limits: {mode} mode {source}";
@@ -1279,8 +1289,73 @@ public partial class NitrousDashboard : Window
 
                 CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
+                PopulateCpuPowerCap(ceiling, writable);
             });
         });
+    }
+
+    /// <summary>
+    /// Fills the cap list from this mode's ceiling and selects what is in use. The list never offers a
+    /// value above the mode's own request, which is what keeps the cap lower-only.
+    /// </summary>
+    private void PopulateCpuPowerCap(int ceiling, bool writable)
+    {
+        if (ceiling <= 0)
+        {
+            CpuPowerCapBox.IsEnabled = false;
+            return;
+        }
+
+        _cpuPowerCapUpdating = true;
+        try
+        {
+            var saved = CpuPowerCap.SavedWatts;
+            var options = new List<CpuPowerCapOption> { new(0, "Off"), new(ceiling, $"{ceiling} W") };
+
+            for (var watts = ceiling - 5; watts >= CpuPowerCap.FloorWatts; watts -= 5)
+                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
+
+            // A cap saved under a mode with a wider range may not be on this list; keep it selectable
+            // rather than silently showing a different value.
+            if (saved > 0 && options.All(option => option.Watts != saved))
+                options.Insert(1, new CpuPowerCapOption(saved, $"{saved} W"));
+
+            CpuPowerCapBox.ItemsSource = options;
+            var index = options.FindIndex(option => option.Watts == saved);
+            CpuPowerCapBox.SelectedIndex = index >= 0 ? index : 0;
+            CpuPowerCapBox.IsEnabled = writable;
+
+            CpuPowerCapHint.Text = writable
+                ? "Lowering this writes MSR 0x610. Nitrous re-applies it after sleep and never sets it above the mode's request."
+                : "The firmware has locked the power limit until the next reboot.";
+        }
+        finally
+        {
+            _cpuPowerCapUpdating = false;
+        }
+    }
+
+    private async void CpuPowerCap_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_cpuPowerCapUpdating) return;
+        if (CpuPowerCapBox.SelectedItem is not CpuPowerCapOption option) return;
+
+        CpuPowerCapBox.IsEnabled = false;
+
+        var result = await Task.Run(() =>
+            option.Watts == 0 ? CpuPowerCap.Reset() : CpuPowerCap.Apply(option.Watts));
+
+        CpuPowerCapHint.Text = result.Message;
+
+        // The register line on the card changed with the write; rebuild it instead of leaving the
+        // numbers from before the write on screen.
+        if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
+        else CpuPowerCapBox.IsEnabled = true;
+    }
+
+    private readonly record struct CpuPowerCapOption(int Watts, string Label)
+    {
+        public override string ToString() => Label;
     }
 
     /// <summary>
