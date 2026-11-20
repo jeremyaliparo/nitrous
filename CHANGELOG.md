@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.17 - 2026-11-20
+
+### CPU
+
+- **The power-limit card shows both copies, labelled and unranked.** `test.15` called MCHBAR "the
+  firmware's copy" and treated the register as an override, but pr4u measured the two moving together:
+  writing `0x610` changed what `0x59A0` read, and it stayed changed across a resume. Neither copy
+  stands alone, so the card now reads `asks` (MCHBAR `0x59A0`, what the mode requests) and `register`
+  (MSR `0x610`, what the CPU holds), and collapses to one pair only when they agree.
+- Correction to `test.16`: on pr4u's ANV15-52 all four modes read bit-identical on AC and on battery,
+  so the power source is context for a laptop that switches mode on an adapter change, not a separate
+  limit table. The label stays; the claim that the table differs goes.
+
 ## 0.14.0-test.16 - 2026-11-20
 
 ### CPU

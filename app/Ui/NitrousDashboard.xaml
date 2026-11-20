@@ -938,7 +938,7 @@
 						<StackPanel>
 							<TextBlock Text="CPU Power Limits" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
 							<TextBlock x:Name="CpuPowerLimitsText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-							<TextBlock Text="Read from the firmware&apos;s copy at MCHBAR 0x59A0 through the PawnIO driver, which follows the power mode. Nitrous does not change these." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
+							<TextBlock Text="The mode&apos;s request (MCHBAR 0x59A0) and the register the CPU holds (MSR 0x610), read through the PawnIO driver. Nitrous changes neither, and a tool that writes the register can move both." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
 						</StackPanel>
 					</Border>
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">

@@ -1220,17 +1220,13 @@ public partial class NitrousDashboard : Window
     private bool _brightnessSyncUpdating;
 
     /// <summary>
-    /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
-    /// separate HID device; models without it keep the card visible but disabled.
-    /// </summary>
-    /// <summary>
-    /// Reads PL1/PL2 once, when PawnIO is installed. Read-only on purpose: the card shows what the
-    /// firmware is enforcing, and nothing in Nitrous writes MSR 0x610.
+    /// Reads both copies of the package power limit when PawnIO is installed. Read-only on purpose:
+    /// nothing in Nitrous writes MSR 0x610 or MCHBAR.
     /// </summary>
     private void RefreshCpuPowerLimits(PowerProfile mode)
     {
-        // These laptops set different limits on battery, and the firmware also adjusts PL1 while it
-        // runs, so the snapshot is keyed on the power source as well as the mode.
+        // Keyed on the power source as well as the mode: Acer re-applies the limits when the adapter
+        // comes out, and a write to 0x610 has been measured moving 0x59A0.
         var onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus !=
                         System.Windows.Forms.PowerLineStatus.Online;
         if (_powerLimitsKey == (mode, onBattery)) return;
@@ -1243,31 +1239,43 @@ public partial class NitrousDashboard : Window
             await Task.Delay(1500);
 
             var firmware = CpuPowerLimits.ReadFirmware();
-            if (firmware is null) return;
-
-            var limits = firmware.Value;
             var register = CpuPowerLimits.ReadRegister();
+            if (firmware is null && register is null) return;
 
-            var detail = $"PL1 {limits.Pl1Watts:0} W, PL2 {limits.Pl2Watts:0} W " +
-                         $"(MCHBAR 0x59A0, {mode} mode{(onBattery ? ", on battery" : "")}" +
-                         $"{(limits.Locked ? ", locked" : "")})";
+            var source = onBattery ? "on battery" : "on AC";
+            var detail = $"CPU power limits: {mode} mode {source}";
+            if (firmware is { } asks)
+                detail += $", MCHBAR 0x59A0 asks {asks.Pl1Watts:0} W / {asks.Pl2Watts:0} W" +
+                          $"{(asks.Locked ? " (locked)" : "")}";
+            if (register is { } holds)
+                detail += $", MSR 0x610 holds {holds.Pl1Watts:0} W / {holds.Pl2Watts:0} W" +
+                          $"{(holds.Locked ? " (locked)" : "")}";
 
-            // The register is the copy the CPU enforces; it is seeded at boot and a mode switch does
-            // not rewrite it. When it disagrees, something has set the limits outside the firmware.
-            var overridden = register is { } current &&
-                (Math.Abs(current.Pl1Watts - limits.Pl1Watts) >= 0.5 ||
-                 Math.Abs(current.Pl2Watts - limits.Pl2Watts) >= 0.5);
-            if (overridden && register is { } set)
-                detail += $"; MSR 0x610 reads {set.Pl1Watts:0} W / {set.Pl2Watts:0} W";
+            Logger.Info($"{detail}.");
 
-            Logger.Info($"CPU power limits: {detail}.");
+            // Neither copy stands alone: 0x610 is seeded at boot and is what a tuning tool writes,
+            // and writing it has been measured moving 0x59A0. Both are shown, labelled, unranked.
+            var agree = firmware is { } left && register is { } right &&
+                        Math.Abs(left.Pl1Watts - right.Pl1Watts) < 0.5 &&
+                        Math.Abs(left.Pl2Watts - right.Pl2Watts) < 0.5;
 
             await Dispatcher.InvokeAsync(() =>
             {
-                var text = $"PL1 {limits.Pl1Watts:0} W sustained · PL2 {limits.Pl2Watts:0} W peak · {mode} mode";
+                var text = $"{mode} mode";
+
+                if (agree && register is { } same)
+                {
+                    text += $" · {same.Pl1Watts:0} W / {same.Pl2Watts:0} W";
+                }
+                else
+                {
+                    if (firmware is { } asking)
+                        text += $" · asks {asking.Pl1Watts:0} W / {asking.Pl2Watts:0} W";
+                    if (register is { } holding)
+                        text += $" · register {holding.Pl1Watts:0} W / {holding.Pl2Watts:0} W";
+                }
+
                 if (onBattery) text += " · on battery";
-                if (overridden && register is { } applied)
-                    text += $" · register set to {applied.Pl1Watts:0} W / {applied.Pl2Watts:0} W";
 
                 CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
@@ -1275,6 +1283,10 @@ public partial class NitrousDashboard : Window
         });
     }
 
+    /// <summary>
+    /// Loads the saved lighting state and shows it. The keyboard's lighting interface is a
+    /// separate HID device; models without it keep the card visible but disabled.
+    /// </summary>
     private void InitializeKeyboardLighting()
     {
         // The old red test was ambiguous with the Performance mode. A Yes from it is cleared once;
