@@ -44,6 +44,7 @@ public partial class NitrousDashboard : Window
     private (PowerProfile Mode, bool OnBattery)? _powerLimitsKey;
     private bool _cpuPowerCapUpdating;
     private string? _cpuPowerCapMessage;
+    private bool _cpuLimitsPreview;
 
     public NitrousDashboard()
     {
@@ -81,6 +82,7 @@ public partial class NitrousDashboard : Window
         // A cap may have been applied by the tray or by an earlier dashboard process; pick up the
         // ceiling that bounds it.
         CpuPowerCap.Load();
+        PrepareCpuPowerLimits();
         RefreshCpuPowerLimits((PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance));
         InitializeCoolBoost();
 
@@ -285,6 +287,10 @@ public partial class NitrousDashboard : Window
         // Captures are headless; a modal capability question would block the render.
         _captureMode = true;
 
+        // The card is hidden on this machine (AMD), so its Intel-only states cannot be reached here
+        // without a hardware-specific override. "setup-limits" previews the not-installed state.
+        if (page?.ToLowerInvariant().Contains("limits") == true) ShowCpuPowerLimitsInstallNeeded();
+
         var key = page?.ToLowerInvariant() ?? string.Empty;
 
         // Renders the three-tab navigation a model without a lighting controller would get.
@@ -304,7 +310,7 @@ public partial class NitrousDashboard : Window
         {
             "gpu" => 1,
             "kb" or "keyboard" => 2,
-            "setup" or "settings" or "setup-hotkeys" => 3,
+            "setup" or "settings" or "setup-hotkeys" or "setup-limits" => 3,
             _ => 0
         };
 
@@ -1257,7 +1263,25 @@ public partial class NitrousDashboard : Window
 
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
-            if (firmware is null && register is null) return;
+            if (firmware is null && register is null)
+            {
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_cpuLimitsPreview) return;
+
+                    // No limits on this machine at all: the card does not exist on AMD Nitros.
+                    if (!PawnIo.HasIntelCpu)
+                    {
+                        CpuPowerLimitsCard.Visibility = Visibility.Collapsed;
+                        return;
+                    }
+
+                    ApplyCpuPowerLimitsUnavailable(
+                        "PawnIO did not answer, so these limits cannot be read.",
+                        "Check that the PawnIO driver is running; the log has the reason.");
+                });
+                return;
+            }
 
             // Read here rather than on the UI thread: every one of these goes through the driver.
             var writable = CpuPowerCap.IsWritable();
@@ -1305,9 +1329,57 @@ public partial class NitrousDashboard : Window
 
                 CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
+                CpuPowerLimitsCaption.Visibility = Visibility.Visible;
                 PopulateCpuPowerCap(ceiling, writable);
             });
         });
+    }
+
+    /// <summary>
+    /// Intel machines always see the card, so the feature is discoverable and says what it needs.
+    /// Anything else keeps it hidden: these limits do not exist there, and an empty control would be
+    /// noise on every AMD Nitro.
+    /// </summary>
+    private void PrepareCpuPowerLimits()
+    {
+        if (!PawnIo.HasIntelCpu) return;
+
+        CpuPowerLimitsCard.Visibility = Visibility.Visible;
+        if (PawnIo.IsInstalled) return;
+
+        ShowCpuPowerLimitsInstallNeeded();
+    }
+
+    /// <summary>The card on an Intel machine where PawnIO is absent: present, explained, not usable.</summary>
+    private void ShowCpuPowerLimitsInstallNeeded()
+    {
+        _cpuLimitsPreview = true;
+        ApplyCpuPowerLimitsUnavailable(
+            "PawnIO is not installed, so these limits cannot be read.",
+            "Optional. PawnIO (pawnio.eu) is a signed third-party driver; Nitrous never installs or starts it.");
+    }
+
+    /// <summary>
+    /// The single shape of "no numbers to show": present, explained, the control inert. Both the
+    /// not-installed and the did-not-answer cases go through here so they cannot drift apart.
+    /// </summary>
+    private void ApplyCpuPowerLimitsUnavailable(string text, string hint)
+    {
+        _cpuPowerCapUpdating = true;
+        try
+        {
+            CpuPowerLimitsCard.Visibility = Visibility.Visible;
+            CpuPowerLimitsText.Text = text;
+            CpuPowerLimitsCaption.Visibility = Visibility.Collapsed;
+            CpuPowerCapBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "Off") };
+            CpuPowerCapBox.SelectedIndex = 0;
+            CpuPowerCapBox.IsEnabled = false;
+            CpuPowerCapHint.Text = hint;
+        }
+        finally
+        {
+            _cpuPowerCapUpdating = false;
+        }
     }
 
     /// <summary>
@@ -1362,6 +1434,9 @@ public partial class NitrousDashboard : Window
 
         var result = await Task.Run(() =>
             option.Watts == 0 ? CpuPowerCap.Reset() : CpuPowerCap.Apply(option.Watts));
+
+        // The window can be closed while a write is in flight; nothing here is safe to touch then.
+        if (Dispatcher.HasShutdownStarted) return;
 
         _cpuPowerCapMessage = result.Message;
         CpuPowerCapHint.Text = result.Message;

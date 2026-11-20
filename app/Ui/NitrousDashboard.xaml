@@ -934,17 +934,18 @@
 					</Border>
 
 					<!-- Read-only: the firmware's power limits through the PawnIO driver, when it is installed -->
-					<Border x:Name="CpuPowerLimitsCard" Style="{StaticResource SetupCardStyle}" Visibility="Collapsed">
+					<Border x:Name="CpuPowerLimitsCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
 						<StackPanel>
 							<TextBlock Text="CPU Power Limits" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
 							<TextBlock x:Name="CpuPowerLimitsText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-							<TextBlock Text="The mode&apos;s request (MCHBAR 0x59A0) and the register the CPU holds (MSR 0x610). The cap below only lowers the register, never above what this mode asks for." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
+							<TextBlock x:Name="CpuPowerLimitsCaption" Text="The mode&apos;s request (MCHBAR 0x59A0) and the register the CPU holds (MSR 0x610). The cap below only lowers the register, never above what this mode asks for." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
 							<Grid Margin="0,10,0,0">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
 									<TextBlock Text="Sustained Power Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
 									<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
 								</StackPanel>

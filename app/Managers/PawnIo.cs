@@ -38,6 +38,12 @@ internal static class PawnIo
     private static bool? _installed;
     private static bool? _isIntel;
 
+    /// <summary>
+    /// Whether this is an Intel package. The IntelMSR and IntelMCHBAR modules only load there, so
+    /// anything gated on them is gated on this first.
+    /// </summary>
+    public static bool HasIntelCpu => IsIntelCpu();
+
     /// <summary>Whether the PawnIO service is registered. Says nothing about whether it answers.</summary>
     public static bool IsInstalled
     {

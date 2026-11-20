@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.23 - 2026-11-20
+
+### CPU
+
+- **The power-limit card is shown on Intel Nitro models without PawnIO**, disabled and saying what it
+  needs, so the feature can be found before the driver is installed. On AMD models it is absent: these
+  limits do not exist there, and an inert control would be noise on every AMD Nitro.
+- The card follows the setup page's conventions - card padding, a rule above the control row, the same
+  title and body sizes - and every "no numbers yet" state shares one layout so they cannot drift apart.
+
+### Fixes
+
+- A power cap write that finished after the dashboard had been closed crashed the process.
+- The not-installed state could re-enable its own dropdown through its own change event.
+
 ## 0.14.0-test.22 - 2026-11-20
 
 ### CPU
