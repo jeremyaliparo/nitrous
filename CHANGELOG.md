@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.15 - 2026-11-20
+
+### CPU
+
+- **The power-limit card reads the firmware's copy of the limits, not the register.** MSR `0x610`
+  turns out to be seeded once at boot and then left alone: on pr4u's i9-13900H a full
+  Quiet/Balanced/Performance sweep left it bit-identical, so the card would have shown the same two
+  numbers under every mode label. The limits now come from the firmware's own copy at MCHBAR `0x59A0`,
+  which a mode switch does rewrite, via PawnIO's read-only IntelMCHBAR module (LGPL-2.1, embedded
+  beside IntelMSR).
+- When `0x610` disagrees with the firmware - something outside Nitrous has set the limits itself - the
+  card says so rather than hiding it, because that register is the copy the CPU enforces.
+
 ## 0.14.0-test.14 - 2026-11-18
 
 ### CPU

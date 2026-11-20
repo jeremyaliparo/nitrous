@@ -15,7 +15,7 @@
 		     that property is ignored when a custom manifest is supplied. -->
 		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.14.0-test.14</Version>
+		<Version>0.14.0-test.15</Version>
 		<Product>Nitrous</Product>
 		<Company>Jeremy Aliparo</Company>
 		<Authors>Jeremy Aliparo</Authors>
@@ -44,5 +44,7 @@
 		<!-- PawnIO module for MSR reads; LGPL-2.1, licence in assets/pawnio/COPYING. -->
 		<EmbeddedResource Include="..\assets\pawnio\IntelMSR.bin" Link="assets\pawnio\IntelMSR.bin"
 		                  LogicalName="Nitrous.assets.pawnio.IntelMSR.bin" />
+		<EmbeddedResource Include="..\assets\pawnio\IntelMCHBAR.bin" Link="assets\pawnio\IntelMCHBAR.bin"
+		                  LogicalName="Nitrous.assets.pawnio.IntelMCHBAR.bin" />
 	</ItemGroup>
 </Project>

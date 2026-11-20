@@ -1234,21 +1234,36 @@ public partial class NitrousDashboard : Window
 
         _ = Task.Run(async () =>
         {
-            // The EC applies a mode a moment after the request, so read after it settles rather
-            // than catching the previous mode's limits.
+            // The EC applies a mode a moment after the request and MCHBAR follows it, so read after
+            // it settles rather than catching the previous mode's numbers.
             await Task.Delay(1500);
 
-            var limits = CpuPowerLimits.Read();
-            if (limits is null) return;
+            var firmware = CpuPowerLimits.ReadFirmware();
+            if (firmware is null) return;
 
-            var reading = limits.Value;
-            Logger.Info($"CPU power limits: PL1 {reading.Pl1Watts:0} W, PL2 {reading.Pl2Watts:0} W " +
-                        $"(MSR 0x610, {mode} mode{(reading.Locked ? ", locked" : "")}).");
+            var limits = firmware.Value;
+            var register = CpuPowerLimits.ReadRegister();
+
+            var detail = $"PL1 {limits.Pl1Watts:0} W, PL2 {limits.Pl2Watts:0} W " +
+                         $"(MCHBAR 0x59A0, {mode} mode{(limits.Locked ? ", locked" : "")})";
+
+            // The register is the copy the CPU enforces; it is seeded at boot and a mode switch does
+            // not rewrite it. When it disagrees, something has set the limits outside the firmware.
+            var overridden = register is { } current &&
+                (Math.Abs(current.Pl1Watts - limits.Pl1Watts) >= 0.5 ||
+                 Math.Abs(current.Pl2Watts - limits.Pl2Watts) >= 0.5);
+            if (overridden && register is { } set)
+                detail += $"; MSR 0x610 reads {set.Pl1Watts:0} W / {set.Pl2Watts:0} W";
+
+            Logger.Info($"CPU power limits: {detail}.");
 
             await Dispatcher.InvokeAsync(() =>
             {
-                CpuPowerLimitsText.Text =
-                    $"PL1 {reading.Pl1Watts:0} W sustained · PL2 {reading.Pl2Watts:0} W peak · {mode} mode";
+                var text = $"PL1 {limits.Pl1Watts:0} W sustained · PL2 {limits.Pl2Watts:0} W peak · {mode} mode";
+                if (overridden && register is { } applied)
+                    text += $" · register set to {applied.Pl1Watts:0} W / {applied.Pl2Watts:0} W";
+
+                CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
             });
         });

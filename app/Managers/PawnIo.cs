@@ -9,17 +9,16 @@ using Nitrous.Diagnostics;
 namespace Nitrous.Managers;
 
 /// <summary>
-/// Read-only access to model-specific registers through PawnIO's signed driver
+/// Read-only access to Intel registers through PawnIO's signed driver
 /// (<see href="https://pawnio.eu"/> by namazso).
 ///
 /// Nitrous talks to the driver only through its device IOCTL interface, which PawnIO's licence
-/// exception explicitly allows for independent programs; it never links PawnIO code. The module it
-/// loads - IntelMSR, from PawnIO.Modules - is LGPL-2.1 and shipped unmodified, with its licence in
-/// <c>assets/pawnio/COPYING</c>.
+/// exception explicitly allows for independent programs; it never links PawnIO code. The modules it
+/// loads - IntelMSR and IntelMCHBAR, from PawnIO.Modules - are LGPL-2.1 and shipped unmodified, with
+/// their licence in <c>assets/pawnio/COPYING</c>.
 ///
-/// This exists for one register: MSR 0x610, the package power limit, which Windows exposes no API
-/// for. Reading it is harmless; writing is deliberately not implemented here - see
-/// <see cref="CpuPowerLimits"/>.
+/// One device handle holds one loaded module, so each module gets its own handle and they are opened
+/// only when something actually reads through them.
 /// </summary>
 internal static class PawnIo
 {
@@ -30,14 +29,14 @@ internal static class PawnIo
     /// <summary>PawnIO takes the function name as a zero-padded 32-byte field before the arguments.</summary>
     private const int FunctionNameLength = 32;
 
-    private const string ModuleResource = "Nitrous.assets.pawnio.IntelMSR.bin";
     private const string DevicePath = @"\Device\PawnIO";
 
     private static readonly object Gate = new();
-    private static SafeFileHandle? _device;
-    private static bool _ready;
-    private static bool _failed;
+    private static readonly Channel Msr = new("Nitrous.assets.pawnio.IntelMSR.bin", "IntelMSR");
+    private static readonly Channel Mchbar = new("Nitrous.assets.pawnio.IntelMCHBAR.bin", "IntelMCHBAR");
+
     private static bool? _installed;
+    private static bool? _isIntel;
 
     /// <summary>Whether the PawnIO service is registered. Says nothing about whether it answers.</summary>
     public static bool IsInstalled
@@ -61,22 +60,32 @@ internal static class PawnIo
         }
     }
 
-    /// <summary>The register's value, or null when PawnIO is absent or the read was refused.</summary>
-    public static ulong? ReadMsr(uint register)
+    /// <summary>MSR_PKG_POWER_LIMIT and anything else the IntelMSR module allows.</summary>
+    public static ulong? ReadMsr(uint register) => Execute(Msr, "ioctl_read_msr", register);
+
+    /// <summary>A 64-bit MCHBAR word, such as the firmware's copy of the power limit at 0x59A0.</summary>
+    public static ulong? ReadMchbar(ulong offset) => Execute(Mchbar, "ioctl_read_qword", offset);
+
+    private static ulong? Execute(Channel channel, string function, ulong argument)
     {
         lock (Gate)
         {
-            if (!EnsureReady()) return null;
+            if (!IsInstalled || !IsIntelCpu()) return null;
+            if (!channel.EnsureOpen()) return null;
 
             var input = new byte[FunctionNameLength + sizeof(ulong)];
-            Encoding.ASCII.GetBytes("ioctl_read_msr").CopyTo(input, 0);
-            BitConverter.GetBytes((ulong)register).CopyTo(input, FunctionNameLength);
+            Encoding.ASCII.GetBytes(function).CopyTo(input, 0);
+            BitConverter.GetBytes(argument).CopyTo(input, FunctionNameLength);
 
             var output = new byte[sizeof(ulong)];
-            if (!DeviceIoControl(_device!, IoctlExecute, input, input.Length,
+            if (!DeviceIoControl(channel.Device!, IoctlExecute, input, input.Length,
                     output, output.Length, out var written, IntPtr.Zero))
             {
-                Logger.Warn($"PawnIO: reading 0x{register:X} failed (error {Marshal.GetLastWin32Error()}).");
+                // A stopped or restarted driver leaves this handle stale. Drop it so the next read
+                // opens a fresh one instead of failing for the rest of the session.
+                var error = Marshal.GetLastWin32Error();
+                channel.Close();
+                Logger.Warn($"PawnIO: {function} failed (error {error}).");
                 return null;
             }
 
@@ -85,68 +94,31 @@ internal static class PawnIo
     }
 
     /// <summary>
-    /// The IntelMSR module refuses to load on anything but an Intel package, and most Nitro models
-    /// are AMD. Checking first keeps an installed PawnIO from logging a failed load on those.
+    /// The IntelMSR and IntelMCHBAR modules refuse to load on anything but an Intel package, and most
+    /// Nitro models are AMD. Checking first keeps an installed PawnIO from logging a failed load.
     /// </summary>
     private static bool IsIntelCpu()
     {
+        if (_isIntel is { } known) return known;
+
         try
         {
             using var key = Registry.LocalMachine.OpenSubKey(
                 @"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
-            return key?.GetValue("VendorIdentifier") as string == "GenuineIntel";
+            _isIntel = key?.GetValue("VendorIdentifier") as string == "GenuineIntel";
         }
         catch
         {
-            return false;
-        }
-    }
-
-    private static bool EnsureReady()
-    {
-        if (_ready) return true;
-        if (_failed) return false;
-
-        if (!IsInstalled || !IsIntelCpu())
-        {
-            _failed = true;
-            return false;
+            _isIntel = false;
         }
 
-        try
-        {
-            var handle = OpenDevice();
-            if (handle is null || handle.IsInvalid)
-            {
-                handle?.Dispose();
-                _failed = true;
-                Logger.Info("PawnIO: the driver is installed but its device does not answer; CPU registers are unavailable.");
-                return false;
-            }
-
-            if (!LoadModule(handle))
-            {
-                handle.Dispose();
-                _failed = true;
-                return false;
-            }
-
-            _device = handle;
-            _ready = true;
-            Logger.Info("PawnIO: IntelMSR module loaded.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _failed = true;
-            Logger.Warn("PawnIO: could not be opened.", ex);
-            return false;
-        }
+        return _isIntel.Value;
     }
 
     /// <summary>
     /// Opens <c>\Device\PawnIO</c> the way PawnIOLib does, through NtOpenFile. The Win32
-    /// <c>\\?\GLOBALROOT</c> form is not equivalent for a driver that has not registered a DOS name.
+    /// <c>\\?\GLOBALROOT</c> form also works against a healthy install; NtOpenFile is used because it
+    /// does not depend on the driver registering a DOS name.
     /// </summary>
     private static SafeFileHandle? OpenDevice()
     {
@@ -177,12 +149,12 @@ internal static class PawnIo
         }
     }
 
-    private static bool LoadModule(SafeFileHandle device)
+    private static bool LoadModule(SafeFileHandle device, string resource, string name)
     {
-        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ModuleResource);
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource);
         if (stream is null)
         {
-            Logger.Warn($"PawnIO: the {ModuleResource} resource is missing from the build.");
+            Logger.Warn($"PawnIO: the {resource} resource is missing from the build.");
             return false;
         }
 
@@ -192,12 +164,42 @@ internal static class PawnIo
 
         if (!DeviceIoControl(device, IoctlLoadBinary, blob, blob.Length, null, 0, out _, IntPtr.Zero))
         {
-            Logger.Warn($"PawnIO: the IntelMSR module would not load (error {Marshal.GetLastWin32Error()}). " +
-                        "Intel CPUs only, and the driver must be running.");
+            Logger.Warn($"PawnIO: the {name} module would not load (error {Marshal.GetLastWin32Error()}). " +
+                        "Intel CPUs only, the driver must be running, and the chipset must expose MCHBAR.");
             return false;
         }
 
         return true;
+    }
+
+    /// <summary>One module on one device handle, opened the first time something reads through it.</summary>
+    private sealed class Channel(string resource, string name)
+    {
+        public SafeFileHandle? Device { get; private set; }
+
+        public bool EnsureOpen()
+        {
+            if (Device is not null) return true;
+
+            var handle = OpenDevice();
+            if (handle is null) return false;
+
+            if (!LoadModule(handle, resource, name))
+            {
+                handle.Dispose();
+                return false;
+            }
+
+            Device = handle;
+            Logger.Info($"PawnIO: {name} module loaded.");
+            return true;
+        }
+
+        public void Close()
+        {
+            Device?.Dispose();
+            Device = null;
+        }
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
