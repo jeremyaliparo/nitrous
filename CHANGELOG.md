@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.27 - 2026-11-20
+
+### CPU
+
+- **The ceiling is selectable again.** Dropping 55 W / 115 W from the lists was the wrong cure for
+  "choosing the maximum snaps back to Off" - those numbers are real choices, and they came straight
+  back missing. The snap-back came from saving "no cap" for a value that equalled the ceiling; the
+  choice is now saved as made, and the dropdowns read it back.
+- A clamp caused by a mode change no longer overwrites that choice. "50 W in Performance" survives a
+  detour through Quiet and is restored on the way back, instead of being flattened to Quiet's number
+  and forgotten.
+- When a mode's ceiling is below the saved value, the box shows the clamped number actually in the
+  register rather than claiming Off.
+
 ## 0.14.0-test.26 - 2026-11-20
 
 ### CPU

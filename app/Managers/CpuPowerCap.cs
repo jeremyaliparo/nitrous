@@ -96,7 +96,9 @@ internal static class CpuPowerCap
     /// them back. A null field means "leave this one at the mode's value". A write that does not stick is
     /// undone and reported.
     /// </summary>
-    public static Result Apply(int? pl1Watts, int? pl2Watts)
+    public static Result Apply(int? pl1Watts, int? pl2Watts) => ApplyCore(pl1Watts, pl2Watts, persist: true);
+
+    private static Result ApplyCore(int? pl1Watts, int? pl2Watts, bool persist)
     {
         lock (Gate)
         {
@@ -136,8 +138,14 @@ internal static class CpuPowerCap
             _moved = true;
             _pristine = mode;
 
-            SettingsManager.Save(Pl1Key, pl1 == mode.Pl1 ? 0 : pl1);
-            SettingsManager.Save(Pl2Key, pl2 == mode.Pl2 ? 0 : pl2);
+            // A clamp applied because a mode changed is not the user's choice, so it must not replace it:
+            // "50 W in Performance" has to survive a detour through Quiet and come back.
+            if (persist)
+            {
+                SettingsManager.Save(Pl1Key, pl1);
+                SettingsManager.Save(Pl2Key, pl2);
+            }
+
             SettingsManager.Save(Pl1CeilingKey, mode.Pl1);
             SettingsManager.Save(Pl2CeilingKey, mode.Pl2);
 
@@ -198,17 +206,18 @@ internal static class CpuPowerCap
     /// </summary>
     public static void Reassert()
     {
+        var saved = Saved;
+        if (saved.Pl1 == 0 && saved.Pl2 == 0) return;   // Off: the register belongs to the firmware
+
         if (Ceilings() is not { } mode) return;
         if (Applied() is not { } now) return;
 
-        var saved = Saved;
-
-        var pl1 = Math.Min(saved.Pl1 > 0 ? saved.Pl1 : now.Pl1, mode.Pl1);
-        var pl2 = Math.Min(saved.Pl2 > 0 ? saved.Pl2 : now.Pl2, mode.Pl2);
+        var pl1 = Math.Min(saved.Pl1 == 0 ? mode.Pl1 : saved.Pl1, mode.Pl1);
+        var pl2 = Math.Min(saved.Pl2 == 0 ? mode.Pl2 : saved.Pl2, mode.Pl2);
 
         if (pl1 == now.Pl1 && pl2 == now.Pl2) return;
 
-        Apply(pl1, pl2);
+        ApplyCore(pl1, pl2, persist: false);
     }
 
     /// <summary>

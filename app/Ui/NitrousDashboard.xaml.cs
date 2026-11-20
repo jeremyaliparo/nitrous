@@ -1411,10 +1411,10 @@ public partial class NitrousDashboard : Window
             var burst = Options(mode.Pl2, applied.Pl1);
 
             CpuPowerCapBox.ItemsSource = sustained;
-            CpuPowerCapBox.SelectedIndex = Math.Max(0, sustained.FindIndex(option => option.Watts == saved.Pl1));
+            CpuPowerCapBox.SelectedIndex = SelectCapIndex(sustained, saved.Pl1, applied.Pl1);
 
             CpuPowerCapBurstBox.ItemsSource = burst;
-            CpuPowerCapBurstBox.SelectedIndex = Math.Max(0, burst.FindIndex(option => option.Watts == saved.Pl2));
+            CpuPowerCapBurstBox.SelectedIndex = SelectCapIndex(burst, saved.Pl2, applied.Pl2);
 
             CpuPowerCapBox.IsEnabled = writable;
             CpuPowerCapBurstBox.IsEnabled = writable;
@@ -1434,16 +1434,39 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// "Off" then round steps strictly below the ceiling. The ceiling itself is not offered: it is the
-    /// mode's own number, which is exactly what Off means, and listing both made picking the maximum
-    /// look like the dropdown snapping back.
+    /// What the box should show: the saved choice when this mode still offers it, otherwise what the
+    /// register actually holds, otherwise Off. A cap of 55 W followed by a switch to a 35 W mode must not
+    /// leave the dropdown claiming Off while the register sits at 35 W.
+    /// </summary>
+    private static int SelectCapIndex(List<CpuPowerCapOption> options, int saved, int applied)
+    {
+        if (saved > 0)
+        {
+            var chosen = options.FindIndex(option => option.Watts == saved);
+            if (chosen >= 0) return chosen;
+        }
+
+        if (applied > 0)
+        {
+            var shown = options.FindIndex(option => option.Watts == applied);
+            if (shown >= 0) return shown;
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// "Off", the ceiling, then round steps below it. The ceiling is offered because it is a real choice -
+    /// it is the highest this mode allows - and Off means "do not manage this at all", which is the only
+    /// way to leave the register to the firmware.
     /// </summary>
     private static List<CpuPowerCapOption> Options(int ceiling, int floor)
     {
-        var options = new List<CpuPowerCapOption> { new(0, "Off") };
+        var options = new List<CpuPowerCapOption> { new(0, "Off"), new(ceiling, $"{ceiling} W") };
 
-        for (var watts = (ceiling - 1) / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, floor); watts -= 5)
-            options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
+        for (var watts = ceiling / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, floor); watts -= 5)
+            if (watts != ceiling)
+                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
 
         return options;
     }
