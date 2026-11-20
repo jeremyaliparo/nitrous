@@ -950,7 +950,7 @@
 								</Grid.ColumnDefinitions>
 								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
 									<TextBlock Text="Sustained Limit (PL1)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
-									<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Steady power over time."/>
+									<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Held across mode changes."/>
 								</StackPanel>
 								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCap_Changed"/>
 							</Grid>

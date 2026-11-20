@@ -1369,12 +1369,12 @@ public partial class NitrousDashboard : Window
             CpuPowerLimitsText.Text = text;
             CpuPowerLimitsCaption.Visibility = Visibility.Collapsed;
 
-            var off = new List<CpuPowerCapOption> { new(0, "Off") };
-            CpuPowerCapBox.ItemsSource = off;
+            var placeholder = new List<CpuPowerCapOption> { new(0, "—") };
+            CpuPowerCapBox.ItemsSource = placeholder;
             CpuPowerCapBox.SelectedIndex = 0;
             CpuPowerCapBox.IsEnabled = false;
 
-            CpuPowerCapBurstBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "Off") };
+            CpuPowerCapBurstBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "—") };
             CpuPowerCapBurstBox.SelectedIndex = 0;
             CpuPowerCapBurstBox.IsEnabled = false;
 
@@ -1456,13 +1456,14 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// "Off", the ceiling, then round steps below it. The ceiling is offered because it is a real choice -
-    /// it is the highest this mode allows - and Off means "do not manage this at all", which is the only
-    /// way to leave the register to the firmware.
+    /// The ceiling then round steps below it. The ceiling is the "follow this mode" choice: the register
+    /// is kept at whatever the mode asks, which is what the firmware does not do by itself across a mode
+    /// change. There is no separate Off, because "stop writing" left the register holding the previous
+    /// mode's numbers and looked like a reset that had failed.
     /// </summary>
     private static List<CpuPowerCapOption> Options(int ceiling, int floor)
     {
-        var options = new List<CpuPowerCapOption> { new(0, "Off"), new(ceiling, $"{ceiling} W") };
+        var options = new List<CpuPowerCapOption> { new(ceiling, $"{ceiling} W") };
 
         for (var watts = ceiling / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, floor); watts -= 5)
             if (watts != ceiling)
@@ -1486,11 +1487,7 @@ public partial class NitrousDashboard : Window
         CpuPowerCapBox.IsEnabled = false;
         CpuPowerCapBurstBox.IsEnabled = false;
 
-        var pl1 = sustained.Watts == 0 ? (int?)null : sustained.Watts;
-        var pl2 = burst.Watts == 0 ? (int?)null : burst.Watts;
-
-        var result = await Task.Run(() =>
-            pl1 is null && pl2 is null ? CpuPowerCap.Reset() : CpuPowerCap.Apply(pl1, pl2));
+        var result = await Task.Run(() => CpuPowerCap.Apply(sustained.Watts, burst.Watts));
 
         // The window can be closed while a write is in flight; nothing here is safe to touch then.
         if (Dispatcher.HasShutdownStarted) return;

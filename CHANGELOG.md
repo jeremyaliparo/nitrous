@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.29 - 2026-11-20
+
+### CPU
+
+- **"Off" is gone; the top value means "follow the mode".** Senpai reported that the limits never went
+  back to off "in any mode", and the cause was the definition: Off meant Nitrous stopped writing, and a
+  mode change does not rewrite that register, so the previous mode's numbers stayed on screen. A reset
+  that looks like it failed. Choosing the mode's own value now keeps the register at whatever the current
+  mode asks, on every mode change and after a resume.
+- The sustained row reads "Held across mode changes." instead of "Steady power over time."
+
 ## 0.14.0-test.28 - 2026-11-20
 
 ### CPU
