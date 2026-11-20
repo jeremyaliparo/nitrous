@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.36 - 2026-11-20
+
+### CPU
+
+- **The card catches up after a resume.** His log shows the dashboard reading the register at wake and
+  the tray re-applying his 50 W cap two seconds later, so the card showed the firmware's value with a
+  blank status line until the window was reopened. The resume refresh now runs twice: once straight
+  after wake for the rest of the window, once after the tray's re-apply has landed.
+- The status line now describes the register rather than replaying the last click - `Holding 50 W
+  sustained / 115 W burst.` when a cap is in place, `Following this mode's own limits.` when not - so it
+  is right whoever applied the cap. A refusal is still reported, and now clears when the mode changes.
+
 ## 0.14.0-test.35 - 2026-11-20
 
 ### Fixes

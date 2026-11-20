@@ -119,16 +119,21 @@ public partial class NitrousDashboard : Window
     {
         if (e.Mode is not (PowerModes.StatusChange or PowerModes.Resume)) return;
 
-        System.Threading.Tasks.Task.Delay(5500).ContinueWith(_ =>
+        // Two passes: the first keeps the window current straight after wake, the second lands after the
+        // tray has re-applied its hardware state (6 s settle plus its own 1.5 s), because reading before
+        // that shows the firmware's value and then the cap appears later with no visible reason.
+        foreach (var delay in new[] { 5500, 11000 })
         {
-            if (Dispatcher.HasShutdownStarted) return;
-            Dispatcher.InvokeAsync(() =>
+            System.Threading.Tasks.Task.Delay(delay).ContinueWith(_ =>
             {
-                RefreshDashboardState();
-                // The tray re-applies a saved power cap after resume; re-read once it has.
-                if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
+                if (Dispatcher.HasShutdownStarted) return;
+                Dispatcher.InvokeAsync(() =>
+                {
+                    RefreshDashboardState();
+                    if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
+                });
             });
-        });
+        }
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
@@ -1253,6 +1258,10 @@ public partial class NitrousDashboard : Window
         var onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus !=
                         System.Windows.Forms.PowerLineStatus.Online;
         if (!force && _powerLimitsKey == (mode, onBattery)) return;
+
+        // A refusal describes the mode it happened in, so it should not outlive the mode.
+        if (_powerLimitsKey is { } previous && previous.Mode != mode) _cpuPowerCapMessage = null;
+
         _powerLimitsKey = (mode, onBattery);
 
         _ = Task.Run(async () =>
@@ -1426,9 +1435,12 @@ public partial class NitrousDashboard : Window
 
             // The rows now carry a fixed description; results and refusals land on the status line the
             // way the other cards report state.
-            CpuPowerCapStatus.Text = writable
-                ? _cpuPowerCapMessage ?? string.Empty
-                : "The firmware has locked the power limit until the next reboot.";
+            CpuPowerCapStatus.Text = !writable
+                ? "The firmware has locked the power limit until the next reboot."
+                : _cpuPowerCapMessage
+                  ?? (applied.Pl1 == mode.Pl1 && applied.Pl2 == mode.Pl2
+                      ? "Following this mode's own limits."
+                      : $"Holding {applied.Pl1} W sustained / {applied.Pl2} W burst.");
             CpuPowerCapStatus.Visibility =
                 CpuPowerCapStatus.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -1522,7 +1534,7 @@ public partial class NitrousDashboard : Window
         // The window can be closed while a write is in flight; nothing here is safe to touch then.
         if (Dispatcher.HasShutdownStarted) return;
 
-        _cpuPowerCapMessage = result.Message;
+        _cpuPowerCapMessage = result.Ok ? null : result.Message;
         CpuPowerCapStatus.Text = result.Message;
         CpuPowerCapStatus.Visibility = Visibility.Visible;
 
