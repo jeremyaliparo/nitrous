@@ -3,6 +3,42 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0 - 2026-11-20
+
+### CPU power limits
+
+- **PL1 and PL2 are visible, and cappable, on Intel Nitro models that already have
+  [PawnIO](https://pawnio.eu) installed.** Windows exposes no API for the package power limit, so the
+  card reads the mode's own request from MCHBAR `0x59A0` and the register the CPU holds at MSR `0x610`.
+  Lowering is the only direction offered: each list is built from the mode's numbers, the write is read
+  back, and a value that does not stick is reverted. The lock bit is never written.
+- Your cap follows the mode down and returns when you switch back, survives a sleep or a charger change,
+  and **RESET** restores the mode's own limits. AMD machines do not see the card at all.
+
+### Lighting
+
+- **Brightness steps are learned from the keyboard instead of assumed.** Some firmwares keep three, not
+  five, which made the dropdown offer levels that did nothing and the beat effect write refused values.
+- **"Pulse with sound" warns where the backlight is driven over ACPI**, a path measured to add audio
+  latency; keyboards with a HID lighting interface keep the original beat rate. Fewer writes, and a
+  back-off after three refusals.
+
+### GPU and setup
+
+- Open the NVIDIA App from Nitrous - a card on the GPU page and a hotkey - including machines that only
+  have the Store build of the Control Panel.
+- GPU temperature falls back to NVML where the EC reports `0`.
+- Battery Health leads the battery card, and the Turbo profile no longer flashes on models without it.
+
+### Fixes
+
+- **Nitrous no longer fails to start on a machine with an NVIDIA GPU but no NVIDIA App or Control Panel
+  entry.** That combination killed the process before a window appeared, and it had been latent since
+  0.13.0.
+- A brightness control says so when the keyboard never reports its level back, rather than appearing to
+  work.
+- The dashboard no longer shows the firmware's limits in place of your cap just after waking.
+
 ## 0.14.0-test.36 - 2026-11-20
 
 ### CPU
