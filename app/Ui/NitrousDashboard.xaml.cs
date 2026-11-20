@@ -1243,8 +1243,8 @@ public partial class NitrousDashboard : Window
     private bool _brightnessSyncUpdating;
 
     /// <summary>
-    /// Reads both copies of the package power limit when PawnIO is installed. Read-only on purpose:
-    /// nothing in Nitrous writes MSR 0x610 or MCHBAR.
+    /// Reads both copies of the package power limit when PawnIO is installed, and offers the caps.
+    /// Read-only until the user asks otherwise: nothing here writes until a value is chosen.
     /// </summary>
     private void RefreshCpuPowerLimits(PowerProfile mode, bool force = false)
     {
@@ -1285,9 +1285,7 @@ public partial class NitrousDashboard : Window
 
             // Read here rather than on the UI thread: every one of these goes through the driver.
             var writable = CpuPowerCap.IsWritable();
-            // The trusted ceiling, not the live MCHBAR reading: after a cap is written that copy can
-            // read higher than the mode actually asks for.
-            var ceiling = CpuPowerCap.Ceiling() ?? 0;
+            var ceilings = CpuPowerCap.Ceilings();
 
             var source = onBattery ? "on battery" : "on AC";
             var detail = $"CPU power limits: {mode} mode {source}";
@@ -1316,11 +1314,8 @@ public partial class NitrousDashboard : Window
                 }
                 else
                 {
-                    if (firmware is { } asking)
-                    {
-                        var askPl1 = ceiling > 0 ? ceiling : (int)Math.Round(asking.Pl1Watts);
-                        text += $" · asks {askPl1} W / {asking.Pl2Watts:0} W";
-                    }
+                    if (firmware is { } asking && ceilings is { } ask)
+                        text += $" · asks {ask.Pl1} W / {ask.Pl2} W";
                     if (register is { } holding)
                         text += $" · register {holding.Pl1Watts:0} W / {holding.Pl2Watts:0} W";
                 }
@@ -1330,7 +1325,7 @@ public partial class NitrousDashboard : Window
                 CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
                 CpuPowerLimitsCaption.Visibility = Visibility.Visible;
-                PopulateCpuPowerCap(ceiling, writable);
+                PopulateCpuPowerCap(ceilings, writable);
             });
         });
     }
@@ -1360,7 +1355,7 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// The single shape of "no numbers to show": present, explained, the control inert. Both the
+    /// The single shape of "no numbers to show": present, explained, the controls inert. Both the
     /// not-installed and the did-not-answer cases go through here so they cannot drift apart.
     /// </summary>
     private void ApplyCpuPowerLimitsUnavailable(string text, string hint)
@@ -1371,10 +1366,18 @@ public partial class NitrousDashboard : Window
             CpuPowerLimitsCard.Visibility = Visibility.Visible;
             CpuPowerLimitsText.Text = text;
             CpuPowerLimitsCaption.Visibility = Visibility.Collapsed;
-            CpuPowerCapBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "Off") };
+
+            var off = new List<CpuPowerCapOption> { new(0, "Off") };
+            CpuPowerCapBox.ItemsSource = off;
             CpuPowerCapBox.SelectedIndex = 0;
             CpuPowerCapBox.IsEnabled = false;
+
+            CpuPowerCapBurstBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "Off") };
+            CpuPowerCapBurstBox.SelectedIndex = 0;
+            CpuPowerCapBurstBox.IsEnabled = false;
+
             CpuPowerCapHint.Text = hint;
+            CpuPowerCapBurstHint.Text = string.Empty;
         }
         finally
         {
@@ -1383,41 +1386,43 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// Fills the cap list from this mode's ceiling and selects what is in use. The list never offers a
-    /// value above the mode's own request, which is what keeps the cap lower-only.
+    /// Fills both cap lists from this mode's ceilings and selects what is in use. The sustained list stops
+    /// at the applied burst value and the burst list starts at the applied sustained value, so an invalid
+    /// pair cannot be chosen in the first place.
     /// </summary>
-    private void PopulateCpuPowerCap(int ceiling, bool writable)
+    private void PopulateCpuPowerCap(CpuPowerCap.Limits? ceilings, bool writable)
     {
-        if (ceiling <= 0)
+        if (ceilings is not { } mode)
         {
             CpuPowerCapBox.IsEnabled = false;
+            CpuPowerCapBurstBox.IsEnabled = false;
             return;
         }
+
+        var saved = CpuPowerCap.Saved;
+        var applied = CpuPowerCap.Applied() ?? mode;
 
         _cpuPowerCapUpdating = true;
         try
         {
-            var saved = CpuPowerCap.SavedWatts;
-            var options = new List<CpuPowerCapOption> { new(0, "Off"), new(ceiling, $"{ceiling} W") };
+            var sustained = Options(Math.Min(mode.Pl1, applied.Pl2), CpuPowerCap.FloorWatts);
+            var burst = Options(mode.Pl2, Math.Max(CpuPowerCap.FloorWatts, applied.Pl1));
 
-            for (var watts = ceiling - 5; watts >= CpuPowerCap.FloorWatts; watts -= 5)
-                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
+            CpuPowerCapBox.ItemsSource = sustained;
+            CpuPowerCapBox.SelectedIndex = Math.Max(0, sustained.FindIndex(option => option.Watts == saved.Pl1));
 
-            // A cap saved under a mode with a wider range may not be on this list; keep it selectable
-            // rather than silently showing a different value.
-            if (saved > 0 && options.All(option => option.Watts != saved))
-                options.Insert(1, new CpuPowerCapOption(saved, $"{saved} W"));
+            CpuPowerCapBurstBox.ItemsSource = burst;
+            CpuPowerCapBurstBox.SelectedIndex = Math.Max(0, burst.FindIndex(option => option.Watts == saved.Pl2));
 
-            CpuPowerCapBox.ItemsSource = options;
-            var index = options.FindIndex(option => option.Watts == saved);
-            CpuPowerCapBox.SelectedIndex = index >= 0 ? index : 0;
             CpuPowerCapBox.IsEnabled = writable;
+            CpuPowerCapBurstBox.IsEnabled = writable;
 
-            // A result from the last change outranks the standing explanation, otherwise every refresh
-            // would wipe the message before it could be read.
             CpuPowerCapHint.Text = _cpuPowerCapMessage ?? (writable
-                ? "Lowering this writes MSR 0x610. Off puts the mode's own limit back, not whatever another tool had set, and the cap is re-applied after sleep."
+                ? "Lowering this writes MSR 0x610. Off returns the mode's own value."
                 : "The firmware has locked the power limit until the next reboot.");
+            CpuPowerCapBurstHint.Text = writable
+                ? "Short-term turbo. Never below the sustained limit."
+                : string.Empty;
         }
         finally
         {
@@ -1425,15 +1430,38 @@ public partial class NitrousDashboard : Window
         }
     }
 
-    private async void CpuPowerCap_Changed(object sender, SelectionChangedEventArgs e)
+    /// <summary>Highest first, then round steps down to the floor; 0 is the "Off" entry.</summary>
+    private static List<CpuPowerCapOption> Options(int highest, int lowest)
+    {
+        var options = new List<CpuPowerCapOption> { new(0, "Off"), new(highest, $"{highest} W") };
+
+        for (var watts = (highest - 1) / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, lowest); watts -= 5)
+            if (watts != highest)
+                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
+
+        return options;
+    }
+
+    private async void CpuPowerCap_Changed(object sender, SelectionChangedEventArgs e) =>
+        await ApplyCpuPowerCapAsync();
+
+    private async void CpuPowerCapBurst_Changed(object sender, SelectionChangedEventArgs e) =>
+        await ApplyCpuPowerCapAsync();
+
+    private async Task ApplyCpuPowerCapAsync()
     {
         if (_cpuPowerCapUpdating) return;
-        if (CpuPowerCapBox.SelectedItem is not CpuPowerCapOption option) return;
+        if (CpuPowerCapBox.SelectedItem is not CpuPowerCapOption sustained) return;
+        if (CpuPowerCapBurstBox.SelectedItem is not CpuPowerCapOption burst) return;
 
         CpuPowerCapBox.IsEnabled = false;
+        CpuPowerCapBurstBox.IsEnabled = false;
+
+        var pl1 = sustained.Watts == 0 ? (int?)null : sustained.Watts;
+        var pl2 = burst.Watts == 0 ? (int?)null : burst.Watts;
 
         var result = await Task.Run(() =>
-            option.Watts == 0 ? CpuPowerCap.Reset() : CpuPowerCap.Apply(option.Watts));
+            pl1 is null && pl2 is null ? CpuPowerCap.Reset() : CpuPowerCap.Apply(pl1, pl2));
 
         // The window can be closed while a write is in flight; nothing here is safe to touch then.
         if (Dispatcher.HasShutdownStarted) return;
@@ -1444,7 +1472,11 @@ public partial class NitrousDashboard : Window
         // The register line on the card changed with the write; rebuild it instead of leaving the
         // numbers from before the write on screen.
         if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
-        else CpuPowerCapBox.IsEnabled = true;
+        else
+        {
+            CpuPowerCapBox.IsEnabled = true;
+            CpuPowerCapBurstBox.IsEnabled = true;
+        }
     }
 
     private readonly record struct CpuPowerCapOption(int Watts, string Label)

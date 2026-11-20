@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.24 - 2026-11-20
+
+### CPU
+
+- **Both fields are cappable now: sustained (PL1) and burst (PL2), each lower-only.** The previous build
+  offered only the sustained limit, which is not what the feature is - PL2 is what decides how far a
+  short burst goes. Each list is bounded by the mode's own value for that field, the sustained list
+  stops at the applied burst value and the burst list starts at the applied sustained value, so a pair
+  where sustained exceeds burst cannot be chosen at all.
+- Off on a field returns that field to the mode's own number; Off on both is a full reset.
+
 ## 0.14.0-test.23 - 2026-11-20
 
 ### CPU

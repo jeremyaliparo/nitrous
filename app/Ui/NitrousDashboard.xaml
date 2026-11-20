@@ -946,10 +946,22 @@
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
 								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-									<TextBlock Text="Sustained Power Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+									<TextBlock Text="Sustained Limit (PL1)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
 									<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
 								</StackPanel>
 								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCap_Changed"/>
+							</Grid>
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
+							<Grid Margin="0,10,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+									<TextBlock Text="Burst Limit (PL2)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+									<TextBlock x:Name="CpuPowerCapBurstHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+								</StackPanel>
+								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBurstBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCapBurst_Changed"/>
 							</Grid>
 						</StackPanel>
 					</Border>
