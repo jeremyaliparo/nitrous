@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.22 - 2026-11-20
+
+### CPU
+
+- The card now says what Off does. It returns the mode's own limit, not whatever value another tool had
+  left in the register, which pr4u confirmed on his machine and flagged as a wording gap: the semantics
+  were correct and unstated.
+
 ## 0.14.0-test.21 - 2026-11-20
 
 ### CPU

@@ -1344,7 +1344,7 @@ public partial class NitrousDashboard : Window
             // A result from the last change outranks the standing explanation, otherwise every refresh
             // would wipe the message before it could be read.
             CpuPowerCapHint.Text = _cpuPowerCapMessage ?? (writable
-                ? "Lowering this writes MSR 0x610. Nitrous re-applies it after sleep and never sets it above the mode's request."
+                ? "Lowering this writes MSR 0x610. Off puts the mode's own limit back, not whatever another tool had set, and the cap is re-applied after sleep."
                 : "The firmware has locked the power limit until the next reboot.");
         }
         finally
