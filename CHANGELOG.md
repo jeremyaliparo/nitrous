@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.25 - 2026-11-20
+
+### CPU
+
+- The power-limit card has an icon like its neighbours, and each row now says what the field is for -
+  "Steady power over time." and "Short bursts of extra power." - instead of carrying the PawnIO
+  explanation.
+- Results and refusals moved to a status line under the rows, the same dim 9 pt line the other cards
+  use, so a message is not competing with the row's own description.
+
 ## 0.14.0-test.24 - 2026-11-20
 
 ### CPU

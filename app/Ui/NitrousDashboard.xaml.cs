@@ -1349,9 +1349,7 @@ public partial class NitrousDashboard : Window
     private void ShowCpuPowerLimitsInstallNeeded()
     {
         _cpuLimitsPreview = true;
-        ApplyCpuPowerLimitsUnavailable(
-            "PawnIO is not installed, so these limits cannot be read.",
-            "Optional. PawnIO (pawnio.eu) is a signed third-party driver; Nitrous never installs or starts it.");
+        ApplyCpuPowerLimitsUnavailable("PawnIO is not installed, so these limits cannot be read.", string.Empty);
     }
 
     /// <summary>
@@ -1376,8 +1374,8 @@ public partial class NitrousDashboard : Window
             CpuPowerCapBurstBox.SelectedIndex = 0;
             CpuPowerCapBurstBox.IsEnabled = false;
 
-            CpuPowerCapHint.Text = hint;
-            CpuPowerCapBurstHint.Text = string.Empty;
+            CpuPowerCapStatus.Text = hint;
+            CpuPowerCapStatus.Visibility = hint.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally
         {
@@ -1417,12 +1415,13 @@ public partial class NitrousDashboard : Window
             CpuPowerCapBox.IsEnabled = writable;
             CpuPowerCapBurstBox.IsEnabled = writable;
 
-            CpuPowerCapHint.Text = _cpuPowerCapMessage ?? (writable
-                ? "Lowering this writes MSR 0x610. Off returns the mode's own value."
-                : "The firmware has locked the power limit until the next reboot.");
-            CpuPowerCapBurstHint.Text = writable
-                ? "Short-term turbo. Never below the sustained limit."
-                : string.Empty;
+            // The rows now carry a fixed description; results and refusals land on the status line the
+            // way the other cards report state.
+            CpuPowerCapStatus.Text = writable
+                ? _cpuPowerCapMessage ?? string.Empty
+                : "The firmware has locked the power limit until the next reboot.";
+            CpuPowerCapStatus.Visibility =
+                CpuPowerCapStatus.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally
         {
@@ -1467,7 +1466,8 @@ public partial class NitrousDashboard : Window
         if (Dispatcher.HasShutdownStarted) return;
 
         _cpuPowerCapMessage = result.Message;
-        CpuPowerCapHint.Text = result.Message;
+        CpuPowerCapStatus.Text = result.Message;
+        CpuPowerCapStatus.Visibility = Visibility.Visible;
 
         // The register line on the card changed with the write; rebuild it instead of leaving the
         // numbers from before the write on screen.
