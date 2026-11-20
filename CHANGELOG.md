@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.32 - 2026-11-20
+
+### Setup
+
+- **The Turbo profile no longer flashes on models that do not have it.** The window drew the button and
+  the hardware check then hid it a moment later, which Senpai caught on an ANV15-52. The last known answer
+  is remembered, so the first frame is already right; the check still runs each launch and corrects it if
+  the hardware has changed.
+
 ## 0.14.0-test.31 - 2026-11-20
 
 ### CPU

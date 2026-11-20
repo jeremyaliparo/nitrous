@@ -328,7 +328,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _gpuPowerText = "0.0 W";
     public string GpuPowerText { get => _gpuPowerText; set => SetProperty(ref _gpuPowerText, value); }
 
-    private bool _isTurboSupported = true;
+    // Seeded from the last run: the hardware check below runs after the window is up, so an
+    // unsupported model used to show the Turbo button first and drop it a moment later.
+    private bool _isTurboSupported = SettingsManager.Get("TurboModeSupported", 1) == 1;
     public bool IsTurboSupported { get => _isTurboSupported; set => SetProperty(ref _isTurboSupported, value); }
 
     /// <summary>Whether a vendor GPU tool was found; the GPU page hides its entry when not.</summary>
@@ -552,6 +554,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
             System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
             {
                 IsTurboSupported = isTurbo;
+                SettingsManager.Save("TurboModeSupported", isTurbo ? 1 : 0);
 
                 IsNvidiaToolAvailable = nvidia is not null;
                 if (nvidia is { } vendorTool) NvidiaToolLabel = vendorTool.Label;
