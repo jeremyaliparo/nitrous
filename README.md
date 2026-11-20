@@ -34,71 +34,93 @@ OEM control centers install heavy background service stacks, telemetry daemons, 
 - **Reversible Changes:** CPU power limits, processor boost mode, and disabled Acer services are backed up before they are touched and restored with one click.
 - **Portable & Lightweight:** Ships as a single framework-dependent `.exe` with silent tray boot, configurable global hotkeys, and SHA-256 verified updates.
 
----
-
 ## Key Features
 
-### Power and thermals
+### Power and Thermals
 
-- **Modes that stick** - Quiet, Balanced, Performance and Turbo applied through the EC, so the
-  firmware's own CPU and GPU limits follow the mode.
-- **CPU power limits (PL1/PL2)** - on Intel Nitro models that already have
-  [PawnIO](https://pawnio.eu) installed, the sustained and burst limits are shown per mode and can be
-  lowered. Every value is clamped to what the current mode asks, read back after the write, and
-  reverted if it does not stick. A cap follows the mode down and returns with it, survives a sleep,
-  and **RESET** puts the mode's own numbers back. AMD models never see the card.
-- **Fan control** - per-profile curves, manual 1-100 %, Auto and Max, with instant spin-up and a
-  gradual ramp-down so short CPU bursts do not cause revving. CoolBoost appears only where the
-  firmware has it.
-- **Battery health** - charge limit, USB charging while the lid is off, and a health figure read from
-  the battery itself.
-- **AC/DC memory** - optional separate power and fan modes for charger and battery, applied when the
-  plug changes.
+**Modes that stick**<br>
+Quiet, Balanced, Performance, and Turbo are applied directly through the EC, so the firmware's own CPU and GPU limits follow the mode.
+
+**CPU power limits (`PL1` / `PL2`)**<br>
+On Intel Nitro models with [PawnIO](https://pawnio.eu) already installed, sustained and burst limits are shown per mode and can be lowered—AMD models never see the card. Every value is clamped to what the current mode asks, read back after the write, and reverted if it does not stick. Caps follow the mode down and return with it, survive sleep, and restore cleanly via **RESET**.
+
+**Fan control**<br>
+Per-profile curves alongside Auto, Max, and manual 1–100% control. Instant spin-up paired with a gradual ramp-down stops brief CPU bursts from causing revving. CoolBoost appears only where the firmware supports it.
+
+**Battery health**<br>
+Charge limit, USB charging while the lid is off, and a health figure read directly from the battery itself.
+
+**AC / DC memory**<br>
+Optional separate power and fan modes for charger and battery, applied automatically when the plug state changes.
+
+---
 
 ### GPU
 
-- **Clock offsets** - core and memory offsets per profile, with live clocks, utilisation, power and
-  thermal readouts.
-- **Opt-in ownership** - clock writes are **off by default**, so an external tool such as Afterburner
-  is never overwritten by accident. When enabled, a background watchdog repairs driver clock drift.
-- **Vendor tools** - opens the NVIDIA App, or the Control Panel where that is what is installed, from
-  the GPU page or with **Ctrl + Alt + N**.
-- **No idle wake** - the GPU is polled only while its tab is open, and a sleeping dGPU is checked
-  through Windows' cached PnP state rather than by touching it.
+**Clock offsets**<br>
+Core and memory offsets per profile, paired with live clock, utilisation, power, and thermal readouts.
+
+**Opt-in ownership**<br>
+Clock writes are **off by default**, so external tools such as Afterburner are never overwritten by accident. When enabled, a background watchdog repairs driver clock drift.
+
+**Vendor tools**<br>
+Opens the NVIDIA App—or the Control Panel where that is what is installed—from the GPU page or with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>N</kbd>.
+
+**No idle wake**<br>
+Polls the GPU only while its tab is open, checking a sleeping dGPU through Windows' cached PnP state rather than touching it.
+
+---
 
 ### Display
 
-- **Refresh rate** - switch to any rate the panel advertises. `Auto` uses your chosen rate on AC and
-  60 Hz on battery.
-- **LCD overdrive** - panel response overdrive where the display reports support for it.
+**Refresh rate**<br>
+Switch to any rate the panel advertises. `Auto` uses your chosen rate on AC and drops to 60 Hz on battery.
+
+**LCD overdrive**<br>
+Panel response overdrive wherever the display reports support for it.
+
+---
 
 ### Lighting
 
-- **Global and Area presets** - one effect across the keyboard and lid, or four per-zone colours,
-  with brightness and speed, driven through the keyboard's own HID controller.
-- **Screen and sound sync** - follow the screen's colours, run the active effect on the audio, or
-  combine screen colours with an audio beat: four-band Spectrum, bass Beat, the five-step Vibe engine,
-  saturation and a silence floor.
-- **Cover logo** - the lid logo is driven too, with Static, Breathing and Neon effects.
-- **Mode flash** - the keyboard acknowledges a power-profile change in the mode's colour, as the OEM
-  software does.
-- **Fit to hardware** - single-colour keyboards get one Colour chip instead of four dead zones, and a
-  model with no reachable controller gets no LIGHT tab at all.
+**Global and Area presets**<br>
+One effect across the keyboard and lid, or four per-zone colours with brightness and speed, driven through the keyboard's own HID controller.
+
+**Screen and sound sync**<br>
+Follow the screen's colours, run the active effect on audio, or combine screen colours with an audio beat—with four-band Spectrum, bass Beat, the five-step Vibe engine, saturation control, and a silence floor.
+
+**Cover logo**<br>
+Dedicated lid logo control with Static, Breathing, and Neon effects.
+
+**Mode flash**<br>
+Acknowledges a power-profile change in the mode's colour, matching the OEM software.
+
+**Fit to hardware**<br>
+Single-colour keyboards get one Colour chip instead of four dead zones, and models with no reachable controller omit the `LIGHT` tab entirely.
+
+---
 
 ### Appearance
 
-- **Accent** - seven curated colours, `Auto` to follow Windows, or any custom colour, contrast-checked
-  so a pick cannot make a label unreadable.
-- **Backgrounds** - five window presets - Midnight, Black, Graphite, Slate and Navy - each rebuilding
-  the card, hover, border and toggle shades around the window colour.
-- **Sections and fonts** - the card surface set on its own, and a font list built only from families
-  your PC actually has, so a choice always applies.
+**Accent**<br>
+Seven curated colours, `Auto` to follow Windows, or any custom colour—contrast-checked so a pick can never make a label unreadable.
 
-### System and diagnostics
+**Backgrounds**<br>
+Five window presets—Midnight, Black, Graphite, Slate, and Navy—each rebuilding the card, hover, border, and toggle shades around the window colour.
 
-- **Service disabler** - one-click disable, and exact restore, of the stock Acer background services.
-- **Diagnostics** - a redacted export bundle and a read-only EC probe, so an unsupported Nitro model
-  can be compared against one that works.
+**Sections and fonts**<br>
+Configure the card surface on its own, paired with a font list built strictly from families installed on your PC so every choice applies.
+
+---
+
+### System and Diagnostics
+
+**Service disabler**<br>
+One-click disable—and exact restore—of the stock Acer background services.
+
+**Diagnostics**<br>
+A redacted export bundle and a read-only EC probe so an unsupported Nitro model can be compared against one that works.
+
 ## Quick Start
 
 ### 1. Check Requirements
