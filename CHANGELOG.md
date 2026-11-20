@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.35 - 2026-11-20
+
+### Fixes
+
+- **Nitrous no longer fails to start on a machine that has an NVIDIA GPU but no NVIDIA app entry.**
+  The vendor-tool search ended in `FirstOrDefault` over a list of tuples, which yields `(null, null)`,
+  and the next line read `match.Id.Length`. That throws, and it ran inside the tray constructor, so the
+  process died before a window appeared - the ANV15-51 tester hit it after uninstalling the Control Panel.
+- The vendor search also can no longer take the app down at all: every discovery step logs and returns
+  nothing instead of letting an unexpected exception escape into start-up code.
+
 ## 0.14.0-test.34 - 2026-11-20
 
 ### Lighting

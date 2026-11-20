@@ -127,7 +127,7 @@ public static class NvidiaTools
                 if (executables.FirstOrDefault() is { } app)
                     return new Target("NVIDIA App", app, ShellApp: false);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex)
             {
                 Logger.Warn("NVIDIA: could not search the vendor folder.", ex);
             }
@@ -220,12 +220,15 @@ public static class NvidiaTools
                      })
             {
                 var match = apps.FirstOrDefault(app => app.Name.Contains(needle, StringComparison.OrdinalIgnoreCase));
-                if (match.Id.Length > 0)
+
+                // FirstOrDefault over a tuple list yields (null, null) when nothing matches, and this
+                // runs in the tray constructor: dereferencing it stopped Nitrous from starting at all
+                // on a machine with no NVIDIA entries.
+                if (match.Id is { Length: > 0 })
                     return new Target(label, match.Id, ShellApp: true);
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or
-                                       System.ComponentModel.Win32Exception)
+        catch (Exception ex)
         {
             Logger.Warn("NVIDIA: could not query the Start apps list.", ex);
         }
@@ -259,7 +262,7 @@ public static class NvidiaTools
         {
             return Directory.EnumerateFiles(root, "*.lnk", SearchOption.AllDirectories);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
             Logger.Warn("NVIDIA: could not read the Start Menu.", ex);
             return Array.Empty<string>();
