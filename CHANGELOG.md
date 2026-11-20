@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.34 - 2026-11-20
+
+### Lighting
+
+- **The brightness control says when the keyboard does not report its level back.** Senpai confirmed his
+  keyboard was lit while the firmware answered `0`, and that a write from Nitrous changes nothing - it
+  only responds to Fn+F11, which is EC firmware. Where the step probe finds nothing it can verify, the
+  card now says the changes may not take effect, and the reported `0` is no longer trusted as "Off".
+
 ## 0.14.0-test.33 - 2026-11-20
 
 ### Lighting

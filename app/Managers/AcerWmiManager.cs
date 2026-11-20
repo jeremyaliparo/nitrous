@@ -476,6 +476,12 @@ public static class AcerWmiManager
         return _keyboardBrightnessLevels;
     }
 
+    /// <summary>
+    /// Whether the last probe found no level the firmware reports back. A write is still accepted, so
+    /// this is the only signal that the control may do nothing on this model.
+    /// </summary>
+    public static bool BacklightLevelsUnverified { get; private set; }
+
     /// <summary>Where the backlight brightness can be set on this model.</summary>
     public enum KeyboardBacklightPath
     {
