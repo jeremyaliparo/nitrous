@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.30 - 2026-11-20
+
+### CPU
+
+- Choosing a value now costs fewer driver round-trips: a forced refresh after a write no longer re-runs
+  the mode guard, which was four more reads behind every selection. Senpai hears this IOCTL as an audio
+  pop, so the shortest path through it is the one worth taking.
+
 ## 0.14.0-test.29 - 2026-11-20
 
 ### CPU

@@ -1262,8 +1262,11 @@ public partial class NitrousDashboard : Window
             await Task.Delay(1500);
 
             // A mode change does not rewrite the register, so a cap set in a higher mode can sit above
-            // what the new mode asks for. Correct that before reading, never upward.
-            CpuPowerCap.Reassert();
+            // what the new mode asks for. Correct that before reading, never upward. A forced refresh
+            // follows a write, where the register already holds the choice - skipping it keeps a
+            // selection down to its own write and read-back instead of adding four more driver calls,
+            // which is the shortest path on a machine where this IOCTL is audible.
+            if (!force) CpuPowerCap.Reassert();
 
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
