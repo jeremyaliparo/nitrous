@@ -966,7 +966,14 @@
 								</StackPanel>
 								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBurstBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCapBurst_Changed"/>
 							</Grid>
-							<TextBlock x:Name="CpuPowerCapStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock x:Name="CpuPowerCapStatus" Grid.Column="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"/>
+								<Button x:Name="CpuPowerCapResetButton" Grid.Column="1" Content="RESET" Click="CpuPowerCapReset_Click" Style="{StaticResource SetupActionButtonStyle}" ToolTip="Return both limits to this mode's own values."/>
+							</Grid>
 						</StackPanel>
 					</Border>
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">

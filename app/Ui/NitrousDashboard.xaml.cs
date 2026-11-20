@@ -1376,6 +1376,7 @@ public partial class NitrousDashboard : Window
             CpuPowerCapBox.ItemsSource = placeholder;
             CpuPowerCapBox.SelectedIndex = 0;
             CpuPowerCapBox.IsEnabled = false;
+            CpuPowerCapResetButton.IsEnabled = false;
 
             CpuPowerCapBurstBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "—") };
             CpuPowerCapBurstBox.SelectedIndex = 0;
@@ -1421,6 +1422,7 @@ public partial class NitrousDashboard : Window
 
             CpuPowerCapBox.IsEnabled = writable;
             CpuPowerCapBurstBox.IsEnabled = writable;
+            CpuPowerCapResetButton.IsEnabled = writable;
 
             // The rows now carry a fixed description; results and refusals land on the status line the
             // way the other cards report state.
@@ -1481,6 +1483,30 @@ public partial class NitrousDashboard : Window
     private async void CpuPowerCapBurst_Changed(object sender, SelectionChangedEventArgs e) =>
         await ApplyCpuPowerCapAsync();
 
+    /// <summary>
+    /// Returns both limits to this mode's own values. It selects the top entry rather than stopping the
+    /// management, so the register keeps following the mode afterwards - "stop writing" is what left a
+    /// stale number on screen and looked like a reset that had failed.
+    /// </summary>
+    private async void CpuPowerCapReset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_cpuPowerCapUpdating) return;
+        if (CpuPowerCapBox.Items.Count == 0 || CpuPowerCapBurstBox.Items.Count == 0) return;
+
+        _cpuPowerCapUpdating = true;
+        try
+        {
+            CpuPowerCapBox.SelectedIndex = 0;
+            CpuPowerCapBurstBox.SelectedIndex = 0;
+        }
+        finally
+        {
+            _cpuPowerCapUpdating = false;
+        }
+
+        await ApplyCpuPowerCapAsync();
+    }
+
     private async Task ApplyCpuPowerCapAsync()
     {
         if (_cpuPowerCapUpdating) return;
@@ -1489,6 +1515,7 @@ public partial class NitrousDashboard : Window
 
         CpuPowerCapBox.IsEnabled = false;
         CpuPowerCapBurstBox.IsEnabled = false;
+        CpuPowerCapResetButton.IsEnabled = false;
 
         var result = await Task.Run(() => CpuPowerCap.Apply(sustained.Watts, burst.Watts));
 
@@ -1506,6 +1533,7 @@ public partial class NitrousDashboard : Window
         {
             CpuPowerCapBox.IsEnabled = true;
             CpuPowerCapBurstBox.IsEnabled = true;
+            CpuPowerCapResetButton.IsEnabled = true;
         }
     }
 

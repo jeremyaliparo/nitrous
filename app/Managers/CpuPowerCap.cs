@@ -154,7 +154,10 @@ internal static class CpuPowerCap
                 ? $"CPU power cap: {pl1} W sustained / {pl2} W burst (this mode asks {mode.Pl1}/{mode.Pl2})."
                 : $"CPU power cap: held at {pl1} W sustained / {pl2} W burst to stay inside this mode " +
                   $"(asks {mode.Pl1}/{mode.Pl2}).");
-            return new Result(true, $"Capped to {pl1} W sustained / {pl2} W burst.");
+
+            return new Result(true, pl1 == mode.Pl1 && pl2 == mode.Pl2
+                ? "Following this mode's own limits."
+                : $"Capped to {pl1} W sustained / {pl2} W burst.");
         }
     }
 

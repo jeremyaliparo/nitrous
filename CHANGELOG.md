@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.31 - 2026-11-20
+
+### CPU
+
+- **A RESET button on the power-limit card** returns both limits to the mode's own values in one click,
+  the way RESTORE works on the card above. It selects the top value rather than stopping the management,
+  so the register keeps following the mode afterwards - the stale number that made Off look broken.
+- With both limits at the mode's own values the status line reads "Following this mode's own limits."
+  instead of reporting a cap at the ceiling.
+
 ## 0.14.0-test.30 - 2026-11-20
 
 ### CPU
