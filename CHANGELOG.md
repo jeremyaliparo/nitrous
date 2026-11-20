@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.16 - 2026-11-20
+
+### CPU
+
+- The power-limit card names the power source and re-reads when it changes. These laptops use a
+  different limit table on battery, and the firmware also adjusts PL1 while it runs - pr4u saw Quiet
+  move between 26 and 31 W minutes apart, and his Turbo reading came back 35 W against the 55 W his
+  own sweep had recorded. Without the source on the line, a number that drifted looked like a bug
+  instead of context.
+
 ## 0.14.0-test.15 - 2026-11-20
 
 ### CPU

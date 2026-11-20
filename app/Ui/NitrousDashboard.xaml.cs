@@ -41,7 +41,7 @@ public partial class NitrousDashboard : Window
     private KeyboardEffect? _lastSyncedGlobalEffect;
     private string _lastSyncedAreaStyle = "";
     private KeyboardEffect? _lastSyncedAreaEffect;
-    private PowerProfile? _powerLimitsMode;
+    private (PowerProfile Mode, bool OnBattery)? _powerLimitsKey;
 
     public NitrousDashboard()
     {
@@ -1229,8 +1229,12 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void RefreshCpuPowerLimits(PowerProfile mode)
     {
-        if (_powerLimitsMode == mode) return;
-        _powerLimitsMode = mode;
+        // These laptops set different limits on battery, and the firmware also adjusts PL1 while it
+        // runs, so the snapshot is keyed on the power source as well as the mode.
+        var onBattery = System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus !=
+                        System.Windows.Forms.PowerLineStatus.Online;
+        if (_powerLimitsKey == (mode, onBattery)) return;
+        _powerLimitsKey = (mode, onBattery);
 
         _ = Task.Run(async () =>
         {
@@ -1245,7 +1249,8 @@ public partial class NitrousDashboard : Window
             var register = CpuPowerLimits.ReadRegister();
 
             var detail = $"PL1 {limits.Pl1Watts:0} W, PL2 {limits.Pl2Watts:0} W " +
-                         $"(MCHBAR 0x59A0, {mode} mode{(limits.Locked ? ", locked" : "")})";
+                         $"(MCHBAR 0x59A0, {mode} mode{(onBattery ? ", on battery" : "")}" +
+                         $"{(limits.Locked ? ", locked" : "")})";
 
             // The register is the copy the CPU enforces; it is seeded at boot and a mode switch does
             // not rewrite it. When it disagrees, something has set the limits outside the firmware.
@@ -1260,6 +1265,7 @@ public partial class NitrousDashboard : Window
             await Dispatcher.InvokeAsync(() =>
             {
                 var text = $"PL1 {limits.Pl1Watts:0} W sustained · PL2 {limits.Pl2Watts:0} W peak · {mode} mode";
+                if (onBattery) text += " · on battery";
                 if (overridden && register is { } applied)
                     text += $" · register set to {applied.Pl1Watts:0} W / {applied.Pl2Watts:0} W";
 
