@@ -13,13 +13,22 @@ explains a specific check.
 
 ## Build and publish
 
-Test builds go to `bin\publishN` and are reported with their SHA-256:
+Test builds go to `bin\<release>\Nitrous-<version>.exe` — the folder is the release line, the file name is
+the full version including any test suffix, so a tester build is never mistaken for the release:
+
+```
+bin\0.14.0\Nitrous-0.14.0-test.36.exe
+bin\0.14.0\Nitrous-0.14.0.exe
+```
+
+Publish with `publish.ps1`; it reads `<Version>` from `app/Nitrous.csproj`, publishes single-file,
+names the file, refuses to overwrite an existing one, and prints the SHA-256:
 
 ```powershell
-dotnet publish app/Nitrous.csproj -c Release -r win-x64 --self-contained false `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-  -p:DebugType=none -p:DebugSymbols=false -o bin\publishN
+pwsh -NoProfile -File publish.ps1
 ```
+
+Do not pass `-o bin\publishN` by hand any more, and do not override the version on the command line.
 
 Never tag or publish a release unless asked. The version comes from the csproj; do not override it
 with `-p:Version` on the command line or the binary will disagree with the tree.
