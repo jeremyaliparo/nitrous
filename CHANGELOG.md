@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.0-test.26 - 2026-11-20
+
+### CPU
+
+- **The top of the list is no longer offered, because it was Off.** Senpai found that picking the
+  maximum snapped straight back to Off: the top entry was the mode's own number, choosing it saved no
+  cap, and the next refresh drew Off in its place. The list now stops strictly below the ceiling.
+- **The register is pulled back inside the mode's request when a mode change leaves it above it.**
+  Switching Performance to Balanced left the sustained limit at Performance's value, because a mode
+  change does not rewrite the register. A Quiet switch could therefore fail to lower the limits Quiet
+  advertises. It only ever lowers, never raises.
+
 ## 0.14.0-test.25 - 2026-11-20
 
 ### CPU

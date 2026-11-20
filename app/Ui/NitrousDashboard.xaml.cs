@@ -1261,6 +1261,10 @@ public partial class NitrousDashboard : Window
             // it settles rather than catching the previous mode's numbers.
             await Task.Delay(1500);
 
+            // A mode change does not rewrite the register, so a cap set in a higher mode can sit above
+            // what the new mode asks for. Correct that before reading, never upward.
+            CpuPowerCap.Reassert();
+
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
             if (firmware is null && register is null)
@@ -1404,7 +1408,7 @@ public partial class NitrousDashboard : Window
         try
         {
             var sustained = Options(Math.Min(mode.Pl1, applied.Pl2), CpuPowerCap.FloorWatts);
-            var burst = Options(mode.Pl2, Math.Max(CpuPowerCap.FloorWatts, applied.Pl1));
+            var burst = Options(mode.Pl2, applied.Pl1);
 
             CpuPowerCapBox.ItemsSource = sustained;
             CpuPowerCapBox.SelectedIndex = Math.Max(0, sustained.FindIndex(option => option.Watts == saved.Pl1));
@@ -1429,14 +1433,17 @@ public partial class NitrousDashboard : Window
         }
     }
 
-    /// <summary>Highest first, then round steps down to the floor; 0 is the "Off" entry.</summary>
-    private static List<CpuPowerCapOption> Options(int highest, int lowest)
+    /// <summary>
+    /// "Off" then round steps strictly below the ceiling. The ceiling itself is not offered: it is the
+    /// mode's own number, which is exactly what Off means, and listing both made picking the maximum
+    /// look like the dropdown snapping back.
+    /// </summary>
+    private static List<CpuPowerCapOption> Options(int ceiling, int floor)
     {
-        var options = new List<CpuPowerCapOption> { new(0, "Off"), new(highest, $"{highest} W") };
+        var options = new List<CpuPowerCapOption> { new(0, "Off") };
 
-        for (var watts = (highest - 1) / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, lowest); watts -= 5)
-            if (watts != highest)
-                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
+        for (var watts = (ceiling - 1) / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, floor); watts -= 5)
+            options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
 
         return options;
     }

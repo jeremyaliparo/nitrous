@@ -191,21 +191,24 @@ internal static class CpuPowerCap
     }
 
     /// <summary>
-    /// Re-applies the saved caps at start-up, after a resume, or when a mode change lowered a ceiling
-    /// under them. Does nothing when nothing is saved.
+    /// Keeps the register inside the current mode's request: re-applies a saved cap after a resume, and
+    /// pulls the register down when a mode change left it above what the new mode asks for. A mode change
+    /// does not rewrite MSR 0x610, so a cap set in a higher mode otherwise outlives the mode that allowed
+    /// it. Never raises anything.
     /// </summary>
     public static void Reassert()
     {
-        var saved = Saved;
-        if (saved.Pl1 == 0 && saved.Pl2 == 0) return;
-
         if (Ceilings() is not { } mode) return;
+        if (Applied() is not { } now) return;
 
-        // A mode change can put either ceiling under an existing cap; never leave the register above
-        // what the current mode asks for.
-        Apply(
-            saved.Pl1 == 0 ? null : Math.Min(saved.Pl1, mode.Pl1),
-            saved.Pl2 == 0 ? null : Math.Min(saved.Pl2, mode.Pl2));
+        var saved = Saved;
+
+        var pl1 = Math.Min(saved.Pl1 > 0 ? saved.Pl1 : now.Pl1, mode.Pl1);
+        var pl2 = Math.Min(saved.Pl2 > 0 ? saved.Pl2 : now.Pl2, mode.Pl2);
+
+        if (pl1 == now.Pl1 && pl2 == now.Pl2) return;
+
+        Apply(pl1, pl2);
     }
 
     /// <summary>
