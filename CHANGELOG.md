@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.2 - 2026-11-21
+
+### Diagnostics
+
+- The GPU power probe reports the mode the EC *actually* has, not the saved setting, and gained
+  `--wake` for machines whose dGPU sleeps within seconds - a laptop GPU drops back to D3 faster than a
+  sampling run can start, and the probe will not wake it unless asked.
+
 ## 0.14.1-test.1 - 2026-11-21
 
 ### Diagnostics

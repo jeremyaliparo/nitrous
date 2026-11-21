@@ -24,12 +24,18 @@ public static class GpuPowerProbe
     private const string NvmlDll = "nvml.dll";
     private const uint TemperatureGpu = 0;
 
-    public static int Run(int seconds)
+    public static int Run(int seconds, bool allowWake = false)
     {
         if (GpuPowerState.IsAsleep)
         {
-            Logger.Warn("GPU power probe: the dGPU is powered down; refusing to wake it. Run this with the GPU awake.");
-            return 1;
+            if (!allowWake)
+            {
+                Logger.Warn("GPU power probe: the dGPU is powered down; refusing to wake it. " +
+                            "Run this with the GPU awake, or pass --wake to allow it.");
+                return 1;
+            }
+
+            Logger.Info("GPU power probe: the dGPU is asleep and --wake was passed; waking it for the run.");
         }
 
         if (!TryStart(out var device))
@@ -177,9 +183,14 @@ public static class GpuPowerProbe
         return true;
     }
 
+    /// <summary>
+    /// The mode the EC actually reports, not the saved setting: a mode can be applied by the tray, a
+    /// hotkey or the dashboard, and the setting lags whichever process did it.
+    /// </summary>
     private static string CurrentMode() =>
-        ((Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Balanced))
-        .ToString();
+        AcerWmiManager.GetEcPowerMode()?.ToString()
+        ?? ((Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Balanced))
+            .ToString();
 
     private static bool OnBattery() =>
         System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus !=

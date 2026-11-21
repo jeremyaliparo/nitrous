@@ -46,7 +46,8 @@ static class Program
             if (index >= 0 && index + 1 < args.Length && int.TryParse(args[index + 1], out var parsed))
                 seconds = parsed;
 
-            Environment.ExitCode = GpuPowerProbe.Run(seconds);
+            var allowWake = args.Any(arg => string.Equals(arg, "--wake", StringComparison.OrdinalIgnoreCase));
+            Environment.ExitCode = GpuPowerProbe.Run(seconds, allowWake);
             return;
         }
 
