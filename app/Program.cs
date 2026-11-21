@@ -39,6 +39,17 @@ static class Program
             return;
         }
 
+        if (args.Any(arg => string.Equals(arg, "--probe-gpu-power", StringComparison.OrdinalIgnoreCase)))
+        {
+            var seconds = 60;
+            var index = Array.FindIndex(args, arg => string.Equals(arg, "--seconds", StringComparison.OrdinalIgnoreCase));
+            if (index >= 0 && index + 1 < args.Length && int.TryParse(args[index + 1], out var parsed))
+                seconds = parsed;
+
+            Environment.ExitCode = GpuPowerProbe.Run(seconds);
+            return;
+        }
+
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             Logger.Error("Unhandled exception.", e.ExceptionObject as Exception);
 
