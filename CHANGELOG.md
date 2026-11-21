@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.4 - 2026-11-21
+
+### Diagnostics
+
+- `--probe-gpu-power --policies` reads NVAPI's client power and thermal policies - the interface NVIDIA's
+  tuning partners use, and a different surface from NVML. `--temperature <C>` performs one reversible,
+  lower-only write of the GPU throttle target.
+- What that settled on an RTX 5060 Laptop: NVML refuses the power-limit write with `NOT_SUPPORTED`
+  (code 4), and NVAPI exposes **no** client power policy on this GPU (zero entries), so GPU power cannot
+  be set through either API here. The thermal policy **is** present: range 75-87 °C, one global target of
+  87 °C in every power mode, and a write to 85 °C was accepted, held, and reverted cleanly. NVAPI setters
+  need administrator - without it they return `NVAPI_INVALID_USER_PRIVILEGE`, which is not the same
+  answer as "unsupported".
+
 ## 0.14.1-test.3 - 2026-11-21
 
 ### Diagnostics

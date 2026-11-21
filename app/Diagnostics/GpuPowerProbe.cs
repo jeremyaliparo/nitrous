@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using NvAPIWrapper;
+using NvAPIWrapper.GPU;
+using NvAPIWrapper.Native;
+using NvAPIWrapper.Native.GPU;
+using NvAPIWrapper.Native.GPU.Structures;
 using Nitrous.Helpers;
 using Nitrous.Managers;
 
@@ -203,7 +208,203 @@ public static class GpuPowerProbe
         return true;
     }
 
+    /// <summary>
+    /// Read-only NVAPI power and thermal policies - the interface NVIDIA's own tuning partners use, and a
+    /// different surface from NVML. NVML refused the write on the RTX 5060 with NOT_SUPPORTED; this asks
+    /// whether the driver exposes the same numbers through the client power-policy calls instead.
+    /// </summary>
+    public static int Policies(bool allowWake)
+    {
+        if (GpuPowerState.IsAsleep && !allowWake)
+        {
+            Logger.Warn("GPU power probe: the dGPU is powered down; refusing to wake it. Pass --wake to allow it.");
+            return 1;
+        }
+
+        try
+        {
+            NVIDIA.Initialize();
+
+            var gpu = PhysicalGPU.GetPhysicalGPUs()
+                .OrderByDescending(candidate => candidate.SystemType == SystemType.Laptop)
+                .FirstOrDefault();
+
+            if (gpu is null)
+            {
+                Logger.Warn("GPU power probe: NVAPI reports no physical GPU.");
+                return 2;
+            }
+
+            Logger.Info($"GPU power probe: NVAPI {gpu.FullName} ({gpu.SystemType}), mode {CurrentMode()}");
+
+            try
+            {
+                var info = GPUApi.ClientPowerPoliciesGetInfo(gpu.Handle);
+                var status = GPUApi.ClientPowerPoliciesGetStatus(gpu.Handle);
+                var entries = info.PowerPolicyInfoEntries.ToList();
+
+                Logger.Info($"GPU power probe:   client power policies: {entries.Count} entries");
+
+                if (entries.Count == 0)
+                    Logger.Info("GPU power probe:   the driver implements the call but exposes no power policy, " +
+                                "so there is nothing to set through it on this GPU.");
+
+                foreach (var entry in entries)
+                {
+                    var current = status.PowerPolicyStatusEntries
+                        .FirstOrDefault(seen => seen.PerformanceStateId == entry.PerformanceStateId);
+
+                    Logger.Info($"GPU power probe:   pstate {entry.PerformanceStateId}: " +
+                                $"min {entry.MinimumPowerInPCM} default {entry.DefaultPowerInPCM} " +
+                                $"max {entry.MaximumPowerInPCM} PCM, current {current.PowerTargetInPCM} PCM");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"GPU power probe: NVAPI client power policies unavailable: {ex.Message}");
+            }
+
+            try
+            {
+                var thermalInfo = GPUApi.GetThermalPoliciesInfo(gpu.Handle);
+                var thermalStatus = GPUApi.GetThermalPoliciesStatus(gpu.Handle);
+
+                foreach (var entry in thermalInfo.ThermalPoliciesInfoEntries)
+                {
+                    var current = thermalStatus.ThermalPoliciesStatusEntries
+                        .FirstOrDefault(seen => seen.Controller == entry.Controller);
+
+                    Logger.Info($"GPU power probe:   thermal {entry.Controller}: " +
+                                $"min {entry.MinimumTemperature} C default {entry.DefaultTemperature} C " +
+                                $"max {entry.MaximumTemperature} C, target {current.TargetTemperature} C");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"GPU power probe: NVAPI thermal policies unavailable: {ex.Message}");
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GPU power probe: NVAPI policies failed.", ex);
+            return 4;
+        }
+    }
+
+    /// <summary>
+    /// A single reversible thermal-target write: lower the throttle temperature, watch whether it holds,
+    /// then put the driver's own target back. Lower-only, like every other write here - a lower target
+    /// throttles sooner, which is the direction someone asking for a cooler machine wants.
+    /// </summary>
+    public static int Temperature(int celsius, int holdSeconds, bool allowWake = false)
+    {
+        if (GpuPowerState.IsAsleep && !allowWake)
+        {
+            Logger.Warn("GPU power probe: the dGPU is powered down; refusing to wake it. Pass --wake to allow it.");
+            return 1;
+        }
+
+        try
+        {
+            NVIDIA.Initialize();
+
+            var gpu = PhysicalGPU.GetPhysicalGPUs()
+                .OrderByDescending(candidate => candidate.SystemType == SystemType.Laptop)
+                .FirstOrDefault();
+
+            if (gpu is null)
+            {
+                Logger.Warn("GPU power probe: NVAPI reports no physical GPU.");
+                return 2;
+            }
+
+            var info = GPUApi.GetThermalPoliciesInfo(gpu.Handle).ThermalPoliciesInfoEntries.ToList();
+            if (info.Count == 0)
+            {
+                Logger.Warn("GPU power probe: this driver exposes no thermal policy; nothing to set.");
+                return 3;
+            }
+
+            var entry = info[0];
+            var original = TargetOf(gpu, entry.Controller) ?? entry.DefaultTemperature;
+
+            Logger.Info($"GPU power probe: before - target {original} C, range {entry.MinimumTemperature}-" +
+                        $"{entry.MaximumTemperature} C, mode {CurrentMode()}");
+
+            if (celsius >= original || celsius < entry.MinimumTemperature)
+            {
+                Logger.Warn($"GPU power probe: {celsius} C is not a lowering inside {entry.MinimumTemperature}-" +
+                            $"{original} C, so nothing was written.");
+                return 4;
+            }
+
+            try
+            {
+                Write(gpu, entry.Controller, celsius);
+
+                var after = TargetOf(gpu, entry.Controller);
+                Logger.Info($"GPU power probe: wrote {celsius} C, target now {after} C " +
+                            $"({(after == celsius ? "accepted" : "not taken")})");
+
+                var held = 0;
+                var samples = 0;
+                var deadline = Environment.TickCount64 + Math.Max(1, holdSeconds) * 1000L;
+
+                while (Environment.TickCount64 < deadline)
+                {
+                    Thread.Sleep(2000);
+
+                    var now = TargetOf(gpu, entry.Controller);
+                    samples++;
+                    if (now == celsius) held++;
+
+                    Logger.Info($"GPU power probe: holding - target {now} C " +
+                                $"({(now == celsius ? "held" : "moved")})");
+                }
+
+                Logger.Info($"GPU power probe: held {held}/{samples} samples at {celsius} C" +
+                            (samples > 0 && held == samples ? " - the driver keeps it." : " - something reset it."));
+            }
+            finally
+            {
+                Write(gpu, entry.Controller, original);
+
+                var back = TargetOf(gpu, entry.Controller);
+                Logger.Info($"GPU power probe: reverted to {original} C, target now {back} C " +
+                            $"({(back == original ? "ok" : "MISMATCH")})");
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GPU power probe: the thermal write failed.", ex);
+            return 5;
+        }
+    }
+
+    private static int? TargetOf(PhysicalGPU gpu, ThermalController controller)
+    {
+        var entries = GPUApi.GetThermalPoliciesStatus(gpu.Handle).ThermalPoliciesStatusEntries.ToList();
+        foreach (var entry in entries)
+        {
+            if (entry.Controller == controller) return entry.TargetTemperature;
+        }
+
+        return null;
+    }
+
+    private static void Write(PhysicalGPU gpu, ThermalController controller, int celsius)
+    {
+        var status = new PrivateThermalPoliciesStatusV2(
+            new[] { new PrivateThermalPoliciesStatusV2.ThermalPoliciesStatusEntry(controller, celsius) });
+
+        GPUApi.SetThermalPoliciesStatus(gpu.Handle, status);
+    }
     private readonly record struct Sample(
+
         Reading Value, string Mode, bool OnBattery);
 
     private readonly record struct Reading(
