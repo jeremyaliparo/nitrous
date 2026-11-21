@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.1 - 2026-11-21
+
+### Diagnostics
+
+- **A read-only GPU power-limit probe.** `--probe-gpu-power [--seconds N]` samples the driver's own
+  fields - range, default, current and enforced limit, draw and temperature - every two seconds, records
+  the Acer mode and power source with each sample, and summarises the run by mode. It refuses to run
+  while Windows reports the dGPU powered down, because initialising NVML is what wakes it, and it never
+  writes anything.
+- First finding, on an RTX 5060 Laptop: `nvmlDeviceGetPowerManagementLimit` is not implemented by this
+  driver, so the enforced limit is the number to read (100 W, range 5-115 W, default 70 W).
+
 ## 0.14.0 - 2026-11-20
 
 ### CPU power limits
