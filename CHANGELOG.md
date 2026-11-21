@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.7 - 2026-11-21
+
+### GPU
+
+- **The thermal target is held per power profile.** A value is stored for Quiet, Balanced, Performance and
+  Turbo and written when that profile becomes active - the driver's policy is one global target, so the
+  per-profile part is ours - and it is restored on a mode change, at start-up and after a resume.
+- **One gate for GPU writes: "Manage GPU tuning"** replaces the clock-only switch and covers the thermal
+  limit too, so a machine cannot end up with offsets allowed and thermal writes not, or the reverse.
+- The clock card became the **GPU TUNING** card: core and memory sliders, then the thermal row, under a
+  single heading and one switch. The separate thermal card is gone.
+
 ## 0.14.1-test.6 - 2026-11-21
 
 ### GPU

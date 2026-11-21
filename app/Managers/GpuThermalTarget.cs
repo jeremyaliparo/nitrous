@@ -6,31 +6,45 @@ using NvAPIWrapper.Native;
 using NvAPIWrapper.Native.GPU;
 using NvAPIWrapper.Native.GPU.Structures;
 using Nitrous.Diagnostics;
+using Nitrous.Enums;
 using Nitrous.Helpers;
 
 namespace Nitrous.Managers;
 
 /// <summary>
-/// The GPU's thermal (throttle) target, through NVAPI's thermal policy.
+/// The GPU's thermal (throttle) target, through NVAPI's thermal policy, held per power profile.
 ///
-/// This is a single global value, not a per-profile one: measured on an RTX 5060 Laptop, the target read
-/// 87 °C in Quiet, Balanced and Performance, and a written value survived mode switches. So there is
-/// nothing mode-shaped to compose with, unlike the CPU power limits.
+/// The driver's policy has a single global target - measured identically in Quiet, Balanced and
+/// Performance - and a mode switch does not touch it. So per-profile behaviour is ours to provide: a value
+/// is stored per profile and written when that profile becomes active, which is why this sits behind the
+/// same opt-in as the clock offsets rather than applying itself unasked.
 ///
-/// Lower-only by construction: the offered range stops at the driver's own default, and the driver's
-/// advertised minimum. NVAPI setters need administrator; without it the call returns
-/// INVALID_USER_PRIVILEGE, which is a different answer from "unsupported" and is reported as such.
+/// Lower-only by construction: the offered range stops at the driver's own default and its advertised
+/// minimum. NVAPI setters need administrator; without it the call returns INVALID_USER_PRIVILEGE, which is
+/// a different answer from "unsupported" and is reported as such.
 /// </summary>
 internal static class GpuThermalTarget
 {
-    private const string Key = "GpuThermalTargetC";
 
     public readonly record struct Limits(int Min, int Default, int Current);
 
     public readonly record struct Result(bool Ok, string Message);
 
-    /// <summary>The chosen target, or zero when the driver's default is in use.</summary>
-    public static int Saved => Math.Max(0, SettingsManager.Get(Key, 0));
+    /// <summary>
+    /// Whether the user has opted in to GPU writes at all. The same switch that governs clock offsets
+    /// governs this: one "Manage GPU tuning" gate rather than two, so a machine cannot end up with
+    /// offsets allowed and thermal writes not, or the reverse.
+    /// </summary>
+    public static bool Managing => SettingsManager.Get("ManageGpuClocks", 0) == 1;
+
+    /// <summary>The target chosen for a profile, or zero when that profile follows the driver default.</summary>
+    public static int SavedFor(PowerProfile profile) =>
+        Math.Max(0, SettingsManager.Get(KeyFor(profile), 0));
+
+    public static void SaveFor(PowerProfile profile, int celsius) =>
+        SettingsManager.Save(KeyFor(profile), Math.Max(0, celsius));
+
+    private static string KeyFor(PowerProfile profile) => $"GpuThermal_{profile}";
 
     /// <summary>The policy's range and current value, or null when the GPU is asleep or exposes none.</summary>
     public static Limits? Read()
@@ -92,7 +106,6 @@ internal static class GpuThermalTarget
             return new Result(false, "The target did not stick; the previous value is back.");
         }
 
-        SettingsManager.Save(Key, target == limits.Default ? 0 : target);
         Logger.Info($"GPU thermal: target {target} C (range {limits.Min}-{limits.Default} C).");
 
         return new Result(true, target == limits.Default
@@ -100,10 +113,15 @@ internal static class GpuThermalTarget
             : $"Target set to {target} C.");
     }
 
-    /// <summary>Re-applies the saved target after a resume or a start-up. Does nothing when unset.</summary>
-    public static void Reassert()
+    /// <summary>
+    /// Applies the profile's chosen target - on a mode change, after a resume, or at start-up. Does
+    /// nothing unless management is on and the profile has a value other than the default.
+    /// </summary>
+    public static void Reassert(PowerProfile profile)
     {
-        var saved = Saved;
+        if (!Managing) return;
+
+        var saved = SavedFor(profile);
         if (saved == 0) return;
 
         if (Read() is not { } limits) return;

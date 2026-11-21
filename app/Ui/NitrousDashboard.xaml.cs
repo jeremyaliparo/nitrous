@@ -330,7 +330,7 @@ public partial class NitrousDashboard : Window
         {
             UpdateLayout();
             RefreshGpuThermalTarget();
-            GpuThermalCard.BringIntoView();
+            GpuThermalBox.BringIntoView();
         }
 
         if (key == "setup-hotkeys")
@@ -1414,10 +1414,9 @@ public partial class NitrousDashboard : Window
             _cpuPowerCapUpdating = false;
         }
     }
-
     /// <summary>
-    /// The GPU thermal target: one global value from the driver's thermal policy. Hidden when the GPU is
-    /// asleep or exposes no policy, because reading it is what would wake the GPU.
+    /// The GPU thermal target: one value per power profile, from the driver's thermal policy. Hidden when
+    /// the GPU is asleep or exposes no policy, because reading it is what would wake the GPU.
     /// </summary>
     private void RefreshGpuThermalTarget()
     {
@@ -1426,15 +1425,17 @@ public partial class NitrousDashboard : Window
 
         if (limits is not { } policy)
         {
-            GpuThermalCard.Visibility = Visibility.Collapsed;
+            GpuThermalBox.IsEnabled = false;
+            GpuThermalHint.Text = "This GPU exposes no thermal policy, or it is asleep.";
             return;
         }
 
-        var saved = GpuThermalTarget.Saved;
+        var mode = ActiveProfile();
+        var saved = GpuThermalTarget.SavedFor(mode);
+        var managing = GpuThermalTarget.Managing;
 
-        GpuThermalCard.Visibility = Visibility.Visible;
         GpuThermalHint.Text =
-            $"The temperature the GPU throttles at, {policy.Min}-{policy.Default} C. Lower runs cooler and quieter at the cost of boost.";
+            $"Applies to {mode}. {policy.Min}-{policy.Default} C; lower runs cooler and quieter at the cost of boost.";
 
         _gpuThermalUpdating = true;
         try
@@ -1447,6 +1448,7 @@ public partial class NitrousDashboard : Window
             var selected = saved == 0 ? policy.Default : Math.Min(saved, policy.Default);
             var index = options.IndexOf(selected);
             GpuThermalBox.SelectedIndex = index >= 0 ? index : 0;
+            GpuThermalBox.IsEnabled = managing;
         }
         finally
         {
@@ -1456,18 +1458,37 @@ public partial class NitrousDashboard : Window
         GpuThermalStatus.Visibility = Visibility.Collapsed;
     }
 
+    /// <summary>The shared "Manage GPU tuning" switch changed: the dropdown follows it.</summary>
+    private void GpuTuning_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_gpuThermalUpdating) return;
+
+        RefreshGpuThermalTarget();
+
+        if (GpuThermalTarget.Managing)
+            GpuThermalTarget.Reassert(ActiveProfile());
+    }
+
     private void GpuThermal_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_gpuThermalUpdating) return;
         if (GpuThermalBox.SelectedItem is not GpuThermalOption option) return;
 
         var result = GpuThermalTarget.Apply(option.Celsius);
-
         GpuThermalStatus.Text = result.Message;
         GpuThermalStatus.Visibility = Visibility.Visible;
 
+        // Remember the choice for the profile it was made in, so the next mode change can restore it.
+        if (result.Ok && GpuThermalTarget.Read() is { } limits)
+            GpuThermalTarget.SaveFor(ActiveProfile(), option.Celsius == limits.Default ? 0 : option.Celsius);
+
         UpdateGpuThermalLimitText(GpuThermalTarget.Read());
     }
+
+    /// <summary>The profile settings currently point at, falling back to what the EC reports.</summary>
+    private static Nitrous.Enums.PowerProfile ActiveProfile() =>
+        AcerWmiManager.GetEcPowerMode()
+        ?? (Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Performance);
 
     /// <summary>
     /// The readout beside the performance state: the target the driver holds, and whether it is still the

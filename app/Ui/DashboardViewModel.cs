@@ -523,9 +523,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
         // starts writing clocks on a machine that has been tuned by another tool.
         _manageGpuClocks = NvidiaGpuManager.IsClockManagementEnabled();
         _gpuClockStatusText = _manageGpuClocks
-            ? "Nitrous manages GPU clocks. Per-profile offsets apply at startup, profile switches, AC/DC, resume, and the 30-second watchdog."
+            ? "Nitrous manages GPU clocks and the thermal limit. Per-profile values apply at startup, profile switches, AC/DC, resume, and the 30-second watchdog."
             : "Nitrous is not managing GPU clocks. Offsets below are read from the driver and are never written. " +
-              "Enable the switch to apply per-profile core and memory offsets.";
+              "Enable the switch to apply per-profile core offsets, memory offsets and the thermal limit.";
 
         _deepGpuTelemetry = SettingsManager.Get("DeepGpuTelemetry", 1) == 1;
         if (!_deepGpuTelemetry) ClearDeepTelemetryUI();
@@ -589,6 +589,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)mode);
 
                 await AcerWmiManager.SetPowerModeAsync(mode);
+
+            // The GPU thermal policy is global, so per-profile behaviour is a write on each mode change.
+            GpuThermalTarget.Reassert(mode);
 
                 // The request lives in settings; show it now rather than on the next sync tick.
                 WhisperModeActive = SettingsManager.Get("WhisperActive", 0) == 1;
