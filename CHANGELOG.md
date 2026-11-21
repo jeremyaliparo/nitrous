@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.3 - 2026-11-21
+
+### Diagnostics
+
+- `--probe-gpu-power --set <W>` performs a single reversible write: it lowers the limit, samples whether it
+  holds, and always puts the mode's own number back. It refuses to raise above the current value. NVML
+  return codes are now named, because the answer that matters is usually the code: **4 means the driver
+  does not support writing this limit at all**.
+
 ## 0.14.1-test.2 - 2026-11-21
 
 ### Diagnostics
