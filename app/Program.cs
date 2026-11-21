@@ -39,49 +39,32 @@ static class Program
             return;
         }
 
-        if (args.Any(arg => string.Equals(arg, "--probe-gpu-power", StringComparison.OrdinalIgnoreCase)))
+        if (args.Any(arg => string.Equals(arg, "--probe-gpu-thermal", StringComparison.OrdinalIgnoreCase)))
         {
-            var seconds = 60;
-            var index = Array.FindIndex(args, arg => string.Equals(arg, "--seconds", StringComparison.OrdinalIgnoreCase));
-            if (index >= 0 && index + 1 < args.Length && int.TryParse(args[index + 1], out var parsed))
-                seconds = parsed;
-
             var allowWake = args.Any(arg => string.Equals(arg, "--wake", StringComparison.OrdinalIgnoreCase));
 
-            if (args.Any(arg => string.Equals(arg, "--policies", StringComparison.OrdinalIgnoreCase)))
-            {
-                Environment.ExitCode = GpuPowerProbe.Policies(allowWake);
-                return;
-            }
-
             var tempIndex = Array.FindIndex(args, arg => string.Equals(arg, "--temperature", StringComparison.OrdinalIgnoreCase));
-            if (tempIndex >= 0 && tempIndex + 1 < args.Length && int.TryParse(args[tempIndex + 1], out var targetCelsius))
+            if (tempIndex >= 0 && tempIndex + 1 < args.Length && int.TryParse(args[tempIndex + 1], out var celsius))
             {
-                var holdFor = 15;
-                var holdAt = Array.FindIndex(args, arg => string.Equals(arg, "--hold", StringComparison.OrdinalIgnoreCase));
-                if (holdAt >= 0 && holdAt + 1 < args.Length && int.TryParse(args[holdAt + 1], out var holdSecs))
-                    holdFor = holdSecs;
-
-                Environment.ExitCode = GpuPowerProbe.Temperature(targetCelsius, holdFor, allowWake);
-                return;
-            }
-
-            var setIndex = Array.FindIndex(args, arg => string.Equals(arg, "--set", StringComparison.OrdinalIgnoreCase));
-            if (setIndex >= 0 && setIndex + 1 < args.Length && int.TryParse(args[setIndex + 1], out var targetWatts))
-            {
-                var hold = 20;
+                var hold = 15;
                 var holdIndex = Array.FindIndex(args, arg => string.Equals(arg, "--hold", StringComparison.OrdinalIgnoreCase));
                 if (holdIndex >= 0 && holdIndex + 1 < args.Length && int.TryParse(args[holdIndex + 1], out var holdSeconds))
                     hold = holdSeconds;
 
-                Environment.ExitCode = GpuPowerProbe.Change(targetWatts, hold, allowWake);
+                var keep = args.Any(arg => string.Equals(arg, "--keep", StringComparison.OrdinalIgnoreCase));
+                Environment.ExitCode = GpuThermalProbe.Write(celsius, hold, allowWake, keep);
                 return;
             }
 
-            Environment.ExitCode = GpuPowerProbe.Run(seconds, allowWake);
+            if (args.Any(arg => string.Equals(arg, "--restore", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = GpuThermalProbe.Restore(allowWake);
+                return;
+            }
+
+            Environment.ExitCode = GpuThermalProbe.Read(allowWake);
             return;
         }
-
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             Logger.Error("Unhandled exception.", e.ExceptionObject as Exception);
 

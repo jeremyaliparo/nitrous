@@ -1517,6 +1517,21 @@
 							</Grid>
 						</StackPanel>
 					</Border>
+					<!-- GPU thermal target: NVAPI thermal policy, one global value, lower is cooler -->
+					<Border x:Name="GpuThermalCard" Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="14,12" Margin="0,0,0,16" Visibility="Collapsed">
+						<Grid>
+							<Grid.ColumnDefinitions>
+								<ColumnDefinition Width="*"/>
+								<ColumnDefinition Width="Auto"/>
+							</Grid.ColumnDefinitions>
+							<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+								<TextBlock Text="THERMAL TARGET" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+								<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,4,0,0"/>
+								<TextBlock x:Name="GpuThermalStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
+							</StackPanel>
+							<ComboBox Grid.Column="1" x:Name="GpuThermalBox" Width="110" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="GpuThermal_Changed"/>
+						</Grid>
+					</Border>
 					<!-- Vendor GPU software: driver settings Nitrous deliberately does not touch -->
 					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="14,12" Margin="0,0,0,16"
 						        Visibility="{Binding IsNvidiaToolAvailable, Converter={StaticResource BoolToVis}}">

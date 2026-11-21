@@ -3,6 +3,25 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.5 - 2026-11-21
+
+### GPU
+
+- **A GPU thermal target.** One control on the GPU page sets the temperature the GPU throttles at,
+  between the driver's own minimum and default - 75-87 °C on the RTX 5060 - through NVAPI's thermal
+  policy. It is a **single global setting, not per profile**: the target read 87 °C in Quiet, Balanced
+  and Performance, and a written value ignored mode switches. Lower-only, read back after the write,
+  reverted if it does not stick, and re-applied after a resume.
+- The card appears only once the GPU page has been opened, because reading the policy is what would wake
+  a sleeping GPU.
+
+### Diagnostics
+
+- **The GPU power-limit probe is gone.** NVML refuses that write with `NOT_SUPPORTED` and NVAPI exposes no
+  client power policy on the hardware tested, so the feature cannot be built and the probe was dead
+  weight. `--probe-gpu-thermal [--temperature C] [--hold N] [--keep|--restore]` replaces it and covers
+  only the thermal policy.
+
 ## 0.14.1-test.4 - 2026-11-21
 
 ### Diagnostics

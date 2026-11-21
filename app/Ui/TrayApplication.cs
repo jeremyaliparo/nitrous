@@ -493,6 +493,7 @@ public class TrayApplication : ApplicationContext
                 await Task.Delay(1500);
                 if (_shuttingDown) return;
                 CpuPowerCap.Reassert();
+                GpuThermalTarget.Reassert();
             });
         }
         catch (Exception ex)

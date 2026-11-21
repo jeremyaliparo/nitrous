@@ -64,7 +64,10 @@ Core and memory offsets per profile, paired with live clock, utilisation, power,
 Clock writes are **off by default**, so external tools such as Afterburner are never overwritten by accident. When enabled, a background watchdog repairs driver clock drift.
 
 **Vendor tools**<br>
-Opens the NVIDIA App—or the Control Panel where that is what is installed—from the GPU page or with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>N</kbd>.
+Opens the NVIDIA App-or the Control Panel where that is what is installed-from the GPU page or with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>N</kbd>.
+
+**Thermal target**<br>
+The temperature the GPU throttles at, lowered inside the driver's own range (75-87 °C on an RTX 5060). One global setting rather than one per profile, read back after the write and restored if the driver will not keep it.
 
 **No idle wake**<br>
 Polls the GPU only while its tab is open, checking a sleeping dGPU through Windows' cached PnP state rather than touching it.

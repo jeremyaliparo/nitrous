@@ -45,6 +45,7 @@ public partial class NitrousDashboard : Window
     private bool _cpuPowerCapUpdating;
     private string? _cpuPowerCapMessage;
     private bool _cpuLimitsPreview;
+    private bool _gpuThermalUpdating;
 
     public NitrousDashboard()
     {
@@ -83,6 +84,7 @@ public partial class NitrousDashboard : Window
         // ceiling that bounds it.
         CpuPowerCap.Load();
         PrepareCpuPowerLimits();
+        RefreshGpuThermalTarget();
         RefreshCpuPowerLimits((PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance));
         InitializeCoolBoost();
 
@@ -313,7 +315,7 @@ public partial class NitrousDashboard : Window
 
         var index = key switch
         {
-            "gpu" => 1,
+            "gpu" or "gpu-thermal" => 1,
             "kb" or "keyboard" => 2,
             "setup" or "settings" or "setup-hotkeys" or "setup-limits" => 3,
             _ => 0
@@ -323,6 +325,13 @@ public partial class NitrousDashboard : Window
         if (key.StartsWith("lighting")) index = 2;
 
         SetActiveNav(index);
+
+        if (key == "gpu-thermal")
+        {
+            UpdateLayout();
+            RefreshGpuThermalTarget();
+            GpuThermalCard.BringIntoView();
+        }
 
         if (key == "setup-hotkeys")
         {
@@ -377,7 +386,13 @@ public partial class NitrousDashboard : Window
         // Entering the GPU page should show live values immediately rather than the previous
         // page's last snapshot.
         if (index == 1 && DataContext is DashboardViewModel vm)
+        {
             vm.RefreshGpuOffsets();
+
+            // Opening the GPU page is what makes the thermal card readable: reading the policy is what
+            // would wake a sleeping GPU, so it is only read once the page that needs it is shown.
+            RefreshGpuThermalTarget();
+        }
 
         // The LIGHT page is where the Fn hint belongs; read the EC only when it is shown.
         if (index == 2)
@@ -1398,6 +1413,60 @@ public partial class NitrousDashboard : Window
         {
             _cpuPowerCapUpdating = false;
         }
+    }
+
+    /// <summary>
+    /// The GPU thermal target: one global value from the driver's thermal policy. Hidden when the GPU is
+    /// asleep or exposes no policy, because reading it is what would wake the GPU.
+    /// </summary>
+    private void RefreshGpuThermalTarget()
+    {
+        if (GpuThermalTarget.Read() is not { } limits)
+        {
+            GpuThermalCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var saved = GpuThermalTarget.Saved;
+
+        GpuThermalCard.Visibility = Visibility.Visible;
+        GpuThermalHint.Text =
+            $"The temperature the GPU throttles at, {limits.Min}-{limits.Default} C. Lower runs cooler and quieter at the cost of boost.";
+
+        _gpuThermalUpdating = true;
+        try
+        {
+            var options = new List<int> { limits.Default };
+            for (var c = limits.Default - 1; c >= limits.Min; c--) options.Add(c);
+
+            GpuThermalBox.ItemsSource = options.Select(c => new GpuThermalOption(c, $"{c} C")).ToList();
+
+            var selected = saved == 0 ? limits.Default : Math.Min(saved, limits.Default);
+            var index = options.IndexOf(selected);
+            GpuThermalBox.SelectedIndex = index >= 0 ? index : 0;
+        }
+        finally
+        {
+            _gpuThermalUpdating = false;
+        }
+
+        GpuThermalStatus.Visibility = Visibility.Collapsed;
+    }
+
+    private void GpuThermal_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_gpuThermalUpdating) return;
+        if (GpuThermalBox.SelectedItem is not GpuThermalOption option) return;
+
+        var result = GpuThermalTarget.Apply(option.Celsius);
+
+        GpuThermalStatus.Text = result.Message;
+        GpuThermalStatus.Visibility = Visibility.Visible;
+    }
+
+    private readonly record struct GpuThermalOption(int Celsius, string Label)
+    {
+        public override string ToString() => Label;
     }
 
     /// <summary>
