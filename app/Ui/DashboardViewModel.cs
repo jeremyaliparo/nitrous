@@ -592,6 +592,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
             // The GPU thermal policy is global, so per-profile behaviour is a write on each mode change.
             GpuThermalTarget.Reassert(mode);
+            GpuClockLimit.Reassert(mode);
 
                 // The request lives in settings; show it now rather than on the next sync tick.
                 WhisperModeActive = SettingsManager.Get("WhisperActive", 0) == 1;

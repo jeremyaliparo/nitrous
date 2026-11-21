@@ -46,6 +46,7 @@ public partial class NitrousDashboard : Window
     private string? _cpuPowerCapMessage;
     private bool _cpuLimitsPreview;
     private bool _gpuThermalUpdating;
+    private bool _gpuClockUpdating;
 
     public NitrousDashboard()
     {
@@ -315,7 +316,7 @@ public partial class NitrousDashboard : Window
 
         var index = key switch
         {
-            "gpu" or "gpu-thermal" => 1,
+            "gpu" or "gpu-thermal" or "gpu-clock" => 1,
             "kb" or "keyboard" => 2,
             "setup" or "settings" or "setup-hotkeys" or "setup-limits" => 3,
             _ => 0
@@ -331,6 +332,13 @@ public partial class NitrousDashboard : Window
             UpdateLayout();
             RefreshGpuThermalTarget();
             GpuThermalBox.BringIntoView();
+        }
+
+        if (key == "gpu-clock")
+        {
+            UpdateLayout();
+            RefreshGpuThermalTarget();
+            GpuClockLimitBox.BringIntoView();
         }
 
         if (key == "setup-hotkeys")
@@ -1456,6 +1464,78 @@ public partial class NitrousDashboard : Window
         }
 
         GpuThermalStatus.Visibility = Visibility.Collapsed;
+
+        PopulateGpuClockLimit();
+    }
+
+    /// <summary>
+    /// The clock cap: values from the GPU's maximum boost down to the floor, plus "No cap". Nothing is read
+    /// back from the driver, so the row reports what NVML accepted rather than claiming a verified state.
+    /// </summary>
+    private void PopulateGpuClockLimit()
+    {
+        var managing = GpuClockLimit.Managing;
+        var maximum = GpuClockLimit.MaximumMhz();
+
+        _gpuClockUpdating = true;
+        try
+        {
+            var cached = GpuClockLimit.SavedFor(ActiveProfile());
+
+            if (maximum is not { } ceiling || ceiling <= GpuClockLimit.FloorMhz)
+            {
+                GpuClockLimitBox.ItemsSource = new List<GpuClockOption> { new(0, "No cap") };
+                GpuClockLimitBox.SelectedIndex = 0;
+                GpuClockLimitBox.IsEnabled = false;
+                GpuClockLimitHint.Text = "This GPU does not report a maximum clock while it is asleep.";
+                return;
+            }
+
+            var options = new List<GpuClockOption> { new(0, "No cap") };
+            for (var mhz = ceiling; mhz >= GpuClockLimit.FloorMhz; mhz -= 100)
+                options.Add(new GpuClockOption(mhz, $"{mhz} MHz"));
+
+            // Show what the driver holds, not what was asked for: the cap is read back through NVAPI.
+            var held = GpuClockLimit.CurrentCapMhz() ?? cached;
+
+            GpuClockLimitBox.ItemsSource = options;
+            GpuClockLimitBox.SelectedIndex = Math.Max(0, options.FindIndex(o => o.Mhz == held));
+            GpuClockLimitBox.IsEnabled = managing;
+
+            GpuClockLimitHint.Text = held > 0
+                ? $"Capped at {held} MHz for {ActiveProfile()} (max {ceiling} MHz)."
+                : $"No cap; the GPU may boost to {ceiling} MHz.";
+        }
+        finally
+        {
+            _gpuClockUpdating = false;
+        }
+
+        GpuClockLimitStatus.Visibility = Visibility.Collapsed;
+    }
+
+    private void GpuClockLimit_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_gpuClockUpdating) return;
+        if (GpuClockLimitBox.SelectedItem is not GpuClockOption option) return;
+
+        var result = GpuClockLimit.Apply(option.Mhz == 0 ? null : option.Mhz);
+
+        GpuClockLimitStatus.Text = result.Message;
+        GpuClockLimitStatus.Visibility = Visibility.Visible;
+
+        if (result.Ok)
+        {
+            GpuClockLimit.SaveFor(ActiveProfile(), option.Mhz);
+            PopulateGpuClockLimit();
+            GpuClockLimitStatus.Text = result.Message;
+            GpuClockLimitStatus.Visibility = Visibility.Visible;
+        }
+    }
+
+    private readonly record struct GpuClockOption(int Mhz, string Label)
+    {
+        public override string ToString() => Label;
     }
 
     /// <summary>The shared "Manage GPU tuning" switch changed: the dropdown follows it.</summary>

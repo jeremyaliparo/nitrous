@@ -1518,6 +1518,14 @@
 							</Grid>
 							<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
 							<TextBlock x:Name="GpuThermalStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
+							<!-- Clock cap: NVML locked clocks. No read-back exists on this driver, so the row reports acceptance only -->
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
+							<Grid Margin="0,0,0,2">
+								<TextBlock Text="Core Clock Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<ComboBox x:Name="GpuClockLimitBox" Width="110" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="GpuClockLimit_Changed"/>
+							</Grid>
+							<TextBlock x:Name="GpuClockLimitHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+							<TextBlock x:Name="GpuClockLimitStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
 							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
 							<!-- Compact action row: ghost RESET beside the accent APPLY -->
 							<Grid>

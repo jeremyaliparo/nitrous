@@ -9,6 +9,16 @@ GPU tuning is a feature, not a patch, so this line is **0.15.0**. The GPU work b
 target, the probes, the GPU TUNING card - shipped to testers as `0.14.1-test.1` through `.8`; those files
 are still out there and are the same code.
 
+### GPU
+
+- **Core Clock Limit.** A cap on the GPU's boost clock, per power profile, in the GPU TUNING card under the
+  thermal target: `No cap`, then the GPU's own maximum down to 400 MHz in 100 MHz steps. It is written with
+  NVML's locked clocks - the call `nvidia-smi -lgc 0,N` makes - and read back through NVAPI's clock-boost
+  lock, so the row shows what the driver holds rather than what was asked for. `No cap` resets it, and a
+  refusal is reported instead of leaving the control looking as though it worked.
+- The approach follows **G-Helper**, which ships this control: the same NVML write, the same NVAPI read-back
+  (the driver carries the active cap in the lock entry's voltage field), and the same 400 MHz floor.
+
 ## 0.14.1-test.8 - 2026-11-21
 
 ### Diagnostics

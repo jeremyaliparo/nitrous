@@ -494,6 +494,7 @@ public class TrayApplication : ApplicationContext
                 if (_shuttingDown) return;
                 CpuPowerCap.Reassert();
                 GpuThermalTarget.Reassert(profile);
+                GpuClockLimit.Reassert(profile);
             });
         }
         catch (Exception ex)
