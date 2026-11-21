@@ -47,6 +47,19 @@ static class Program
                 seconds = parsed;
 
             var allowWake = args.Any(arg => string.Equals(arg, "--wake", StringComparison.OrdinalIgnoreCase));
+
+            var setIndex = Array.FindIndex(args, arg => string.Equals(arg, "--set", StringComparison.OrdinalIgnoreCase));
+            if (setIndex >= 0 && setIndex + 1 < args.Length && int.TryParse(args[setIndex + 1], out var targetWatts))
+            {
+                var hold = 20;
+                var holdIndex = Array.FindIndex(args, arg => string.Equals(arg, "--hold", StringComparison.OrdinalIgnoreCase));
+                if (holdIndex >= 0 && holdIndex + 1 < args.Length && int.TryParse(args[holdIndex + 1], out var holdSeconds))
+                    hold = holdSeconds;
+
+                Environment.ExitCode = GpuPowerProbe.Change(targetWatts, hold, allowWake);
+                return;
+            }
+
             Environment.ExitCode = GpuPowerProbe.Run(seconds, allowWake);
             return;
         }

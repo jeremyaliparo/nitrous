@@ -90,6 +90,119 @@ public static class GpuPowerProbe
         }
     }
 
+    /// <summary>
+    /// A single, reversible write: lower the limit, watch whether it holds, then put the mode's own
+    /// number back. Lower-only on purpose - raising would answer the same question while breaking the
+    /// rule the feature is built on.
+    /// </summary>
+    public static int Change(int watts, int holdSeconds, bool allowWake = false)
+    {
+        if (GpuPowerState.IsAsleep && !allowWake)
+        {
+            Logger.Warn("GPU power probe: the dGPU is powered down; refusing to wake it. Pass --wake to allow it.");
+            return 1;
+        }
+
+        if (!TryStart(out var device))
+            return 2;
+
+        try
+        {
+            var before = Read(device);
+            Logger.Info($"GPU power probe: before - mode {CurrentMode()}, enforced {before.EnforcedW} W, " +
+                        $"range {before.MinW}-{before.MaxW} W");
+
+            if (before.MinW == before.MaxW)
+            {
+                Logger.Warn("GPU power probe: the driver reports a single fixed limit; nothing to set.");
+                return 0;
+            }
+
+            var ceiling = before.EnforcedW;
+            if (watts >= ceiling)
+            {
+                Logger.Warn($"GPU power probe: {watts} W is not below the current {ceiling} W. " +
+                            "This probe only lowers, so nothing was written.");
+                return 3;
+            }
+
+            var target = (uint)Math.Clamp(watts, (int)before.MinW, (int)ceiling);
+
+            try
+            {
+                if (!Set(device, target))
+                    return 4;
+
+                var after = Read(device);
+                Logger.Info($"GPU power probe: wrote {target} W, enforced now {after.EnforcedW} W " +
+                            $"({(after.EnforcedW == target ? "accepted" : "not taken")})");
+
+                var held = 0;
+                var samples = 0;
+                var deadline = Environment.TickCount64 + Math.Max(1, holdSeconds) * 1000L;
+
+                while (Environment.TickCount64 < deadline)
+                {
+                    Thread.Sleep(2000);
+                    var sample = Read(device);
+                    samples++;
+                    if (sample.EnforcedW == target) held++;
+
+                    Logger.Info($"GPU power probe: holding - mode {CurrentMode()}, enforced {sample.EnforcedW} W " +
+                                $"({(sample.EnforcedW == target ? "held" : "moved")})");
+                }
+
+                Logger.Info($"GPU power probe: held {held}/{samples} samples at {target} W" +
+                            (held == samples
+                                ? " - the driver keeps it and nothing put it back."
+                                : " - something reset it; the EC or the driver owns this value."));
+            }
+            finally
+            {
+                // Whatever happened above, the mode's own number goes back.
+                Set(device, ceiling);
+                var back = Read(device);
+                Logger.Info($"GPU power probe: reverted to {ceiling} W, enforced now {back.EnforcedW} W " +
+                            $"({(back.EnforcedW == ceiling ? "ok" : "MISMATCH - set it back by hand or switch mode")})");
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("GPU power probe: the write test failed.", ex);
+            return 5;
+        }
+        finally
+        {
+            try { NativeNvml.Shutdown(); } catch { }
+        }
+    }
+
+    private static string Describe(int nvmlCode) => nvmlCode switch
+    {
+        1 => "NVML not initialised",
+        2 => "invalid argument - the value is outside the driver range",
+        3 => "device not found",
+        4 => "not supported by this driver or GPU",
+        5 => "permission denied - needs administrator",
+        999 => "unknown error",
+        _ => "see NVML documentation"
+    };
+
+    private static bool Set(IntPtr device, uint watts)
+    {
+        var result = NativeNvml.DeviceSetPowerManagementLimit(device, watts * 1000);
+        if (result != 0)
+        {
+            Logger.Warn($"GPU power probe: nvmlDeviceSetPowerManagementLimit({watts} W) returned {result} " +
+                        $"({Describe(result)}).");
+            return false;
+        }
+
+        return true;
+    }
+
     private readonly record struct Sample(
         Reading Value, string Mode, bool OnBattery);
 
@@ -221,6 +334,9 @@ public static class GpuPowerProbe
 
         [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetEnforcedPowerLimit")]
         public static extern int DeviceGetEnforcedPowerLimit(IntPtr device, out uint limit);
+
+        [DllImport(NvmlDll, EntryPoint = "nvmlDeviceSetPowerManagementLimit")]
+        public static extern int DeviceSetPowerManagementLimit(IntPtr device, uint milliwatts);
 
         [DllImport(NvmlDll, EntryPoint = "nvmlDeviceGetPowerUsage")]
         public static extern int DeviceGetPowerUsage(IntPtr device, out uint milliwatts);
