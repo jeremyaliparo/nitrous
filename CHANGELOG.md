@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.8 - 2026-11-21
+
+### Diagnostics
+
+- `--probe-gpu-clock` reads the driver's clock-boost surface read-only: the reported ranges, the current
+  lock state per domain, and the size of the boost table.
+- What it found on an RTX 5060 Laptop: the lock state reads (seven domains, all unlocked), the boost table
+  reads (80 points, offsets at 0), and the **ranges decode to nonsense** - `-1000..1000 MHz`,
+  `max temperature 32256 C` - so the wrapper's struct does not match this driver and those numbers are not
+  trustworthy. Separately, NVML's locked clocks **do** work here: pinning 1500 MHz took effect
+  immediately and reset cleanly, which makes a clock cap possible through NVML rather than through
+  `NvAPI_GPU_SetClockBoostLock` (which takes a voltage, not a frequency).
+
 ## 0.14.1-test.7 - 2026-11-21
 
 ### GPU

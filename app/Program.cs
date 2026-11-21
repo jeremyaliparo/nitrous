@@ -39,6 +39,13 @@ static class Program
             return;
         }
 
+        if (args.Any(arg => string.Equals(arg, "--probe-gpu-clock", StringComparison.OrdinalIgnoreCase)))
+        {
+            var wakeForClock = args.Any(arg => string.Equals(arg, "--wake", StringComparison.OrdinalIgnoreCase));
+            Environment.ExitCode = GpuClockProbe.Read(wakeForClock);
+            return;
+        }
+
         if (args.Any(arg => string.Equals(arg, "--probe-gpu-thermal", StringComparison.OrdinalIgnoreCase)))
         {
             var allowWake = args.Any(arg => string.Equals(arg, "--wake", StringComparison.OrdinalIgnoreCase));
