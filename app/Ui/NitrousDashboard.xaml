@@ -1484,6 +1484,7 @@
 								</StackPanel>
 							</Grid>
 							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
+							<TextBlock Text="CLOCK OFFSETS · APPLY" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
 							<!-- Core Slider -->
 							<Grid Margin="0,0,0,2">
 								<TextBlock Text="Core Clock" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
@@ -1510,6 +1511,7 @@
 								<TextBlock Text="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
 								<TextBlock Text="+1000 MHz" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
+							<TextBlock Text="LIMITS · APPLIED IMMEDIATELY" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
 							<!-- Thermal target: NVAPI has one global value, so per-profile behaviour is a write on mode change -->
 							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
 							<Grid Margin="0,0,0,2">
@@ -1526,7 +1528,7 @@
 							</Grid>
 							<TextBlock x:Name="GpuClockLimitHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
 							<TextBlock x:Name="GpuClockLimitStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
 							<!-- Compact action row: ghost RESET beside the accent APPLY -->
 							<Grid>
 								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" VerticalAlignment="Center"/>

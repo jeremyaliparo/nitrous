@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.10 - 2026-11-21
+
+### GPU
+
+- **The GPU TUNING card now says how each control commits.** The two sliders sit under
+  `CLOCK OFFSETS · APPLY`, the two dropdowns under `LIMITS · APPLIED IMMEDIATELY`. They behave differently
+  for a reason - a dragged slider is not a decision, while a chosen value is - but the card never said so,
+  which made one half look broken or the other half look unfinished.
+- A gap above the rule that separates the tuning controls from the RESET / APPLY row.
+
 ## 0.15.0-test.9 - 2026-11-21
 
 GPU tuning is a feature, not a patch, so this line is **0.15.0**. The GPU work before it - the thermal
