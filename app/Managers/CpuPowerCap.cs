@@ -1,33 +1,35 @@
+using System;
+using System.Globalization;
 using Nitrous.Diagnostics;
+using Nitrous.Enums;
 
 namespace Nitrous.Managers;
 
 /// <summary>
-/// Sustained (PL1) and burst (PL2) power caps written to MSR 0x610.
+/// Sustained (PL1) and burst (PL2) power caps written to MSR 0x610, held <b>per power profile</b>.
 ///
-/// Lower-only by construction: each field is clamped to the current mode's own request, so nothing here
-/// can ask the package for more power than the firmware already asked for. PL1 is also held at or below
-/// PL2, because a sustained limit above the burst limit is not a configuration the firmware ever sets.
+/// Lower-only by construction: each field is clamped to the current mode's own request, read from MCHBAR
+/// 0x59A0, so nothing here can ask the package for more power than the firmware already asked for. PL1 is
+/// also held at or below PL2.
 ///
-/// "Off" writes the mode's own request back rather than replaying a captured value: a snapshot restored
-/// whatever another tool had left in the register, and there was no snapshot at all when the cap had been
-/// applied by a different process.
+/// Per profile because the firmware's own numbers are neither fixed nor shared: on one ANV15-51 the same
+/// Balanced mode asked 24, 29, 37, 41, 45 and 55 W over a single day (§23.193). A single global cap applied
+/// to every mode therefore looked like it "sometimes applied and sometimes did not" - the clamp was
+/// following a moving ceiling. Values are stored per profile, and a profile with no value is left alone.
 ///
-/// The firmware's request is read from MCHBAR 0x59A0, which a write to 0x610 has been reported moving, so
-/// once a cap is written the live copy is not trusted alone: the last reading taken while the firmware
-/// owned it is kept and the smaller of the two is used.
+/// The firmware's request is read from MCHBAR, which a write to 0x610 has been reported moving, so once a
+/// cap is written the live copy is not trusted alone: the last reading taken while the firmware owned it is
+/// kept and the smaller of the two is used.
 ///
 /// Bit 63 (the lock) is never written: that would make the register refuse changes until the next boot.
 /// </summary>
 internal static class CpuPowerCap
 {
-    /// <summary>
-    /// Below this a laptop is not usable for anything. It is a usability floor, not a vendor limit.
-    /// </summary>
+    /// <summary>Below this a laptop is not usable for anything. A usability floor, not a vendor limit.</summary>
     public const int FloorWatts = 10;
 
-    private const string Pl1Key = "CpuPowerCapWatts";
-    private const string Pl2Key = "CpuPowerCapBurstWatts";
+    private const string LegacyPl1Key = "CpuPowerCapWatts";
+    private const string LegacyPl2Key = "CpuPowerCapBurstWatts";
     private const string Pl1CeilingKey = "CpuPowerCapCeiling";
     private const string Pl2CeilingKey = "CpuPowerCapBurstCeiling";
 
@@ -38,25 +40,71 @@ internal static class CpuPowerCap
 
     private static readonly object Gate = new();
 
-    /// <summary>Whether a write of ours may have moved the MCHBAR copy since the firmware last wrote it.</summary>
     private static bool _moved;
-
-    /// <summary>The last MCHBAR limits read while the copy was still the firmware's.</summary>
     private static Limits? _pristine;
 
     public readonly record struct Limits(int Pl1, int Pl2);
 
     public readonly record struct Result(bool Ok, string Message);
 
-    /// <summary>The caps the user asked for, zero where a field is left at the mode's value.</summary>
-    public static Limits Saved => new(
-        Math.Max(0, SettingsManager.Get(Pl1Key, 0)),
-        Math.Max(0, SettingsManager.Get(Pl2Key, 0)));
+    /// <summary>The caps chosen for a profile; both zero when that profile follows the mode's own limits.</summary>
+    public static Limits SavedFor(PowerProfile profile)
+    {
+        var stored = SettingsManager.Get(KeyFor(profile), "");
+        if (!string.IsNullOrWhiteSpace(stored))
+        {
+            var parts = stored.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2 &&
+                int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl1) &&
+                int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl2))
+            {
+                return new Limits(Math.Max(0, pl1), Math.Max(0, pl2));
+            }
+        }
+
+        return new Limits(0, 0);
+    }
+
+    public static void SaveFor(PowerProfile profile, int pl1, int pl2)
+    {
+        SettingsManager.Save(KeyFor(profile), $"{Math.Max(0, pl1)},{Math.Max(0, pl2)}");
+
+        if (pl1 > 0 || pl2 > 0)
+            SettingsManager.Save("CpuPowerCapConfigured", 1);
+    }
 
     /// <summary>
-    /// The firmware's own limits for this mode: the highest either cap may be set to. While a cap may
-    /// have moved the copy, the smaller of the remembered and live readings is used, so a stale value can
-    /// only ever make this more conservative.
+    /// Whether any profile has ever been capped. Until then, mode changes write nothing at all; afterwards an
+    /// uncapped profile means "follow this mode", which has to be enforced like a cap does.
+    /// </summary>
+    private static bool Configured => SettingsManager.Get("CpuPowerCapConfigured", 0) == 1;
+
+    private static string KeyFor(PowerProfile profile) => $"CpuPowerCap_{profile}";
+
+    /// <summary>
+    /// Moves a cap saved by the single-value model (0.14.x) onto the profile that is active now, then clears
+    /// it, so an upgrade does not silently drop a limit someone set.
+    /// </summary>
+    public static void MigrateLegacyCap(PowerProfile profile)
+    {
+        var pl1 = Math.Max(0, SettingsManager.Get(LegacyPl1Key, 0));
+        var pl2 = Math.Max(0, SettingsManager.Get(LegacyPl2Key, 0));
+        if (pl1 == 0 && pl2 == 0) return;
+
+        if (SavedFor(profile) == new Limits(0, 0))
+        {
+            SaveFor(profile, pl1, pl2);
+            Logger.Info($"CPU power cap: moved the saved cap {pl1}/{pl2} W onto {profile}.");
+        }
+
+        SettingsManager.Save(LegacyPl1Key, 0);
+        SettingsManager.Save(LegacyPl2Key, 0);
+    }
+
+    /// <summary>
+    /// The firmware's own limits for this mode: the highest either cap may be set to. While a cap may have
+    /// moved the copy, the smaller of the remembered and live readings is used, so a stale value can only
+    /// ever make this more conservative.
     /// </summary>
     public static Limits? Ceilings()
     {
@@ -92,13 +140,10 @@ internal static class CpuPowerCap
         CpuPowerLimits.ReadRegisterRaw() is { } raw && (raw & LockBit) == 0;
 
     /// <summary>
-    /// Writes both caps, clamped to <see cref="FloorWatts"/> and to the mode's own request, then reads
-    /// them back. A null field means "leave this one at the mode's value". A write that does not stick is
-    /// undone and reported.
+    /// Writes both caps, clamped to <see cref="FloorWatts"/> and to the mode's own request, then reads them
+    /// back. A null field means "leave this one at the mode's value".
     /// </summary>
-    public static Result Apply(int? pl1Watts, int? pl2Watts) => ApplyCore(pl1Watts, pl2Watts, persist: true);
-
-    private static Result ApplyCore(int? pl1Watts, int? pl2Watts, bool persist)
+    public static Result Apply(int? pl1Watts, int? pl2Watts)
     {
         lock (Gate)
         {
@@ -121,8 +166,6 @@ internal static class CpuPowerCap
                         | ((ulong)pl1 * 8 & Pl1Mask)
                         | (((ulong)pl2 * 8) << 32 & Pl2Mask);
 
-            // Only the two limit fields may differ, so the lock, the enables, the clamp bits and the
-            // time windows are provably untouched by this write.
             if ((value & ~Fields) != (raw & ~Fields))
                 return Fail("the new value would have changed another field; nothing written.");
 
@@ -138,22 +181,11 @@ internal static class CpuPowerCap
             _moved = true;
             _pristine = mode;
 
-            // A clamp applied because a mode changed is not the user's choice, so it must not replace it:
-            // "50 W in Performance" has to survive a detour through Quiet and come back.
-            if (persist)
-            {
-                SettingsManager.Save(Pl1Key, pl1);
-                SettingsManager.Save(Pl2Key, pl2);
-            }
-
             SettingsManager.Save(Pl1CeilingKey, mode.Pl1);
             SettingsManager.Save(Pl2CeilingKey, mode.Pl2);
 
-            // A clamp and a user choice are different events; the log should not read the same for both.
-            Logger.Info(persist
-                ? $"CPU power cap: {pl1} W sustained / {pl2} W burst (this mode asks {mode.Pl1}/{mode.Pl2})."
-                : $"CPU power cap: held at {pl1} W sustained / {pl2} W burst to stay inside this mode " +
-                  $"(asks {mode.Pl1}/{mode.Pl2}).");
+            Logger.Info($"CPU power cap: {pl1} W sustained / {pl2} W burst " +
+                        $"(this mode asks {mode.Pl1}/{mode.Pl2}).");
 
             return new Result(true, pl1 == mode.Pl1 && pl2 == mode.Pl2
                 ? "Following this mode's own limits."
@@ -162,8 +194,8 @@ internal static class CpuPowerCap
     }
 
     /// <summary>
-    /// Puts both fields back to the mode's own request. That is the definition of "no cap", and because
-    /// the ceilings are the firmware's own numbers it can never raise a limit above what the mode asked for.
+    /// Puts both fields back to the mode's own request. That is the definition of "no cap", and because the
+    /// ceilings are the firmware's own numbers it can never raise a limit above what the mode asked for.
     /// </summary>
     public static Result Reset()
     {
@@ -191,11 +223,6 @@ internal static class CpuPowerCap
             if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Fields) != (value & Fields))
                 return Fail("the value did not stick; the register may be locked.");
 
-            SettingsManager.Save(Pl1Key, 0);
-            SettingsManager.Save(Pl2Key, 0);
-
-            // The register now holds the firmware's numbers, but the write may have moved the MCHBAR
-            // copy, so keep them as the trusted ceiling until the firmware rewrites it.
             _moved = true;
             _pristine = mode;
 
@@ -205,30 +232,38 @@ internal static class CpuPowerCap
     }
 
     /// <summary>
-    /// Keeps the register inside the current mode's request: re-applies a saved cap after a resume, and
-    /// pulls the register down when a mode change left it above what the new mode asks for. A mode change
-    /// does not rewrite MSR 0x610, so a cap set in a higher mode otherwise outlives the mode that allowed
-    /// it. Never raises anything.
+    /// Applies the profile's own caps on a mode change, at start-up or after a resume. A profile with no
+    /// saved cap is left entirely alone, which is what makes the cap optional per power mode.
     /// </summary>
-    public static void Reassert()
+    public static void Reassert(PowerProfile profile)
     {
-        var saved = Saved;
-        if (saved.Pl1 == 0 && saved.Pl2 == 0) return;   // Off: the register belongs to the firmware
+        if (!Configured) return;
 
         if (Ceilings() is not { } mode) return;
         if (Applied() is not { } now) return;
+
+        var saved = SavedFor(profile);
+
+        // No cap in this profile means "follow the mode". The firmware does not rewrite the register on a
+        // mode change, so without this a cap set in one profile would follow the user into the others.
+        if (saved.Pl1 == 0 && saved.Pl2 == 0)
+        {
+            if (now.Pl1 == mode.Pl1 && now.Pl2 == mode.Pl2) return;
+            Reset();
+            return;
+        }
 
         var pl1 = Math.Min(saved.Pl1 == 0 ? mode.Pl1 : saved.Pl1, mode.Pl1);
         var pl2 = Math.Min(saved.Pl2 == 0 ? mode.Pl2 : saved.Pl2, mode.Pl2);
 
         if (pl1 == now.Pl1 && pl2 == now.Pl2) return;
 
-        ApplyCore(pl1, pl2, persist: false);
+        Apply(pl1, pl2);
     }
 
     /// <summary>
-    /// The firmware has rewritten MCHBAR - a mode was applied, or the machine resumed - so the copy can
-    /// be trusted again.
+    /// The firmware has rewritten MCHBAR - a mode was applied, or the machine resumed - so the copy can be
+    /// trusted again.
     /// </summary>
     public static void NoteFirmwareRewrite()
     {
@@ -249,9 +284,6 @@ internal static class CpuPowerCap
         {
             _moved = false;
             _pristine = null;
-
-            var saved = Saved;
-            if (saved.Pl1 == 0 && saved.Pl2 == 0) return;
 
             var pl1 = SettingsManager.Get(Pl1CeilingKey, 0);
             var pl2 = SettingsManager.Get(Pl2CeilingKey, 0);

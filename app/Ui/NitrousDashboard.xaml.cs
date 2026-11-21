@@ -83,6 +83,7 @@ public partial class NitrousDashboard : Window
 
         // A cap may have been applied by the tray or by an earlier dashboard process; pick up the
         // ceiling that bounds it.
+        CpuPowerCap.MigrateLegacyCap(ActiveProfile());
         CpuPowerCap.Load();
         PrepareCpuPowerLimits();
         RefreshGpuThermalTarget();
@@ -1298,7 +1299,7 @@ public partial class NitrousDashboard : Window
             // follows a write, where the register already holds the choice - skipping it keeps a
             // selection down to its own write and read-back instead of adding four more driver calls,
             // which is the shortest path on a machine where this IOCTL is audible.
-            if (!force) CpuPowerCap.Reassert();
+            if (!force) CpuPowerCap.Reassert(ActiveProfile());
 
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
@@ -1607,7 +1608,7 @@ public partial class NitrousDashboard : Window
             return;
         }
 
-        var saved = CpuPowerCap.Saved;
+        var saved = CpuPowerCap.SavedFor(ActiveProfile());
         var applied = CpuPowerCap.Applied() ?? mode;
 
         _cpuPowerCapUpdating = true;
@@ -1723,6 +1724,11 @@ public partial class NitrousDashboard : Window
         CpuPowerCapResetButton.IsEnabled = false;
 
         var result = await Task.Run(() => CpuPowerCap.Apply(sustained.Watts, burst.Watts));
+
+        if (result.Ok && CpuPowerCap.Ceilings() is { } ceilings)
+            CpuPowerCap.SaveFor(ActiveProfile(),
+                sustained.Watts == ceilings.Pl1 ? 0 : sustained.Watts,
+                burst.Watts == ceilings.Pl2 ? 0 : burst.Watts);
 
         // The window can be closed while a write is in flight; nothing here is safe to touch then.
         if (Dispatcher.HasShutdownStarted) return;

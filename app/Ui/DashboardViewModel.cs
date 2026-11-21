@@ -590,7 +590,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                 await AcerWmiManager.SetPowerModeAsync(mode);
 
-            // The GPU thermal policy is global, so per-profile behaviour is a write on each mode change.
+            // Both the CPU cap and the GPU thermal policy are stored per profile; applying the mode is
+            // where they are restored.
+            CpuPowerCap.Reassert(mode);
             GpuThermalTarget.Reassert(mode);
             GpuClockLimit.Reassert(mode);
 

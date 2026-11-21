@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.11 - 2026-11-21
+
+### CPU
+
+- **The power cap is held per power profile.** A cap set in Balanced now applies to Balanced only; switching
+  to a profile with no cap restores that mode's own limits, which is what "disable the limit for this mode"
+  has to mean. Before this, one saved pair followed the user into every mode, clamped to whatever that mode
+  asked for.
+- Why it mattered: Angel's ANV15-51 asked **24, 29, 37, 41, 45 and 55 W in Balanced on a single day** - the
+  firmware's own number moves, so a global cap looked like it "sometimes applied and sometimes did not" when
+  the clamp was simply following a moving ceiling. There are no refusals in his log; every write stuck.
+- A cap saved by the old single-value model is moved onto the active profile on first run, so an upgrade does
+  not silently drop a limit someone set.
+
 ## 0.15.0-test.10 - 2026-11-21
 
 ### GPU
