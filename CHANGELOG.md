@@ -3,6 +3,12 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.9 - 2026-11-21
+
+GPU tuning is a feature, not a patch, so this line is **0.15.0**. The GPU work before it - the thermal
+target, the probes, the GPU TUNING card - shipped to testers as `0.14.1-test.1` through `.8`; those files
+are still out there and are the same code.
+
 ## 0.14.1-test.8 - 2026-11-21
 
 ### Diagnostics
