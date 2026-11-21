@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.14.1-test.6 - 2026-11-21
+
+### GPU
+
+- The thermal target also reads beside the performance state in the telemetry card - `87 C (default)` or
+  `85 C (modified)` - derived from the driver's policy rather than from the saved setting, so a value
+  changed in another tool is reported as modified too.
+
 ## 0.14.1-test.5 - 2026-11-21
 
 ### GPU

@@ -1421,7 +1421,10 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void RefreshGpuThermalTarget()
     {
-        if (GpuThermalTarget.Read() is not { } limits)
+        var limits = GpuThermalTarget.Read();
+        UpdateGpuThermalLimitText(limits);
+
+        if (limits is not { } policy)
         {
             GpuThermalCard.Visibility = Visibility.Collapsed;
             return;
@@ -1431,17 +1434,17 @@ public partial class NitrousDashboard : Window
 
         GpuThermalCard.Visibility = Visibility.Visible;
         GpuThermalHint.Text =
-            $"The temperature the GPU throttles at, {limits.Min}-{limits.Default} C. Lower runs cooler and quieter at the cost of boost.";
+            $"The temperature the GPU throttles at, {policy.Min}-{policy.Default} C. Lower runs cooler and quieter at the cost of boost.";
 
         _gpuThermalUpdating = true;
         try
         {
-            var options = new List<int> { limits.Default };
-            for (var c = limits.Default - 1; c >= limits.Min; c--) options.Add(c);
+            var options = new List<int> { policy.Default };
+            for (var c = policy.Default - 1; c >= policy.Min; c--) options.Add(c);
 
             GpuThermalBox.ItemsSource = options.Select(c => new GpuThermalOption(c, $"{c} C")).ToList();
 
-            var selected = saved == 0 ? limits.Default : Math.Min(saved, limits.Default);
+            var selected = saved == 0 ? policy.Default : Math.Min(saved, policy.Default);
             var index = options.IndexOf(selected);
             GpuThermalBox.SelectedIndex = index >= 0 ? index : 0;
         }
@@ -1462,6 +1465,26 @@ public partial class NitrousDashboard : Window
 
         GpuThermalStatus.Text = result.Message;
         GpuThermalStatus.Visibility = Visibility.Visible;
+
+        UpdateGpuThermalLimitText(GpuThermalTarget.Read());
+    }
+
+    /// <summary>
+    /// The readout beside the performance state: the target the driver holds, and whether it is still the
+    /// driver's own value. Derived from the policy rather than from the saved setting, so a change made in
+    /// another tool shows as modified too.
+    /// </summary>
+    private void UpdateGpuThermalLimitText(GpuThermalTarget.Limits? limits)
+    {
+        if (limits is not { } value)
+        {
+            GpuThermalLimitText.Text = "--";
+            return;
+        }
+
+        GpuThermalLimitText.Text = value.Current == value.Default
+            ? $"{value.Current} C (default)"
+            : $"{value.Current} C (modified)";
     }
 
     private readonly record struct GpuThermalOption(int Celsius, string Label)
