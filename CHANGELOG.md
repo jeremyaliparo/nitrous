@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.12 - 2026-11-22
+
+### CPU
+
+- **A mode change no longer wipes a cap.** The previous build cleared the register when entering a profile
+  with no cap saved, which looked like the right meaning of "disabled for this mode" - but modes change on
+  their own (charger switch, tray, hotkeys), so Angel's cap vanished minutes after he set it. Two `cleared`
+  events in his log sit exactly on mode changes he did not make. An uncapped profile now means "Nitrous
+  writes nothing here": clearing is the explicit action (**RESET**), not a side effect of where the machine
+  happens to be.
+- The card, the save and the re-assert now agree on which profile they are working on. The cap path asked
+  the EC for the current mode while the card showed the saved one; where those disagree, a value could be
+  stored against the wrong profile.
+
 ## 0.15.0-test.11 - 2026-11-21
 
 ### CPU

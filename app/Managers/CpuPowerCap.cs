@@ -244,14 +244,11 @@ internal static class CpuPowerCap
 
         var saved = SavedFor(profile);
 
-        // No cap in this profile means "follow the mode". The firmware does not rewrite the register on a
-        // mode change, so without this a cap set in one profile would follow the user into the others.
-        if (saved.Pl1 == 0 && saved.Pl2 == 0)
-        {
-            if (now.Pl1 == mode.Pl1 && now.Pl2 == mode.Pl2) return;
-            Reset();
-            return;
-        }
+        // No cap in this profile: write nothing. Clearing here reverted the register on every mode change
+        // into an uncapped profile, and modes change on their own - on AC/DC, from the tray, from hotkeys -
+        // so a cap the user had just set disappeared without them touching anything. "Follow this mode"
+        // is now an explicit action (RESET), not a side effect of where the machine happens to be.
+        if (saved.Pl1 == 0 && saved.Pl2 == 0) return;
 
         var pl1 = Math.Min(saved.Pl1 == 0 ? mode.Pl1 : saved.Pl1, mode.Pl1);
         var pl2 = Math.Min(saved.Pl2 == 0 ? mode.Pl2 : saved.Pl2, mode.Pl2);

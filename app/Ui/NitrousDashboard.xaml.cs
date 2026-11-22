@@ -47,6 +47,7 @@ public partial class NitrousDashboard : Window
     private bool _cpuLimitsPreview;
     private bool _gpuThermalUpdating;
     private bool _gpuClockUpdating;
+    private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
     public NitrousDashboard()
     {
@@ -1299,7 +1300,7 @@ public partial class NitrousDashboard : Window
             // follows a write, where the register already holds the choice - skipping it keeps a
             // selection down to its own write and read-back instead of adding four more driver calls,
             // which is the shortest path on a machine where this IOCTL is audible.
-            if (!force) CpuPowerCap.Reassert(ActiveProfile());
+            if (!force) CpuPowerCap.Reassert(mode);
 
             var firmware = CpuPowerLimits.ReadFirmware();
             var register = CpuPowerLimits.ReadRegister();
@@ -1365,7 +1366,7 @@ public partial class NitrousDashboard : Window
                 CpuPowerLimitsText.Text = text;
                 CpuPowerLimitsCard.Visibility = Visibility.Visible;
                 CpuPowerLimitsCaption.Visibility = Visibility.Visible;
-                PopulateCpuPowerCap(ceilings, writable);
+                PopulateCpuPowerCap(ceilings, writable, mode);
             });
         });
     }
@@ -1599,8 +1600,9 @@ public partial class NitrousDashboard : Window
     /// at the applied burst value and the burst list starts at the applied sustained value, so an invalid
     /// pair cannot be chosen in the first place.
     /// </summary>
-    private void PopulateCpuPowerCap(CpuPowerCap.Limits? ceilings, bool writable)
+    private void PopulateCpuPowerCap(CpuPowerCap.Limits? ceilings, bool writable, PowerProfile profile)
     {
+        _cpuPowerProfile = profile;
         if (ceilings is not { } mode)
         {
             CpuPowerCapBox.IsEnabled = false;
@@ -1608,7 +1610,7 @@ public partial class NitrousDashboard : Window
             return;
         }
 
-        var saved = CpuPowerCap.SavedFor(ActiveProfile());
+        var saved = CpuPowerCap.SavedFor(_cpuPowerProfile);
         var applied = CpuPowerCap.Applied() ?? mode;
 
         _cpuPowerCapUpdating = true;
@@ -1726,7 +1728,7 @@ public partial class NitrousDashboard : Window
         var result = await Task.Run(() => CpuPowerCap.Apply(sustained.Watts, burst.Watts));
 
         if (result.Ok && CpuPowerCap.Ceilings() is { } ceilings)
-            CpuPowerCap.SaveFor(ActiveProfile(),
+            CpuPowerCap.SaveFor(_cpuPowerProfile,
                 sustained.Watts == ceilings.Pl1 ? 0 : sustained.Watts,
                 burst.Watts == ceilings.Pl2 ? 0 : burst.Watts);
 
