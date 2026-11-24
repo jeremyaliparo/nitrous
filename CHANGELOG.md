@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.15 - 2026-11-24
+
+### Diagnostics
+
+- **The EC probe answers what the keyboard and key work depends on** (probe v14): how each BIOS declares
+  the lighting setters' inputs - a byte array for the effect record, or a number, which limits the model to
+  zone colours; the HID interface on Acer's gaming page `0x88`, which is how the Nitro key arrives where it
+  is not a keystroke; and the firmware's `APGeEvent` class, watched for two seconds so pressing the mode key
+  during the probe records it.
+
 ## 0.15.0-test.14 - 2026-11-24
 
 ### Keys

@@ -38,6 +38,9 @@ internal sealed class AcerEcHid : IDisposable
     private const ushort ExpectedUsagePage = 0xFF05;
     private const ushort ExpectedUsage = 0x0001;
 
+    /// <summary>Acer's gaming HID page, where the Nitro key arrives on some models.</summary>
+    private const ushort GamingUsagePage = 0x0088;
+
     private const byte ReportId = 0xA0;
     private const ushort RequestHeader = 0xA000;
     private const ushort StatusDone = 0xE000;
@@ -162,6 +165,32 @@ internal sealed class AcerEcHid : IDisposable
             // Chicony, Sunrex and Darfon keyboards: present here they mean the keyboard is a USB
             // device with its own controller, not the EC interface Nitrous drives.
             if (info.VendorId is not (0x1025 or 0x0CF2 or 0x04F2 or 0x05AF or 0x0D62)) continue;
+
+            devices.Add(new HidSummary(
+                info.VendorId, info.ProductId, info.UsagePage, info.Usage, info.FeatureLength));
+        }
+
+        return devices;
+    }
+
+    /// <summary>
+    /// The HID interfaces on Acer's gaming usage page (0x88), whichever vendor owns them. That page
+    /// is where the Nitro key arrives on the models that do not send it as a keystroke, so its
+    /// presence says whether a hook alone could ever see the key there.
+    /// </summary>
+    public static IReadOnlyList<HidSummary> ListGamingInterfaces() => ListByUsagePage(GamingUsagePage);
+
+    private static IReadOnlyList<HidSummary> ListByUsagePage(ushort usagePage)
+    {
+        var devices = new List<HidSummary>();
+
+        foreach (var path in HidInterop.DevicePaths())
+        {
+            using var handle = HidInterop.Open(path);
+            if (handle == null) continue;
+
+            var info = HidInterop.Describe(handle, path);
+            if (info == null || info.UsagePage != usagePage) continue;
 
             devices.Add(new HidSummary(
                 info.VendorId, info.ProductId, info.UsagePage, info.Usage, info.FeatureLength));

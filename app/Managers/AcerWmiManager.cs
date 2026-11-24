@@ -1287,6 +1287,32 @@ public static class AcerWmiManager
         }
     }
 
+    /// <summary>
+    /// How the firmware declares a gaming method's input: "UInt64", "UInt8[]", "none" for a method
+    /// without one, or why it could not be read. Read-only, for the EC probe.
+    /// </summary>
+    internal static string GamingInputShape(string methodName)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return "unavailable";
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                if (SingleInput(inParams) is not { } parameter) return "none";
+                return parameter.IsArray ? $"{parameter.Type}[]" : parameter.Type.ToString();
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} parameters could not be read.", ex);
+                return "unknown";
+            }
+        }
+    }
+
     /// <summary>The method's one input parameter, skipping the return value.</summary>
     private static PropertyData? SingleInput(ManagementBaseObject inParams) =>
         inParams.Properties.Cast<PropertyData>().FirstOrDefault(p => p.Name != "ReturnValue");

@@ -76,7 +76,7 @@ public static class EcProbe
         {
             // Bumped whenever a section or field is added: reports are compared across models, and
             // a reader has to know which shape it is looking at.
-            ["probeVersion"] = 13,
+            ["probeVersion"] = 14,
             ["capturedAt"] = DateTimeOffset.Now.ToString("O", CultureInfo.InvariantCulture),
             ["readOnly"] = true,
             ["note"] = "Read-only Acer EC/firmware fingerprint. No Set* method is called by this probe."
@@ -111,6 +111,8 @@ public static class EcProbe
         report["battery"] = CollectBattery(errors);
         report["keyboardAutoOff"] = CollectKeyboardAutoOff(errors);
         report["hidDevices"] = CollectHidDevices(errors);
+        report["nitroKeyHid"] = CollectGamingHid(errors);
+        report["firmwareEvents"] = CollectFirmwareEvents(errors);
         report["errors"] = errors;
 
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
@@ -673,6 +675,15 @@ public static class EcProbe
                 result["getGamingKBBacklightWithoutInputError"] = ex.Message;
             }
 
+            // How this BIOS declares the lighting setters. The record is a byte array where it can
+            // be written; where it is a number, only the zone colours are reachable.
+            result["setKeyboardRecordInput"] =
+                AcerWmiManager.GamingInputShape(AcerWmiProtocol.SetGamingKBBacklight);
+            result["setZoneColorInput"] =
+                AcerWmiManager.GamingInputShape(AcerWmiProtocol.SetGamingRgbKb);
+            result["setZoneSwitchInput"] =
+                AcerWmiManager.GamingInputShape(AcerWmiProtocol.SetGamingLED);
+
             return true;
         }, errors, "keyboardBacklight");
 
@@ -888,6 +899,92 @@ public static class EcProbe
         }
 
         return devices;
+    }
+
+    /// <summary>
+    /// The HID interfaces on Acer's gaming usage page: the Nitro key's transport on the models that
+    /// send it as a report rather than a keystroke. Empty means no hook or raw-input registration
+    /// could ever see the key there.
+    /// </summary>
+    private static List<Dictionary<string, object?>> CollectGamingHid(List<string> errors)
+    {
+        var devices = new List<Dictionary<string, object?>>();
+
+        try
+        {
+            foreach (var device in AcerEcHid.ListGamingInterfaces())
+            {
+                devices.Add(new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["vendorId"] = $"0x{device.VendorId:X4}",
+                    ["productId"] = $"0x{device.ProductId:X4}",
+                    ["usagePage"] = $"0x{device.UsagePage:X4}",
+                    ["usage"] = $"0x{device.Usage:X2}",
+                    ["featureLength"] = device.FeatureLength
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"nitroKeyHid: {ex.Message}");
+        }
+
+        return devices;
+    }
+
+    /// <summary>
+    /// The firmware's event class, watched for two seconds. Whether it exists is a per-model answer,
+    /// and whether it raises anything is the only way to tell a Mode key the firmware applies itself
+    /// from one it leaves to software. Read-only: nothing is written, and the subscription is dropped.
+    /// </summary>
+    private static Dictionary<string, object?> CollectFirmwareEvents(List<string> errors)
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var seen = new List<string>();
+        ManagementEventWatcher? watcher = null;
+
+        try
+        {
+            watcher = new ManagementEventWatcher(
+                new ManagementScope(@"\\.\root\WMI"),
+                new WqlEventQuery("SELECT * FROM APGeEvent"));
+
+            watcher.EventArrived += (_, e) =>
+            {
+                if (e.NewEvent?["EventDetail"] is byte[] detail)
+                {
+                    lock (seen) seen.Add(Convert.ToHexString(detail));
+                }
+            };
+
+            watcher.Start();
+            result["classPresent"] = true;
+
+            // Long enough to press a key while the probe is running; nothing is touched meanwhile.
+            Thread.Sleep(TimeSpan.FromSeconds(2));
+            lock (seen) result["events"] = seen.ToArray();
+        }
+        catch (Exception ex)
+        {
+            // A model without the class is a fact, not a failed section: report it in place.
+            result["classPresent"] = false;
+            result["error"] = ex.Message;
+        }
+        finally
+        {
+            try
+            {
+                watcher?.Stop();
+            }
+            catch (Exception)
+            {
+                // Already gone.
+            }
+
+            watcher?.Dispose();
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -1196,6 +1293,43 @@ public static class EcProbe
             sb.AppendLine($"  APGeAction         : {FormatBacklight(keyboard.GetValueOrDefault("apgeBacklight"))}");
             sb.AppendLine($"  brightness path    : {keyboard.GetValueOrDefault("brightnessPath")}");
             sb.AppendLine($"  WMI zoned lighting : {keyboard.GetValueOrDefault("wmiZonedKeyboard")}");
+            sb.AppendLine($"  WMI setter inputs  : record {keyboard.GetValueOrDefault("setKeyboardRecordInput")}, " +
+                          $"zone colour {keyboard.GetValueOrDefault("setZoneColorInput")}, " +
+                          $"zone switch {keyboard.GetValueOrDefault("setZoneSwitchInput")}");
+            sb.AppendLine();
+        }
+
+        if (report.GetValueOrDefault("nitroKeyHid") is List<Dictionary<string, object?>> nitroKey)
+        {
+            sb.AppendLine("Nitro key HID (usage page 0x88)");
+            if (nitroKey.Count == 0)
+            {
+                sb.AppendLine("  none - the key can only arrive as a keystroke here");
+            }
+            else
+            {
+                foreach (var device in nitroKey)
+                {
+                    sb.AppendLine($"  {device.GetValueOrDefault("vendorId")}:{device.GetValueOrDefault("productId")} " +
+                                  $"usage {device.GetValueOrDefault("usage")} " +
+                                  $"(feature {device.GetValueOrDefault("featureLength")})");
+                }
+            }
+
+            sb.AppendLine();
+        }
+
+        if (report.GetValueOrDefault("firmwareEvents") is Dictionary<string, object?> firmware)
+        {
+            var events = firmware.GetValueOrDefault("events") as string[] ?? Array.Empty<string>();
+            sb.AppendLine("Firmware events (APGeEvent)");
+            sb.AppendLine($"  class present      : {firmware.GetValueOrDefault("classPresent")}");
+            sb.AppendLine($"  events in 2 s      : " +
+                          (events.Length == 0
+                              ? "none (hold the mode key while the probe runs)"
+                              : string.Join(", ", events)));
+            if (firmware.GetValueOrDefault("error") is { } failure)
+                sb.AppendLine($"  error              : {failure}");
             sb.AppendLine();
         }
 
