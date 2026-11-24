@@ -3,14 +3,28 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.14 - 2026-11-24
+
+### Keys
+
+- **The power-mode key now works on the models whose firmware leaves switching to software.** Those units
+  raise a firmware event (`APGeEvent`, kind 7, value 4 or 5) and change nothing themselves, which is why the
+  key did nothing once Acer's software was gone. Nitrous reads the event and walks the same cycle as its own
+  power-mode hotkey, with the same on-screen display. On a model where the firmware runs the key itself no
+  event is raised, so the watcher stays idle there. If Acer's own app is also running it applies the key too,
+  so the mode can step twice; Nitrous does not try to fight it.
+- **The Nitro key is read from Acer's HID collection as well as from the keystroke.** Some models send it as
+  a vendor HID report (usage page `0x88`, bytes `81 FF`) rather than scan code `0x75`, where a keyboard hook
+  can never see it; both paths open the dashboard now.
+
 ## 0.15.0-test.13 - 2026-11-24
 
 ### Lighting
 
 - **The LIGHT page now appears on the older Nitros whose keyboard lighting is driven through Acer's WMI
   class** - the AN515/AN517 family, four RGB zones and no ENEK HID interface. Until now those were hidden
-  even though SMBIOS reports an RGB keyboard, because the only controller Nitrous had was the HID one.
-  ixzzy's AN515-55 is the first report of that gap.
+  even though SMBIOS reports an RGB keyboard, because the only controller Nitrous had was the HID one. The
+  AN515-55 is the first report of that gap.
 - Zone colours, the seven effects and brightness go through `SetGamingKBBacklight` and `SetGamingRgbKb`,
   the registers Acer's own software drives on those units, in its NitroSense payload layout.
 - The lid logo and the mode-key blink stay absent there - they live on the HID controller this family does

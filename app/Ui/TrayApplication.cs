@@ -148,6 +148,11 @@ public class TrayApplication : ApplicationContext
         _nitroHook = new NitroKeyHook();
         _nitroHook.NitroKeyPressed += (s, e) => ShowDashboard();
 
+        // The physical Mode key, on the models whose firmware raises an event for it and applies
+        // nothing itself. It walks the same cycle as Nitrous' own hotkey.
+        FirmwareEvents.ModeKeyPressed += OnModeKeyPressed;
+        FirmwareEvents.Start();
+
         _hotkeys.HotkeyPressed += OnCustomHotkeyPressed;
         ReloadHotkeys();
 
@@ -596,6 +601,32 @@ public class TrayApplication : ApplicationContext
                 NvidiaTools.Open();
                 break;
         }
+    }
+
+    /// <summary>Last Mode-key press, so the firmware's press-and-release pair is one step.</summary>
+    private DateTime _lastModeKey;
+
+    /// <summary>
+    /// The physical Mode key. A worker thread raises it, and the cycle is the one the hotkey uses,
+    /// so the two never disagree about the mode.
+    ///
+    /// The firmware sends the press and its release (values 4 and 5); a press that arrives within
+    /// 400 ms of the last is the same one. A model whose firmware applies the key itself never
+    /// raises the event, so this cannot double-step where the key already worked.
+    /// </summary>
+    private void OnModeKeyPressed()
+    {
+        if (_shuttingDown) return;
+
+        var now = DateTime.UtcNow;
+        if (now - _lastModeKey < TimeSpan.FromMilliseconds(400)) return;
+        _lastModeKey = now;
+
+        _ = Task.Run(async () =>
+        {
+            try { await CyclePowerModeAsync(); }
+            catch (Exception ex) { Logger.Warn("Power: the mode key could not change the mode.", ex); }
+        });
     }
 
     private async Task CyclePowerModeAsync()
@@ -1072,6 +1103,7 @@ public class TrayApplication : ApplicationContext
         _shuttingDown = true;
         _engineCts.Cancel();
         LightingSync.Stop();
+        FirmwareEvents.Stop();
         _nitroHook.Dispose();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
 
