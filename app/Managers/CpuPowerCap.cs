@@ -42,6 +42,8 @@ internal static class CpuPowerCap
 
     private static bool _moved;
     private static Limits? _pristine;
+    private static Limits? _lastApplied;
+    private static (Limits Now, Limits Ask)? _dipNoted;
 
     public readonly record struct Limits(int Pl1, int Pl2);
 
@@ -102,16 +104,16 @@ internal static class CpuPowerCap
     }
 
     /// <summary>
-    /// The firmware's own limits for this mode: the highest either cap may be set to. While a cap may have
-    /// moved the copy, the smaller of the remembered and live readings is used, so a stale value can only
-    /// ever make this more conservative.
+    /// The firmware's own limits for this mode: the highest either cap may be set to.
+    ///
+    /// A write can move the firmware's copy, so a live value that is exactly what Nitrous last wrote cannot
+    /// be told apart from the mode's request: there the reading taken while the firmware owned it is kept.
+    /// Any other live value is the firmware's own number - including one that came back up after dipping -
+    /// and is adopted, because a dip must not ratchet the ceiling down for the rest of the session.
     /// </summary>
     public static Limits? Ceilings()
     {
-        var firmware = CpuPowerLimits.ReadFirmware();
-        var live = firmware is { Pl1Watts: > 0, Pl2Watts: > 0 } mode
-            ? (Limits?)new Limits((int)Math.Round(mode.Pl1Watts), (int)Math.Round(mode.Pl2Watts))
-            : null;
+        var live = LiveAsk();
 
         if (!_moved)
         {
@@ -119,14 +121,20 @@ internal static class CpuPowerCap
             return live;
         }
 
-        return (_pristine, live) switch
-        {
-            ({ } remembered, { } seen) => new Limits(
-                Math.Min(remembered.Pl1, seen.Pl1),
-                Math.Min(remembered.Pl2, seen.Pl2)),
-            ({ } remembered, null) => remembered,
-            _ => live
-        };
+        if (live is { } seen && _lastApplied is { } wrote && seen == wrote)
+            return _pristine ?? seen;
+
+        if (live is not null) _pristine = live;
+        return live ?? _pristine;
+    }
+
+    /// <summary>The firmware's own request right now, or null when it cannot be read.</summary>
+    private static Limits? LiveAsk()
+    {
+        var firmware = CpuPowerLimits.ReadFirmware();
+        return firmware is { Pl1Watts: > 0, Pl2Watts: > 0 } mode
+            ? new Limits((int)Math.Round(mode.Pl1Watts), (int)Math.Round(mode.Pl2Watts))
+            : null;
     }
 
     /// <summary>What the register holds right now, or null when it cannot be read.</summary>
@@ -180,6 +188,7 @@ internal static class CpuPowerCap
 
             _moved = true;
             _pristine = mode;
+            _lastApplied = new Limits(pl1, pl2);
 
             SettingsManager.Save(Pl1CeilingKey, mode.Pl1);
             SettingsManager.Save(Pl2CeilingKey, mode.Pl2);
@@ -225,6 +234,7 @@ internal static class CpuPowerCap
 
             _moved = true;
             _pristine = mode;
+            _lastApplied = mode;
 
             Logger.Info($"CPU power cap: cleared, back to the mode's {mode.Pl1}/{mode.Pl2} W.");
             return new Result(true, $"Back to {mode.Pl1} W sustained / {mode.Pl2} W burst.");
@@ -235,7 +245,11 @@ internal static class CpuPowerCap
     /// Applies the profile's own caps on a mode change, at start-up or after a resume. A profile with no
     /// saved cap is left entirely alone, which is what makes the cap optional per power mode.
     /// </summary>
-    public static void Reassert(PowerProfile profile)
+    /// <param name="modeChanged">
+    /// True when the power mode itself just changed. A periodic refresh passes false: the firmware's own
+    /// request dips on its own, and following a dip down wrote 20 W over a 25 W cap minutes after it was set.
+    /// </param>
+    public static void Reassert(PowerProfile profile, bool modeChanged = false)
     {
         if (!Configured) return;
 
@@ -252,10 +266,49 @@ internal static class CpuPowerCap
 
         var pl1 = Math.Min(saved.Pl1 == 0 ? mode.Pl1 : saved.Pl1, mode.Pl1);
         var pl2 = Math.Min(saved.Pl2 == 0 ? mode.Pl2 : saved.Pl2, mode.Pl2);
+        var desired = new Limits(pl1, pl2);
 
         if (pl1 == now.Pl1 && pl2 == now.Pl2) return;
 
+        var ask = LiveAsk();
+        if (!ShouldWrite(now, ask, desired, modeChanged))
+        {
+            NoteDip(now, ask);
+            return;
+        }
+
         Apply(pl1, pl2);
+    }
+
+    /// <summary>
+    /// Whether a re-assert should touch the register.
+    ///
+    /// Raising, a mode change, and a register the firmware has taken back to its own numbers all write.
+    /// A cap that merely sits above a request that dipped does not: the firmware lowers its own request
+    /// on its own (DTT, or the charger sharing power with a charging battery), and writing that dip down
+    /// turns the user's cap into a smaller number they never chose. The card still shows both numbers, so
+    /// a register above the current request stays visible.
+    /// </summary>
+    internal static bool ShouldWrite(Limits now, Limits? ask, Limits desired, bool modeChanged)
+    {
+        if (desired == now) return false;
+        if (modeChanged) return true;
+        if (desired.Pl1 > now.Pl1 || desired.Pl2 > now.Pl2) return true;
+
+        // Lowering only where the register still holds the firmware's own pair: then no cap is applied
+        // yet, which is a fresh start or a firmware rewrite rather than a dip.
+        return ask is { } live && now == live;
+    }
+
+    /// <summary>Logs a dip once per distinct pair, instead of once per refresh.</summary>
+    private static void NoteDip(Limits now, Limits? ask)
+    {
+        if (ask is not { } live) return;
+        if (_dipNoted == (now, live)) return;
+
+        _dipNoted = (now, live);
+        Logger.Info($"CPU power cap: leaving {now.Pl1}/{now.Pl2} W in place; this mode now asks " +
+                    $"{live.Pl1}/{live.Pl2} W. A dip in the mode's own request is not written over the cap.");
     }
 
     /// <summary>
@@ -268,6 +321,8 @@ internal static class CpuPowerCap
         {
             _moved = false;
             _pristine = null;
+            _lastApplied = null;
+            _dipNoted = null;
         }
     }
 
@@ -281,6 +336,8 @@ internal static class CpuPowerCap
         {
             _moved = false;
             _pristine = null;
+            _lastApplied = null;
+            _dipNoted = null;
 
             var pl1 = SettingsManager.Get(Pl1CeilingKey, 0);
             var pl2 = SettingsManager.Get(Pl2CeilingKey, 0);

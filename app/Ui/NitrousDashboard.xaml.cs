@@ -1617,8 +1617,14 @@ public partial class NitrousDashboard : Window
         _cpuPowerCapUpdating = true;
         try
         {
-            var sustained = Options(Math.Min(mode.Pl1, applied.Pl2), CpuPowerCap.FloorWatts);
-            var burst = Options(mode.Pl2, applied.Pl1);
+            // The lists reach up to the mode's request, but never hide the value the register actually
+            // holds while that request has dipped below it: the box would otherwise say 20 W over a
+            // register holding 25 W, which reads exactly like the cap being reset.
+            var sustainedCeiling = Math.Max(Math.Min(mode.Pl1, applied.Pl2), Math.Max(saved.Pl1, applied.Pl1));
+            var burstCeiling = Math.Max(mode.Pl2, Math.Max(saved.Pl2, applied.Pl2));
+
+            var sustained = Options(sustainedCeiling, CpuPowerCap.FloorWatts);
+            var burst = Options(burstCeiling, Math.Min(applied.Pl1, burstCeiling));
 
             CpuPowerCapBox.ItemsSource = sustained;
             CpuPowerCapBox.SelectedIndex = SelectCapIndex(sustained, saved.Pl1, applied.Pl1);

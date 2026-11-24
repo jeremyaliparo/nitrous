@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.16 - 2026-11-25
+
+### CPU
+
+- **A cap no longer follows the firmware's own request down.** The firmware lowers its sustained request on
+  its own - Intel DTT adapting, or the charger sharing power with a charging battery - and the periodic
+  re-assert wrote that dip over the saved cap. On an ANV15-51 a 25 W cap in Balanced became 20 W about three
+  minutes after it was set, with no mode change and no other software involved: the firmware's request had
+  dropped to 20 W, and the next refresh clamped the register to it. Re-assert now writes only a raise, a mode
+  change, or a register the firmware has taken back to its own numbers; a dip under an applied cap is logged
+  once and left in place.
+- **The remembered ceiling no longer latches a dip.** It adopts a live reading unless that reading is exactly
+  what Nitrous last wrote, so one dip can no longer pin the ceiling - and the cap - below the mode's real
+  request for the rest of the session.
+- The cap control keeps showing the value the register holds while the request has dipped, so a card reading
+  20 W over a 25 W cap can no longer be mistaken for the cap being reset.
+
 ## 0.15.0-test.15 - 2026-11-24
 
 ### Diagnostics

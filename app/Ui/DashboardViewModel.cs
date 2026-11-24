@@ -592,7 +592,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
             // Both the CPU cap and the GPU thermal policy are stored per profile; applying the mode is
             // where they are restored.
-            CpuPowerCap.Reassert(mode);
+            CpuPowerCap.Reassert(mode, modeChanged: true);
             GpuThermalTarget.Reassert(mode);
             GpuClockLimit.Reassert(mode);
 
