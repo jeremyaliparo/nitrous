@@ -1144,6 +1144,168 @@ public static class AcerWmiManager
         return false;
     }
 
+    /// <summary>
+    /// A read-only gaming-class call with one unsigned input and a scalar answer, for registers
+    /// whose value is the point (a keyboard zone's colour) rather than a status. Null when the
+    /// call fails or answers nothing.
+    /// </summary>
+    internal static ulong? ReadGamingScalar(string methodName, ulong input)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return null;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                SetSingleInput(inParams, input);
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                var raw = outParams?.Properties["gmOutput"]?.Value;
+                return raw == null ? null : Convert.ToUInt64(raw);
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} could not be read.", ex);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A gaming-class write with one unsigned input. The firmware reports its verdict in the low
+    /// byte of <c>gmOutput</c> where it answers one, 0 being success; a method that answers nothing
+    /// is taken as applied, as the other setters already do.
+    /// </summary>
+    internal static bool WriteGamingScalar(string methodName, ulong input)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return false;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                SetSingleInput(inParams, input);
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                if (outParams == null) return false;
+
+                var raw = outParams.Properties["gmOutput"]?.Value;
+                return raw == null || (Convert.ToUInt64(raw) & 0xFF) == 0;
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} failed.", ex);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A gaming-class write whose input is a byte array (the 16-byte keyboard record). False when
+    /// this firmware declares the input as a number instead, because then the record has nowhere to
+    /// go: <see cref="GamingInputIsArray"/> answers that in advance.
+    /// </summary>
+    internal static bool WriteGamingArray(string methodName, byte[] input)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return false;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                var parameter = SingleInput(inParams);
+                if (parameter == null || !parameter.IsArray) return false;
+
+                inParams[parameter.Name] = input;
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                if (outParams == null) return false;
+
+                var raw = outParams.Properties["gmOutput"]?.Value;
+                return raw == null || raw is byte[] || (Convert.ToUInt64(raw) & 0xFF) == 0;
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} failed.", ex);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>A gaming-class read whose answer is an array, for a method that takes no input.</summary>
+    internal static byte[]? ReadGamingArray(string methodName)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return null;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                // Newer firmware takes an input here (PredatorSense passes 1); older declares none.
+                if (SingleInput(inParams) is { } declared && !declared.IsArray)
+                    SetSingleInput(inParams, 1);
+
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                return outParams?.Properties["gmOutput"]?.Value as byte[];
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} could not be read.", ex);
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Whether the firmware declares this method's input as an array (it varies by BIOS).</summary>
+    internal static bool GamingInputIsArray(string methodName)
+    {
+        lock (Gate)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return false;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                return SingleInput(inParams)?.IsArray == true;
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                Logger.Warn($"WMI: {methodName} parameters could not be read.", ex);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>The method's one input parameter, skipping the return value.</summary>
+    private static PropertyData? SingleInput(ManagementBaseObject inParams) =>
+        inParams.Properties.Cast<PropertyData>().FirstOrDefault(p => p.Name != "ReturnValue");
+
+    /// <summary>Sets that parameter with the width the firmware declared, not as a string.</summary>
+    private static void SetSingleInput(ManagementBaseObject inParams, ulong value)
+    {
+        if (SingleInput(inParams) is not { } parameter) return;
+
+        inParams[parameter.Name] = parameter.Type switch
+        {
+            CimType.UInt8 => (byte)value,
+            CimType.UInt16 => (ushort)value,
+            CimType.UInt32 => (uint)value,
+            CimType.SInt32 => (int)value,
+            _ => (object)value
+        };
+    }
+
     private static ManagementObject? GetGamingInstanceLocked()
     {
         if (_gaming != null) return _gaming;

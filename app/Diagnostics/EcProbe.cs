@@ -572,6 +572,9 @@ public static class EcProbe
             result["smbiosKeyboardColour"] = capabilities.Smbios.KeyboardColor;
             result["smbiosKeyboardType"] = capabilities.Smbios.KeyboardType;
             result["ecHidPresent"] = capabilities.EcHid != null;
+            // The other lighting path: on a model with no vendor HID the embedded controller
+            // exposes its four zones through WMI, which is what the LIGHT page drives (§23.196).
+            result["wmiZonedKeyboard"] = WmiKeyboard.IsAvailable();
         }
         catch (Exception ex)
         {
@@ -656,6 +659,18 @@ public static class EcProbe
             catch (Exception ex)
             {
                 result["getGamingKBBacklightOutputError"] = ex.Message;
+            }
+
+            // Read the record the other way as well: this family declares the method without an
+            // input, so the sweep above throws on every address and only this call answers.
+            try
+            {
+                result["getGamingKBBacklightWithoutInput"] =
+                    DescribeOutputWith(instance, "GetGamingKBBacklight", Array.Empty<(string, object)>());
+            }
+            catch (Exception ex)
+            {
+                result["getGamingKBBacklightWithoutInputError"] = ex.Message;
             }
 
             return true;
@@ -1180,6 +1195,7 @@ public static class EcProbe
             sb.AppendLine($"  EC HID             : {FormatBacklight(keyboard.GetValueOrDefault("ecHidBacklight"))}");
             sb.AppendLine($"  APGeAction         : {FormatBacklight(keyboard.GetValueOrDefault("apgeBacklight"))}");
             sb.AppendLine($"  brightness path    : {keyboard.GetValueOrDefault("brightnessPath")}");
+            sb.AppendLine($"  WMI zoned lighting : {keyboard.GetValueOrDefault("wmiZonedKeyboard")}");
             sb.AppendLine();
         }
 

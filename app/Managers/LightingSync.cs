@@ -73,7 +73,7 @@ internal static class LightingSync
                 try { _thread?.Join(1200); } catch { }
             }
 
-            var hasLighting = AcerKeyboard.IsAvailable();
+            var hasLighting = KeyboardLighting.IsAvailable();
             var hasBrightness = !hasLighting
                 && AcerWmiManager.GetKeyboardBacklightPath()
                 != AcerWmiManager.KeyboardBacklightPath.None;
@@ -572,7 +572,7 @@ internal static class LightingSync
     private static void WriteEffect(
         KeyboardEffect effect, int brightness, int speed, KeyboardColor color)
     {
-        if (!AcerKeyboard.SetEffect(effect, brightness, speed, leftwards: false, color) &&
+        if (!KeyboardLighting.SetEffect(effect, brightness, speed, leftwards: false, color) &&
             !_writeWarned)
         {
             Logger.Warn("Lighting sync: the keyboard refused an effect frame.");
@@ -584,7 +584,7 @@ internal static class LightingSync
         IReadOnlyList<KeyboardColor> zones, IReadOnlyList<int> levels,
         KeyboardColor logo, int logoBrightness, bool writeLogo)
     {
-        if (!AcerKeyboard.SetZoneColors(zones, levels) && !_writeWarned)
+        if (!KeyboardLighting.SetZoneColors(zones, levels) && !_writeWarned)
         {
             Logger.Warn("Lighting sync: the keyboard refused a frame.");
             _writeWarned = true;
@@ -668,7 +668,7 @@ internal static class LightingSync
     {
         try
         {
-            if (!AcerKeyboard.IsAvailable())
+            if (!KeyboardLighting.IsAvailable())
             {
                 // A five-step backlight has no controller to restore: the EC level is the lighting.
                 // This runs without the sync worker (a mode change or startup), so the worker's own
@@ -773,9 +773,9 @@ internal static class LightingSync
         var speed = AcerKeyboard.MinSpeed + (step - 1) * 2;
 
         if (effect == KeyboardEffect.Static)
-            AcerKeyboard.SetZoneColors(Enumerable.Repeat(color, ZoneCount).ToArray(), brightness);
+            KeyboardLighting.SetZoneColors(Enumerable.Repeat(color, ZoneCount).ToArray(), brightness);
         else
-            AcerKeyboard.SetEffect(effect, brightness, speed, leftwards: false, color);
+            KeyboardLighting.SetEffect(effect, brightness, speed, leftwards: false, color);
 
         if (effect is KeyboardEffect.Static or KeyboardEffect.Breathing or KeyboardEffect.Neon)
             AcerKeyboard.SetEffect(effect, brightness, step, leftwards: false, color, AcerKeyboard.LidDevice);
@@ -792,14 +792,14 @@ internal static class LightingSync
             var speed = Math.Clamp(SettingsManager.Get("KbSpeed", 4), AcerKeyboard.MinSpeed, AcerKeyboard.MaxSpeed);
             var color = KeyboardColor.FromHex(
                 SettingsManager.Get("KbZone1", SettingsManager.Get("KbGlobal_Color", "#B388FF")));
-            AcerKeyboard.SetEffect(effect, brightness, speed, leftwards: false, color);
+            KeyboardLighting.SetEffect(effect, brightness, speed, leftwards: false, color);
         }
         else
         {
             var colors = Enumerable.Range(1, ZoneCount)
                 .Select(i => KeyboardColor.FromHex(SettingsManager.Get($"KbZone{i}", "#B388FF")))
                 .ToArray();
-            AcerKeyboard.SetZoneColors(colors, brightness);
+            KeyboardLighting.SetZoneColors(colors, brightness);
         }
 
         var logoEffect = AcerKeyboard.ParseEffect(SettingsManager.Get("KbLogo_Effect", "Static"));

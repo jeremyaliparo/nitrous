@@ -410,7 +410,8 @@ public partial class NitrousDashboard : Window
 
         // First visit to Lighting on a model whose lid logo has never been confirmed: settle it
         // before any more writes are sent to device 0x83.
-        if (index == 2 && !_keyboardLoading && !_captureMode && _keyboardAvailable && LogoAvailability < 0)
+        if (index == 2 && !_keyboardLoading && !_captureMode && _keyboardAvailable &&
+            AcerKeyboard.IsAvailable() && LogoAvailability < 0)
             Dispatcher.BeginInvoke(new Action(RunLogoCheck), DispatcherPriority.Background);
     }
 
@@ -1176,7 +1177,7 @@ public partial class NitrousDashboard : Window
     /// Only write to the lid once the user has confirmed it exists. Unknown is treated as "not
     /// yet", so a model without a logo never receives a pointless write.
     /// </summary>
-    private static bool LogoIsUsable => LogoAvailability == 1;
+    private static bool LogoIsUsable => AcerKeyboard.IsAvailable() && LogoAvailability == 1;
 
     // The lighting write switches the backlight back on, but the auto-off is a separate countdown
     // on the EC that only a write carrying it arms. Debounced so dragging the brightness slider
@@ -1772,7 +1773,7 @@ public partial class NitrousDashboard : Window
                 SettingsManager.Delete("KbLogoAvailable");
         }
 
-        _keyboardAvailable = AcerKeyboard.IsAvailable();
+        _keyboardAvailable = KeyboardLighting.IsAvailable();
 
         // A model with no lighting controller gets no LIGHT tab at all. A page that can only say it
         // cannot do anything is worse than no page: it invites a click that can never work.
@@ -2206,9 +2207,15 @@ public partial class NitrousDashboard : Window
         var globalAnimated = IsAnimated(_globalEffect);
         var globalHasColour = _globalEffect == KeyboardEffect.Static;
 
-        GlobalEffectBox.IsEnabled = _keyboardAvailable && !screenSync;
-        GlobalBrightness.IsEnabled = _keyboardAvailable;
-        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && (!syncOn || soundSync);
+        // A WMI BIOS that declares the record's input as a number still takes zone colours, but
+        // has no byte for the effect or the brightness. Offering either would look like it worked.
+        GlobalEffectBox.IsEnabled = _keyboardAvailable && !screenSync && KeyboardLighting.EffectsWritable;
+        GlobalBrightness.IsEnabled = _keyboardAvailable && KeyboardLighting.EffectsWritable;
+        GlobalEffectBox.ToolTip = KeyboardLighting.EffectsWritable
+            ? null
+            : "This model's lighting takes zone colours only.";
+        GlobalSpeed.IsEnabled = _keyboardAvailable && globalAnimated && (!syncOn || soundSync) &&
+                                KeyboardLighting.EffectsWritable;
         GlobalSpeedRow.Visibility = globalAnimated ? Visibility.Visible : Visibility.Collapsed;
 
         var syncAvailable = _keyboardAvailable && _keyboardZoned;
@@ -2279,9 +2286,13 @@ public partial class NitrousDashboard : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        KeyboardEffectBox.IsEnabled = _keyboardAvailable && !screenSync;
-        KeyboardBrightness.IsEnabled = _keyboardAvailable;
-        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect) && !screenSync;
+        KeyboardEffectBox.IsEnabled = _keyboardAvailable && !screenSync && KeyboardLighting.EffectsWritable;
+        KeyboardBrightness.IsEnabled = _keyboardAvailable && KeyboardLighting.EffectsWritable;
+        KeyboardEffectBox.ToolTip = KeyboardLighting.EffectsWritable
+            ? null
+            : "This model's lighting takes zone colours only.";
+        KbSpeed.IsEnabled = _keyboardAvailable && IsAnimated(_keyboardEffect) && !screenSync &&
+                            KeyboardLighting.EffectsWritable;
         KbSpeedRow.Visibility = KbDynamicTab.IsChecked == true && IsAnimated(_keyboardEffect)
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -2604,7 +2615,7 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void RunLogoCheck()
     {
-        if (!_keyboardAvailable || _logoCheckBusy || _captureMode) return;
+        if (!AcerKeyboard.IsAvailable() || _logoCheckBusy || _captureMode) return;
 
         _logoCheckBusy = true;
         try
@@ -2640,9 +2651,12 @@ public partial class NitrousDashboard : Window
     /// <summary>Shows the logo controls only when the lid is known to have one.</summary>
     private void UpdateLogoAvailability()
     {
-        var usable = LogoAvailability != 0;
+        // A WMI lighting controller has no lid device at all, so there is nothing to ask about or
+        // to re-test: the panel says so and the check button is gone.
+        var usable = AcerKeyboard.IsAvailable() && LogoAvailability != 0;
         LogoControlsPanel.Visibility = usable ? Visibility.Visible : Visibility.Collapsed;
         LogoUnavailablePanel.Visibility = usable ? Visibility.Collapsed : Visibility.Visible;
+        LogoRecheckBtn.Visibility = AcerKeyboard.IsAvailable() ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void KbSpeed_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -3405,9 +3419,9 @@ public partial class NitrousDashboard : Window
         try
         {
             var applied = KbDynamicTab.IsChecked == true
-                ? AcerKeyboard.SetEffect(
+                ? KeyboardLighting.SetEffect(
                     _keyboardEffect, _keyboardBrightness, _keyboardSpeed, leftwards: false, _zoneColors[0])
-                : AcerKeyboard.SetZoneColors(_zoneColors, _keyboardBrightness);
+                : KeyboardLighting.SetZoneColors(_zoneColors, _keyboardBrightness);
 
             KeyboardLightingStatus.Text = applied ? string.Empty : "The keyboard refused the change";
         }
@@ -3467,9 +3481,9 @@ public partial class NitrousDashboard : Window
             var keyboardSpeed = KeyboardSpeedFor(step);
 
             var keyboardApplied = _globalEffect == KeyboardEffect.Static
-                ? AcerKeyboard.SetZoneColors(
+                ? KeyboardLighting.SetZoneColors(
                     Enumerable.Repeat(_globalColor, AcerKeyboard.ZoneCount).ToArray(), _globalBrightness)
-                : AcerKeyboard.SetEffect(
+                : KeyboardLighting.SetEffect(
                     _globalEffect, _globalBrightness, keyboardSpeed, leftwards: false, _globalColor);
 
             var logoApplied = true;

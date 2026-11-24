@@ -112,7 +112,7 @@ public class TrayApplication : ApplicationContext
 
     /// <summary>Whether the keyboard has RGB zones, which screen sync and effects need.</summary>
     private static bool LightingZoned() =>
-        AcerKeyboard.IsAvailable() &&
+        KeyboardLighting.IsAvailable() &&
         AcerCapabilitiesProvider.Current.Smbios.KeyboardColor is not 1;
 
     /// <summary>Whether sound sync has a path: RGB zones or the five-step backlight.</summary>

@@ -72,6 +72,35 @@ internal static class AcerWmiProtocol
     /// </summary>
     public static bool LcdOverdriveSupported(ulong output) => ((output >> 48) & 0xFF) is 0 or 1;
 
+    // Keyboard lighting on the models whose embedded controller owns the LEDs and exposes them
+    // through WMI alone - the AN515/AN517 family, with no ENEK HID interface (§23.196). The record
+    // is the 16-byte NitroSense layout; a zone colour is a u64 with the zone's bit below R, G, B.
+    public const string GetGamingKBBacklight = "GetGamingKBBacklight";
+    public const string SetGamingKBBacklight = "SetGamingKBBacklight";
+    public const string GetGamingRgbKb = "GetGamingRgbKb";
+    public const string SetGamingRgbKb = "SetGamingRgbKb";
+    public const string SetGamingLED = "SetGamingLED";
+
+    /// <summary>Zones the WMI interface holds; the SMBIOS keyboard type names the same four.</summary>
+    public const int KeyboardZones = 4;
+
+    /// <summary><c>SetGamingRgbKb</c>: zone 1-4 in bits 0-3, then R, G and B in bytes 1-3.</summary>
+    public static ulong KeyboardZoneColor(int zone, byte r, byte g, byte b) =>
+        (1UL << (zone - 1)) | ((ulong)r << 8) | ((ulong)g << 16) | ((ulong)b << 24);
+
+    /// <summary><c>GetGamingRgbKb</c> takes the zone's bit, as the setter does.</summary>
+    public static uint KeyboardZoneQuery(int zone) => 1u << (zone - 1);
+
+    /// <summary>
+    /// <c>SetGamingLED</c>: the keyboard's group (<c>0x08</c>) with every zone lit. Bits 40-43 are
+    /// the four zone switches - the answer for all four is <c>0xF0000000000</c>.
+    /// </summary>
+    public const ulong KeyboardAllZonesOn = 0x08 | (0x0FUL << 40);
+
+    /// <summary>The colour in a <c>GetGamingRgbKb</c> answer: R, G and B in bytes 1-3.</summary>
+    public static (byte R, byte G, byte B) KeyboardZoneAnswer(ulong output) =>
+        ((byte)(output >> 8), (byte)(output >> 16), (byte)(output >> 24));
+
     // APGeAction: power-off USB charging (function 4).
     public const string ActionClass = "APGeAction";
     public const uint UsbChargingQuery = 0x04;

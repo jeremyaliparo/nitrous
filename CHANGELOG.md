@@ -3,6 +3,26 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.13 - 2026-11-24
+
+### Lighting
+
+- **The LIGHT page now appears on the older Nitros whose keyboard lighting is driven through Acer's WMI
+  class** - the AN515/AN517 family, four RGB zones and no ENEK HID interface. Until now those were hidden
+  even though SMBIOS reports an RGB keyboard, because the only controller Nitrous had was the HID one.
+  ixzzy's AN515-55 is the first report of that gap.
+- Zone colours, the seven effects and brightness go through `SetGamingKBBacklight` and `SetGamingRgbKb`,
+  the registers Acer's own software drives on those units, in its NitroSense payload layout.
+- The lid logo and the mode-key blink stay absent there - they live on the HID controller this family does
+  not have - and the panel says so instead of offering a button that cannot work.
+- Where a BIOS declares the effect record's input as a number rather than an array, only zone colours can
+  be written: the effect, speed and brightness controls are disabled and say why, rather than accepting
+  changes that go nowhere.
+- Sound and screen sync use the same path. This interface has one brightness for the whole keyboard, so a
+  per-zone level is written as a dimmed zone colour, which looks the same.
+- The EC probe reports whether this interface answers, and reads the record without an input - the way this
+  family's firmware answers it.
+
 ## 0.15.0-test.12 - 2026-11-22
 
 ### CPU
