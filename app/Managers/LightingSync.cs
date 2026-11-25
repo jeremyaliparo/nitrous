@@ -522,7 +522,7 @@ internal static class LightingSync
                 else if (spectrum != null)
                 {
                     if (haveSamples)
-                        analyzer.Analyze(spectrum.SampleRate, sensitivity, ceiling, levels);
+                        analyzer.Analyze(samples, spectrum.SampleRate, sensitivity, ceiling, levels);
 
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                         Logger.Info($"Sound sync (Spectrum): {string.Join(",", levels)}");
@@ -954,8 +954,6 @@ internal static class LightingSync
     {
         public const int Size = 2048;
 
-        public float[] Samples { get; } = new float[Size];
-
         /// <summary>The raw bass band level (0-1), before smoothing or sensitivity, for beat onsets.</summary>
         public float Bass { get; private set; }
 
@@ -978,13 +976,14 @@ internal static class LightingSync
                 _window[i] = 0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (Size - 1));
         }
 
-        public void Analyze(int sampleRate, int sensitivity, int ceiling, int[] levels)
+        /// <param name="samples">The latest mono loopback samples, at least <see cref="Size"/> of them.</param>
+        public void Analyze(float[] samples, int sampleRate, int sensitivity, int ceiling, int[] levels)
         {
-            if (sampleRate <= 0 || levels.Length < Bands.Length) return;
+            if (sampleRate <= 0 || levels.Length < Bands.Length || samples.Length < Size) return;
 
             for (var i = 0; i < Size; i++)
             {
-                _real[i] = Samples[i] * _window[i];
+                _real[i] = samples[i] * _window[i];
                 _imaginary[i] = 0;
             }
 

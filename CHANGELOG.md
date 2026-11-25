@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.19 - 2026-11-25
+
+### Lighting
+
+- **Spectrum sound sync works.** Its analyser read a sample buffer that nothing ever filled, so every frame
+  measured as silence and the keyboard switched the lights off - which is exactly what "it's like turning the
+  light off" was. Peak, Beat and Vibe were unaffected because they read the live buffer the capture fills.
+  The analyser now takes that buffer as its input.
+
 ## 0.15.0-test.18 - 2026-11-25
 
 ### Lighting
