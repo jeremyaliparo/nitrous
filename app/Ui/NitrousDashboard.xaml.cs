@@ -82,10 +82,9 @@ public partial class NitrousDashboard : Window
         InitializeLcdOverdrive();
         InitializeBootLogo();
 
-        // A cap may have been applied by the tray or by an earlier dashboard process; pick up the
-        // ceiling that bounds it.
+        // A cap saved by an older build's single-value model belongs to the active profile now; the
+        // ceiling that bounds it is learned per profile and power source when the card refreshes.
         CpuPowerCap.MigrateLegacyCap(ActiveProfile());
-        CpuPowerCap.Load();
         PrepareCpuPowerLimits();
         RefreshGpuThermalTarget();
         RefreshCpuPowerLimits((PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance));
@@ -181,10 +180,6 @@ public partial class NitrousDashboard : Window
             activeRefresh == _lastSyncedRefreshMode &&
             DisplayManager.GetCurrentRefreshRate() == _lastSyncedRefreshHz)
             return;
-
-        // A mode apply is what rewrites MCHBAR, so a cap written earlier can no longer be trusted to
-        // be the firmware's number until this happens.
-        if (modeChanged) CpuPowerCap.NoteFirmwareRewrite();
 
         RefreshCpuPowerLimits(activeMode);
         RefreshDashboardState();
@@ -1327,7 +1322,7 @@ public partial class NitrousDashboard : Window
 
             // Read here rather than on the UI thread: every one of these goes through the driver.
             var writable = CpuPowerCap.IsWritable();
-            var ceilings = CpuPowerCap.Ceilings();
+            var ceilings = CpuPowerCap.Ceilings(mode);
 
             var source = onBattery ? "on battery" : "on AC";
             var detail = $"CPU power limits: {mode} mode {source}";
@@ -1356,8 +1351,8 @@ public partial class NitrousDashboard : Window
                 }
                 else
                 {
-                    if (firmware is { } asking && ceilings is { } ask)
-                        text += $" · asks {ask.Pl1} W / {ask.Pl2} W";
+                    if (firmware is { } asking)
+                        text += $" · asks {asking.Pl1Watts:0} W / {asking.Pl2Watts:0} W";
                     if (register is { } holding)
                         text += $" · register {holding.Pl1Watts:0} W / {holding.Pl2Watts:0} W";
                 }
@@ -1732,9 +1727,9 @@ public partial class NitrousDashboard : Window
         CpuPowerCapBurstBox.IsEnabled = false;
         CpuPowerCapResetButton.IsEnabled = false;
 
-        var result = await Task.Run(() => CpuPowerCap.Apply(sustained.Watts, burst.Watts));
+        var result = await Task.Run(() => CpuPowerCap.Apply(_cpuPowerProfile, sustained.Watts, burst.Watts));
 
-        if (result.Ok && CpuPowerCap.Ceilings() is { } ceilings)
+        if (result.Ok && CpuPowerCap.Ceilings(_cpuPowerProfile) is { } ceilings)
             CpuPowerCap.SaveFor(_cpuPowerProfile,
                 sustained.Watts == ceilings.Pl1 ? 0 : sustained.Watts,
                 burst.Watts == ceilings.Pl2 ? 0 : burst.Watts);

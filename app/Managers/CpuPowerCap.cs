@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Windows.Forms;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
 
@@ -8,18 +10,18 @@ namespace Nitrous.Managers;
 /// <summary>
 /// Sustained (PL1) and burst (PL2) power caps written to MSR 0x610, held <b>per power profile</b>.
 ///
-/// Lower-only by construction: each field is clamped to the current mode's own request, read from MCHBAR
-/// 0x59A0, so nothing here can ask the package for more power than the firmware already asked for. PL1 is
-/// also held at or below PL2.
+/// Lower-only by construction: each field is clamped to the highest request the firmware has made for this
+/// profile on this power source, read from MCHBAR 0x59A0, so nothing here can ask the package for more power
+/// than the firmware has itself asked for. PL1 is also held at or below PL2.
 ///
 /// Per profile because the firmware's own numbers are neither fixed nor shared: on one ANV15-51 the same
-/// Balanced mode asked 24, 29, 37, 41, 45 and 55 W over a single day (§23.193). A single global cap applied
-/// to every mode therefore looked like it "sometimes applied and sometimes did not" - the clamp was
-/// following a moving ceiling. Values are stored per profile, and a profile with no value is left alone.
+/// Balanced mode asked 24, 29, 37, 41, 45 and 55 W over a single day (§23.193), and later 20 W idle against
+/// 36-45 W under demand (§23.202). Values are stored per profile and power source, and a profile with no
+/// value is left alone.
 ///
-/// The firmware's request is read from MCHBAR, which a write to 0x610 has been reported moving, so once a
-/// cap is written the live copy is not trusted alone: the last reading taken while the firmware owned it is
-/// kept and the smaller of the two is used.
+/// The live request is not the ceiling: it moves with load, so clamping to it made a 25 or 30 W cap
+/// impossible the moment the request dipped. The ceiling is the highest value the firmware has been seen to
+/// ask for, per profile and per power source, which is a bound the firmware chose.
 ///
 /// Bit 63 (the lock) is never written: that would make the register refuse changes until the next boot.
 /// </summary>
@@ -30,8 +32,6 @@ internal static class CpuPowerCap
 
     private const string LegacyPl1Key = "CpuPowerCapWatts";
     private const string LegacyPl2Key = "CpuPowerCapBurstWatts";
-    private const string Pl1CeilingKey = "CpuPowerCapCeiling";
-    private const string Pl2CeilingKey = "CpuPowerCapBurstCeiling";
 
     private const ulong Pl1Mask = 0x7FFF;
     private const ulong Pl2Mask = 0x7FFFUL << 32;
@@ -40,9 +40,7 @@ internal static class CpuPowerCap
 
     private static readonly object Gate = new();
 
-    private static bool _moved;
-    private static Limits? _pristine;
-    private static Limits? _lastApplied;
+    private static readonly Dictionary<(PowerProfile Profile, bool Online), Limits> Learned = new();
     private static (Limits Now, Limits Ask)? _dipNoted;
 
     public readonly record struct Limits(int Pl1, int Pl2);
@@ -50,22 +48,8 @@ internal static class CpuPowerCap
     public readonly record struct Result(bool Ok, string Message);
 
     /// <summary>The caps chosen for a profile; both zero when that profile follows the mode's own limits.</summary>
-    public static Limits SavedFor(PowerProfile profile)
-    {
-        var stored = SettingsManager.Get(KeyFor(profile), "");
-        if (!string.IsNullOrWhiteSpace(stored))
-        {
-            var parts = stored.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 2 &&
-                int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl1) &&
-                int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl2))
-            {
-                return new Limits(Math.Max(0, pl1), Math.Max(0, pl2));
-            }
-        }
-
-        return new Limits(0, 0);
-    }
+    public static Limits SavedFor(PowerProfile profile) =>
+        Parse(SettingsManager.Get(KeyFor(profile), "")) ?? new Limits(0, 0);
 
     public static void SaveFor(PowerProfile profile, int pl1, int pl2)
     {
@@ -89,6 +73,11 @@ internal static class CpuPowerCap
     /// </summary>
     public static void MigrateLegacyCap(PowerProfile profile)
     {
+        // 0.15.0-test.17 learns a ceiling per profile and power source; the one global pair an earlier
+        // build remembered is not read any more and would only mislead a settings dump.
+        SettingsManager.Delete("CpuPowerCapCeiling");
+        SettingsManager.Delete("CpuPowerCapBurstCeiling");
+
         var pl1 = Math.Max(0, SettingsManager.Get(LegacyPl1Key, 0));
         var pl2 = Math.Max(0, SettingsManager.Get(LegacyPl2Key, 0));
         if (pl1 == 0 && pl2 == 0) return;
@@ -104,29 +93,35 @@ internal static class CpuPowerCap
     }
 
     /// <summary>
-    /// The firmware's own limits for this mode: the highest either cap may be set to.
-    ///
-    /// A write can move the firmware's copy, so a live value that is exactly what Nitrous last wrote cannot
-    /// be told apart from the mode's request: there the reading taken while the firmware owned it is kept.
-    /// Any other live value is the firmware's own number - including one that came back up after dipping -
-    /// and is adopted, because a dip must not ratchet the ceiling down for the rest of the session.
+    /// The highest request the firmware has made for this profile on this power source: what a cap is clamped
+    /// to. Battery and AC have separate tables, so they are remembered separately, and the value is kept
+    /// across restarts so a dip at start-up does not hide a mode's real maximum.
     /// </summary>
-    public static Limits? Ceilings()
+    public static Limits? Ceilings(PowerProfile profile)
     {
+        var key = (profile, IsOnline());
         var live = LiveAsk();
 
-        if (!_moved)
+        if (!Learned.TryGetValue(key, out var known))
+            known = Parse(SettingsManager.Get(MaxKey(key), "")) ?? new Limits(0, 0);
+
+        if (live is { } seen && (seen.Pl1 > known.Pl1 || seen.Pl2 > known.Pl2))
         {
-            _pristine = live;
-            return live;
+            known = new Limits(Math.Max(known.Pl1, seen.Pl1), Math.Max(known.Pl2, seen.Pl2));
+            SettingsManager.Save(MaxKey(key), $"{known.Pl1},{known.Pl2}");
         }
 
-        if (live is { } seen && _lastApplied is { } wrote && seen == wrote)
-            return _pristine ?? seen;
+        if (known.Pl1 <= 0 || known.Pl2 <= 0) return live;
 
-        if (live is not null) _pristine = live;
-        return live ?? _pristine;
+        Learned[key] = known;
+        return known;
     }
+
+    private static bool IsOnline() =>
+        SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+
+    private static string MaxKey((PowerProfile Profile, bool Online) key) =>
+        $"CpuPowerCapMax_{key.Profile}_{(key.Online ? "AC" : "DC")}";
 
     /// <summary>The firmware's own request right now, or null when it cannot be read.</summary>
     private static Limits? LiveAsk()
@@ -135,6 +130,22 @@ internal static class CpuPowerCap
         return firmware is { Pl1Watts: > 0, Pl2Watts: > 0 } mode
             ? new Limits((int)Math.Round(mode.Pl1Watts), (int)Math.Round(mode.Pl2Watts))
             : null;
+    }
+
+    /// <summary>A stored "pl1,pl2" pair, or null when it is missing or damaged.</summary>
+    private static Limits? Parse(string? stored)
+    {
+        if (string.IsNullOrWhiteSpace(stored)) return null;
+
+        var parts = stored.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2 ||
+            !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl1) ||
+            !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var pl2))
+        {
+            return null;
+        }
+
+        return new Limits(Math.Max(0, pl1), Math.Max(0, pl2));
     }
 
     /// <summary>What the register holds right now, or null when it cannot be read.</summary>
@@ -148,14 +159,14 @@ internal static class CpuPowerCap
         CpuPowerLimits.ReadRegisterRaw() is { } raw && (raw & LockBit) == 0;
 
     /// <summary>
-    /// Writes both caps, clamped to <see cref="FloorWatts"/> and to the mode's own request, then reads them
+    /// Writes both caps, clamped to <see cref="FloorWatts"/> and to this profile's ceiling, then reads them
     /// back. A null field means "leave this one at the mode's value".
     /// </summary>
-    public static Result Apply(int? pl1Watts, int? pl2Watts)
+    public static Result Apply(PowerProfile profile, int? pl1Watts, int? pl2Watts)
     {
         lock (Gate)
         {
-            if (Ceilings() is not { } mode)
+            if (Ceilings(profile) is not { } mode)
                 return Fail("this mode does not report its limits.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
@@ -186,12 +197,6 @@ internal static class CpuPowerCap
                 return Fail("the register did not keep the value; the old one is back.");
             }
 
-            _moved = true;
-            _pristine = mode;
-            _lastApplied = new Limits(pl1, pl2);
-
-            SettingsManager.Save(Pl1CeilingKey, mode.Pl1);
-            SettingsManager.Save(Pl2CeilingKey, mode.Pl2);
 
             Logger.Info($"CPU power cap: {pl1} W sustained / {pl2} W burst " +
                         $"(this mode asks {mode.Pl1}/{mode.Pl2}).");
@@ -206,11 +211,11 @@ internal static class CpuPowerCap
     /// Puts both fields back to the mode's own request. That is the definition of "no cap", and because the
     /// ceilings are the firmware's own numbers it can never raise a limit above what the mode asked for.
     /// </summary>
-    public static Result Reset()
+    public static Result Reset(PowerProfile profile)
     {
         lock (Gate)
         {
-            if (Ceilings() is not { } mode)
+            if (Ceilings(profile) is not { } mode)
                 return Fail("this mode does not report its limits.");
 
             if (CpuPowerLimits.ReadRegisterRaw() is not { } raw)
@@ -232,10 +237,6 @@ internal static class CpuPowerCap
             if (CpuPowerLimits.ReadRegisterRaw() is not { } check || (check & Fields) != (value & Fields))
                 return Fail("the value did not stick; the register may be locked.");
 
-            _moved = true;
-            _pristine = mode;
-            _lastApplied = mode;
-
             Logger.Info($"CPU power cap: cleared, back to the mode's {mode.Pl1}/{mode.Pl2} W.");
             return new Result(true, $"Back to {mode.Pl1} W sustained / {mode.Pl2} W burst.");
         }
@@ -253,7 +254,7 @@ internal static class CpuPowerCap
     {
         if (!Configured) return;
 
-        if (Ceilings() is not { } mode) return;
+        if (Ceilings(profile) is not { } mode) return;
         if (Applied() is not { } now) return;
 
         var saved = SavedFor(profile);
@@ -277,7 +278,7 @@ internal static class CpuPowerCap
             return;
         }
 
-        Apply(pl1, pl2);
+        Apply(profile, pl1, pl2);
     }
 
     /// <summary>
@@ -311,42 +312,6 @@ internal static class CpuPowerCap
                     $"{live.Pl1}/{live.Pl2} W. A dip in the mode's own request is not written over the cap.");
     }
 
-    /// <summary>
-    /// The firmware has rewritten MCHBAR - a mode was applied, or the machine resumed - so the copy can be
-    /// trusted again.
-    /// </summary>
-    public static void NoteFirmwareRewrite()
-    {
-        lock (Gate)
-        {
-            _moved = false;
-            _pristine = null;
-            _lastApplied = null;
-            _dipNoted = null;
-        }
-    }
-
-    /// <summary>
-    /// Picks up the remembered ceilings in a process that did not perform the write, so a cap applied by
-    /// the tray or by an earlier dashboard is still bounded correctly.
-    /// </summary>
-    internal static void Load()
-    {
-        lock (Gate)
-        {
-            _moved = false;
-            _pristine = null;
-            _lastApplied = null;
-            _dipNoted = null;
-
-            var pl1 = SettingsManager.Get(Pl1CeilingKey, 0);
-            var pl2 = SettingsManager.Get(Pl2CeilingKey, 0);
-            if (pl1 <= 0 || pl2 <= 0) return;
-
-            _moved = true;
-            _pristine = new Limits(pl1, pl2);
-        }
-    }
 
     private static Result Fail(string message)
     {

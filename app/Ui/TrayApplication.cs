@@ -163,7 +163,6 @@ public class TrayApplication : ApplicationContext
 
             CpuPowerCap.MigrateLegacyCap(GetActivePowerProfile(
                 SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online));
-            CpuPowerCap.Load();
             await ApplyPowerSettingsAsync(isStartup: true, force: true);
             if (_shuttingDown) return;
 
@@ -380,10 +379,6 @@ public class TrayApplication : ApplicationContext
             await Task.Delay(6000);
             if (_shuttingDown) return;
 
-            // The firmware restores its own PL1 and clears the clamp bits across sleep, so the value
-            // captured before the first write is no longer what the register holds.
-            CpuPowerCap.NoteFirmwareRewrite();
-
             ResetFanRamp();
             await ApplyPowerSettingsAsync(isStartup: false, force: true);
             if (_shuttingDown) return;
@@ -499,7 +494,7 @@ public class TrayApplication : ApplicationContext
             {
                 await Task.Delay(1500);
                 if (_shuttingDown) return;
-                CpuPowerCap.Reassert(profile);
+                CpuPowerCap.Reassert(profile, modeChanged: true);
                 GpuThermalTarget.Reassert(profile);
                 GpuClockLimit.Reassert(profile);
             });

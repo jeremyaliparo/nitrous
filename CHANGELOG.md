@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.17 - 2026-11-25
+
+### CPU
+
+- **The cap's ceiling is now the highest request the firmware has made for that mode, not the one it is
+  making right now.** On an ANV15-51 the same Balanced mode asks about 20 W when it is idle and 36-45 W under
+  demand, minutes apart - and Nitrous clamped to whatever it read at that instant, so a 25 W cap and then a
+  30 W cap were both written as 20 W the moment the request dipped. The ceiling is remembered per mode and
+  per power source (battery and AC have different tables) and kept across restarts, so a dip can no longer
+  decide how high a cap may be.
+- The card still shows the live request beside what the register holds - `asks 20 W ... register 30 W` - so
+  a dip stays visible instead of silent, while the picker offers up to the learned ceiling.
+- The single remembered ceiling an earlier build kept is deleted on start; it was the lower of two readings
+  and could pin a cap below the mode's real maximum.
+
 ## 0.15.0-test.16 - 2026-11-25
 
 ### CPU
