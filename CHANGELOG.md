@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.18 - 2026-11-25
+
+### Lighting
+
+- **Snake and Disco are no longer offered on the keyboards whose controller has five effects.** On the WMI
+  four-zone keyboards the firmware accepts effect codes 6 and 7 and leaves the keys dark, so both controls
+  existed and could not work. The pickers, the effect hotkey cycle and the sync restore now use the five the
+  controller implements - Breathing, Neon, Wave, Ripple and Zoom - and an effect saved as Snake or Disco is
+  not written at all instead of switching the keys off.
+- **Sound sync now says when it is hearing silence.** Two seconds of zero levels - nothing playing, or the
+  default output device not reaching the meter - is logged once, and the first frame with audio is logged
+  too. Without that, "sound sync does nothing" could not be told apart from a hardware limit in a bug report.
+
 ## 0.15.0-test.17 - 2026-11-25
 
 ### CPU

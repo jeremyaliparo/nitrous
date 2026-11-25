@@ -38,6 +38,9 @@ internal static class LightingSync
     private static volatile bool _running;
     private static string _source = SourceScreen;
     private static bool _writeWarned;
+    private static bool _silenceNoted;
+    private static bool _audioNoted;
+    private static int _silentFrames;
     private static bool _logoAvailable = true;
     private static bool _brightnessOnly;
     private static bool _brightnessWarned;
@@ -90,6 +93,9 @@ internal static class LightingSync
         _diagnostic = SettingsManager.Get("KbSyncDiagnostic", "").Trim().ToLowerInvariant();
             _writeWarned = false;
             _brightnessWarned = false;
+            _silenceNoted = false;
+            _audioNoted = false;
+            _silentFrames = 0;
         _brightnessWrites = 0;
         _brightnessFloorMs = 0;
         _brightnessFailures = 0;
@@ -520,6 +526,25 @@ internal static class LightingSync
 
                     if (SettingsManager.Get("KbSyncDebug", 0) == 1 && frame % 25 == 0)
                         Logger.Info($"Sound sync (Spectrum): {string.Join(",", levels)}");
+                }
+
+                // A bundle should say whether sound sync heard anything: silence is the commonest reason it
+                // looks broken, and the levels are otherwise only visible with the debug flag set.
+                var loudest = levels.Max();
+                if (loudest > 0)
+                {
+                    _silentFrames = 0;
+                    if (!_audioNoted)
+                    {
+                        _audioNoted = true;
+                        Logger.Info($"Sound sync: audio detected (peak band {loudest}%).");
+                    }
+                }
+                else if (!_silenceNoted && ++_silentFrames > 50)
+                {
+                    _silenceNoted = true;
+                    Logger.Info("Sound sync: no audio for 2 s, so the lighting is being held at zero. " +
+                                "Check the default output device, or that something is playing.");
                 }
 
                 if (_brightnessOnly)

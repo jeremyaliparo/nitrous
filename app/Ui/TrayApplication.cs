@@ -809,12 +809,13 @@ public class TrayApplication : ApplicationContext
             var dynamic = string.Equals(SettingsManager.Get("KbStyle", "Static"), "Dynamic",
                 StringComparison.OrdinalIgnoreCase);
             var current = AcerKeyboard.ParseEffect(SettingsManager.Get("KbEffect", "Breathing"));
-            var index = Array.FindIndex(DynamicEffectCycle, entry => entry.Effect == current);
+            var cycle = DynamicEffectCycle.Where(entry => KeyboardLighting.SupportsEffect(entry.Effect)).ToArray();
+            var index = Array.FindIndex(cycle, entry => entry.Effect == current);
             var next = dynamic
-                ? (index + 1 + DynamicEffectCycle.Length) % DynamicEffectCycle.Length
+                ? (index + 1 + cycle.Length) % cycle.Length
                 : index >= 0 ? index : 0;
 
-            name = DynamicEffectCycle[next].Name;
+            name = cycle[next].Name;
             SettingsManager.Save("KbStyle", "Dynamic");
             SettingsManager.Save("KbEffect", name);
             caption = "AREA EFFECT";
@@ -822,10 +823,11 @@ public class TrayApplication : ApplicationContext
         else
         {
             var current = AcerKeyboard.ParseEffect(SettingsManager.Get("KbGlobal_Effect", "Static"));
-            var index = Array.FindIndex(GlobalEffectCycle, entry => entry.Effect == current);
-            var next = (index + 1 + GlobalEffectCycle.Length) % GlobalEffectCycle.Length;
+            var cycle = GlobalEffectCycle.Where(entry => KeyboardLighting.SupportsEffect(entry.Effect)).ToArray();
+            var index = Array.FindIndex(cycle, entry => entry.Effect == current);
+            var next = (index + 1 + cycle.Length) % cycle.Length;
 
-            name = GlobalEffectCycle[next].Name;
+            name = cycle[next].Name;
             SettingsManager.Save("KbGlobal_Effect", name);
             caption = "GLOBAL EFFECT";
         }

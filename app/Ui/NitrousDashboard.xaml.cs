@@ -49,6 +49,10 @@ public partial class NitrousDashboard : Window
     private bool _gpuClockUpdating;
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
+    /// <summary>The effect lists as offered on this machine: a five-effect controller hides the last two.</summary>
+    private (string Name, KeyboardEffect Effect)[] _keyboardEffects = KeyboardEffects;
+    private (string Name, KeyboardEffect Effect)[] _dynamicEffects = DynamicEffects;
+
     public NitrousDashboard()
     {
         InitializeComponent();
@@ -233,12 +237,12 @@ public partial class NitrousDashboard : Window
         _keyboardLoading = true;
         try
         {
-            var globalIndex = Array.FindIndex(KeyboardEffects, item => item.Effect == globalEffect);
+            var globalIndex = Array.FindIndex(_keyboardEffects, item => item.Effect == globalEffect);
             if (globalIndex >= 0 && GlobalEffectBox.SelectedIndex != globalIndex)
                 GlobalEffectBox.SelectedIndex = globalIndex;
             _globalEffect = globalEffect;
 
-            var areaIndex = Array.FindIndex(DynamicEffects, item => item.Effect == areaEffect);
+            var areaIndex = Array.FindIndex(_dynamicEffects, item => item.Effect == areaEffect);
             if (areaIndex >= 0 && KeyboardEffectBox.SelectedIndex != areaIndex)
                 KeyboardEffectBox.SelectedIndex = areaIndex;
             _keyboardEffect = areaEffect;
@@ -1794,17 +1798,20 @@ public partial class NitrousDashboard : Window
 
         _keyboardBrightness = Math.Clamp(SettingsManager.Get("KbBrightness", 100), 0, 100);
 
-        foreach (var (name, _) in DynamicEffects)
+        _dynamicEffects = DynamicEffects.Where(e => KeyboardLighting.SupportsEffect(e.Effect)).ToArray();
+        _keyboardEffects = KeyboardEffects.Where(e => KeyboardLighting.SupportsEffect(e.Effect)).ToArray();
+
+        foreach (var (name, _) in _dynamicEffects)
             KeyboardEffectBox.Items.Add(name);
 
-        foreach (var (name, _) in KeyboardEffects)
+        foreach (var (name, _) in _keyboardEffects)
             GlobalEffectBox.Items.Add(name);
 
         foreach (var (name, _) in LogoEffects)
             LogoEffectBox.Items.Add(name);
 
-        _keyboardEffect = LoadEffect(KeyboardEffectBox, DynamicEffects, "KbEffect");
-        _globalEffect = LoadEffect(GlobalEffectBox, KeyboardEffects, "KbGlobal_Effect");
+        _keyboardEffect = LoadEffect(KeyboardEffectBox, _dynamicEffects, "KbEffect");
+        _globalEffect = LoadEffect(GlobalEffectBox, _keyboardEffects, "KbGlobal_Effect");
         _logoEffect = LoadEffect(LogoEffectBox, LogoEffects, "KbLogo_Effect");
 
         _keyboardSpeed = Math.Clamp(
@@ -2520,8 +2527,8 @@ public partial class NitrousDashboard : Window
         if (IgnoreLightingChanges || GlobalEffectBox.SelectedIndex < 0)
             return;
 
-        _globalEffect = KeyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
-        SettingsManager.Save("KbGlobal_Effect", KeyboardEffects[GlobalEffectBox.SelectedIndex].Name);
+        _globalEffect = _keyboardEffects[GlobalEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbGlobal_Effect", _keyboardEffects[GlobalEffectBox.SelectedIndex].Name);
         UpdateLightingInteractivity();
         if (!_syncEnabled) ApplyGlobalLighting();
     }
@@ -2802,8 +2809,8 @@ public partial class NitrousDashboard : Window
     {
         if (IgnoreLightingChanges || KeyboardEffectBox.SelectedIndex < 0) return;
 
-        _keyboardEffect = DynamicEffects[KeyboardEffectBox.SelectedIndex].Effect;
-        SettingsManager.Save("KbEffect", DynamicEffects[KeyboardEffectBox.SelectedIndex].Name);
+        _keyboardEffect = _dynamicEffects[KeyboardEffectBox.SelectedIndex].Effect;
+        SettingsManager.Save("KbEffect", _dynamicEffects[KeyboardEffectBox.SelectedIndex].Name);
         UpdateLightingInteractivity();
         if (!_syncEnabled) ApplyKeyboardLighting();
     }

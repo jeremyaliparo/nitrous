@@ -35,6 +35,10 @@ internal static class KeyboardLighting
             ? AcerKeyboard.SetZoneColors(colors, brightness)
             : WmiKeyboard.SetZoneColors(colors, brightness);
 
+    /// <summary>Whether the backend present implements this effect.</summary>
+    public static bool SupportsEffect(KeyboardEffect effect) =>
+        AcerKeyboard.IsAvailable() || WmiKeyboard.SupportsEffect(effect);
+
     public static bool SetEffect(
         KeyboardEffect effect, int brightness, int speed, bool leftwards, KeyboardColor color) =>
         AcerKeyboard.IsAvailable()

@@ -47,6 +47,7 @@ internal static class WmiKeyboard
 
     private static bool? _available;
     private static bool _effectWritable;
+    private static bool _unsupportedEffectLogged;
     private static bool _switchesWritable;
     private static bool _switchesAttempted;
     private static int _zones = AcerWmiProtocol.KeyboardZones;
@@ -162,11 +163,31 @@ internal static class WmiKeyboard
         return SetZoneColors(scaled, peak);
     }
 
+    /// <summary>
+    /// The effects this firmware implements. The EC on this family handles five, Breathing through Zoom:
+    /// codes 6 and 7 are accepted and leave the keyboard dark (§23.203). Nothing readable says which set a
+    /// unit has, so the five are the ones offered rather than letting two controls look broken.
+    /// </summary>
+    public static bool SupportsEffect(KeyboardEffect effect) =>
+        effect is not (KeyboardEffect.Meteor or KeyboardEffect.Twinkling);
+
     /// <summary>One effect across all four zones.</summary>
     public static bool SetEffect(
         KeyboardEffect effect, int brightness, int speed, bool leftwards, KeyboardColor color)
     {
         if (!EffectWritable) return false;
+
+        if (!SupportsEffect(effect))
+        {
+            if (!_unsupportedEffectLogged)
+            {
+                _unsupportedEffectLogged = true;
+                Logger.Info("Keyboard: this firmware implements five effects, so Snake and Disco were not written.");
+            }
+
+            return false;
+        }
+
         return WriteRecord(effect, brightness, speed, leftwards, color);
     }
 
