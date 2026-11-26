@@ -42,6 +42,9 @@ public class TrayApplication : ApplicationContext
 
     private readonly GlobalHotkeyManager _hotkeys = new();
     private readonly EventWaitHandle _hotkeyChanged = HotkeyChangeSignal.CreateReceiver();
+
+    /// <summary>The keep-awake value this tray has applied; the engine tick watches for a change.</summary>
+    private bool _keepAwakeWanted;
     private readonly Control _uiInvoker = new();
 
     // Serializes dashboard launches. A newly spawned dashboard needs a moment to create its
@@ -195,6 +198,10 @@ public class TrayApplication : ApplicationContext
                 Logger.Warn("Lighting: startup restore failed.", ex);
             }
         });
+
+        // A thread execution-state flag, so it is set on this thread: the tray outlives every dashboard.
+        _keepAwakeWanted = SettingsManager.Get("KeepAwake", 0) == 1;
+        KeepAwake.Apply(_keepAwakeWanted);
 
         StartBackgroundEngine();
     }
@@ -917,6 +924,15 @@ public class TrayApplication : ApplicationContext
                     {
                         // The dashboard is a separate process. Pick up hotkey edits without
                         // requiring a restart of the background engine.
+                        // The dashboard writes the preference; this thread holds the request. Only a
+                        // change is marshalled, so a steady setting costs one registry read per tick.
+                        var keepAwake = SettingsManager.Get("KeepAwake", 0) == 1;
+                        if (keepAwake != _keepAwakeWanted)
+                        {
+                            _keepAwakeWanted = keepAwake;
+                            RunOnUi(() => KeepAwake.Apply(keepAwake));
+                        }
+
                         var cycleHotkey = SettingsManager.Get("Hotkey_CyclePower", "");
                         var dashboardHotkey = SettingsManager.Get("Hotkey_Dashboard", "");
                         if (!string.Equals(cycleHotkey, _registeredCycleHotkey, StringComparison.Ordinal) ||

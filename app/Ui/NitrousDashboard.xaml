@@ -509,6 +509,64 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- The alternative: a clearly visible bar, for anyone who wants to see where they are. -->
+        <ControlTemplate x:Key="WideScrollBarTemplate" TargetType="{x:Type ScrollBar}">
+            <Grid Width="{TemplateBinding Width}" Background="Transparent">
+                <Border Background="{DynamicResource SurfaceRaisedBrush}" CornerRadius="4" Margin="1,2"/>
+                <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True" Margin="0,4">
+                    <Track.DecreaseRepeatButton>
+                        <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                      Focusable="False" IsTabStop="False">
+                            <RepeatButton.Template>
+                                <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                    <Border Background="Transparent"/>
+                                </ControlTemplate>
+                            </RepeatButton.Template>
+                        </RepeatButton>
+                    </Track.DecreaseRepeatButton>
+                    <Track.Thumb>
+                        <Thumb MinHeight="24" Cursor="Hand">
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="{x:Type Thumb}">
+                                    <Border x:Name="ThumbBorder" Background="{DynamicResource TextMutedBrush}" CornerRadius="4" Margin="3,0"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsDragging" Value="True">
+                                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Track.Thumb>
+                    <Track.IncreaseRepeatButton>
+                        <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                      Focusable="False" IsTabStop="False">
+                            <RepeatButton.Template>
+                                <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                    <Border Background="Transparent"/>
+                                </ControlTemplate>
+                            </RepeatButton.Template>
+                        </RepeatButton>
+                    </Track.IncreaseRepeatButton>
+                </Track>
+            </Grid>
+        </ControlTemplate>
+
+        <!-- Applied by all four pages; the appearance toggle swaps the width and the template. -->
+        <Style x:Key="PageScrollBarStyle" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShowScrollbars}" Value="True">
+                    <Setter Property="Width" Value="12"/>
+                    <Setter Property="MinWidth" Value="12"/>
+                    <Setter Property="Template" Value="{StaticResource WideScrollBarTemplate}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="ZoneSwatchStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
@@ -579,7 +637,35 @@
                             </StackPanel>
                         </Grid>
                     </Border>
-					<!-- 2. Pin to Top Toggle -->
+					<!-- 2. Keep awake -->
+					<ToggleButton x:Name="BtnKeepAwake"
+                                Cursor="Hand"
+                                Margin="0,0,12,0"
+                                ToolTip="Keep the laptop and its screen awake"
+                                Checked="KeepAwake_Toggled" Unchecked="KeepAwake_Toggled">
+						<ToggleButton.Template>
+							<ControlTemplate TargetType="ToggleButton">
+								<Grid Background="Transparent">
+									<Path x:Name="CoffeeIcon"
+                                        Fill="{DynamicResource TextMutedBrush}"
+                                        Stretch="Uniform"
+                                        Width="13"
+                                        Height="13"
+                                        Data="M2,21H20V19H2M20,8H18V5H20M20,3H4V13A4,4 0 0,0 8,17H16A4,4 0 0,0 20,13V11H22V8H20M18,13A2,2 0 0,1 16,15H8A2,2 0 0,1 6,13V5H18V13Z"
+                                        VerticalAlignment="Center"/>
+								</Grid>
+								<ControlTemplate.Triggers>
+									<Trigger Property="IsMouseOver" Value="True">
+										<Setter TargetName="CoffeeIcon" Property="Fill" Value="{DynamicResource TextStrongBrush}"/>
+									</Trigger>
+									<Trigger Property="IsChecked" Value="True">
+										<Setter TargetName="CoffeeIcon" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+									</Trigger>
+								</ControlTemplate.Triggers>
+							</ControlTemplate>
+						</ToggleButton.Template>
+					</ToggleButton>
+					<!-- 3. Pin to Top Toggle -->
 					<ToggleButton x:Name="BtnPinTop"
                                 Cursor="Hand"
                                 Margin="0,0,12,0"
@@ -609,7 +695,7 @@
 							</ControlTemplate>
 						</ToggleButton.Template>
 					</ToggleButton>
-					<!-- 3. Close Button -->
+					<!-- 4. Close Button -->
 					<Button Content="✕" Foreground="{DynamicResource TextMutedBrush}" Background="Transparent" BorderThickness="0" FontSize="14" FontWeight="Bold" Click="CloseBtn_Click" Cursor="Hand">
 						<Button.Template>
 							<ControlTemplate TargetType="Button">
@@ -627,7 +713,7 @@
 				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
 				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
 					<ScrollViewer.Resources>
-						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource PageScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
 					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
@@ -860,7 +946,7 @@
 				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
 				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
 					<ScrollViewer.Resources>
-						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource PageScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,10">
 					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,10" Padding="12">
@@ -1317,6 +1403,16 @@
 								<TextBlock Text="Font" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 								<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}"/>
 							</Grid>
+							<Grid Margin="0,8,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Text="Scrollbars" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<CheckBox Grid.Column="1" x:Name="TogScrollbars" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
+								          IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
+								          ToolTip="A wide, clearly visible scrollbar on every page."/>
+							</Grid>
 						</StackPanel>
 					</Border>
 
@@ -1389,7 +1485,7 @@
 				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
 				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
 					<ScrollViewer.Resources>
-						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource PageScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
 					<!-- Compact Hero Banner -->
@@ -1567,7 +1663,7 @@
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
                 	<ScrollViewer.Resources>
-                		<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+                		<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource PageScrollBarStyle}"/>
                 	</ScrollViewer.Resources>
                 	<StackPanel Margin="0,0,4,16">
 					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">

@@ -62,7 +62,11 @@ public partial class NitrousDashboard : Window
         BuildAppearanceSwatches();
         BuildFontChoices();
 
-        DataContext = new DashboardViewModel();
+        // Read before the binding exists, so the toggle cannot write a default back over it.
+        DataContext = new DashboardViewModel
+        {
+            ShowScrollbars = SettingsManager.Get("ShowScrollbars", 0) == 1
+        };
 
         // The tray process owns the global hotkey and writes the active profile to
         // settings. Poll that cross-process state so the dashboard follows hotkey,
@@ -85,6 +89,10 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
+
+        _keepAwakeLoading = true;
+        BtnKeepAwake.IsChecked = SettingsManager.Get("KeepAwake", 0) == 1;
+        _keepAwakeLoading = false;
 
         // A cap saved by an older build's single-value model belongs to the active profile now; the
         // ceiling that bounds it is learned per profile and power source when the card refreshes.
@@ -934,6 +942,25 @@ public partial class NitrousDashboard : Window
         Left = workArea.Left + Math.Max(0, (workArea.Width - windowWidth) / 2);
         Top = workArea.Top + Math.Max(0, (workArea.Height - windowHeight) / 2);
         Logger.Info($"Dashboard: recovered the window from ({rect.Left},{rect.Top}) to ({Left:0},{Top:0}).");
+    }
+
+    /// <summary>
+    /// Keeps the machine and screen awake. The saved value is what the tray applies on its own thread, so
+    /// the request survives this window closing; this process applies it too for an instant response.
+    /// </summary>
+    private void KeepAwake_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_keepAwakeLoading) return;
+
+        var on = BtnKeepAwake.IsChecked == true;
+        SettingsManager.Save("KeepAwake", on ? 1 : 0);
+        KeepAwake.Apply(on);
+    }
+
+    /// <summary>Appearance: the binding has already updated the view model; the value is remembered here.</summary>
+    private void Scrollbars_Toggled(object sender, RoutedEventArgs e)
+    {
+        SettingsManager.Save("ShowScrollbars", TogScrollbars.IsChecked == true ? 1 : 0);
     }
 
     private void Window_Activated(object sender, EventArgs e)
@@ -3318,6 +3345,7 @@ public partial class NitrousDashboard : Window
     private sealed record RefreshChoice(string Label, int? Hz);
 
     private bool _refreshControlsLoading;
+    private bool _keepAwakeLoading;
 
     /// <summary>
     /// Fills the dropdown with Auto and the rates the display advertises, and marks the saved

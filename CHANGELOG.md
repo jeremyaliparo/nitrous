@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.21 - 2026-11-27
+
+### Keep awake
+
+- **A coffee toggle in the title bar, left of Pin to Top, keeps the machine and its screen awake.** It is a
+  Windows thread execution-state flag, not a timer, thread or service: one call when it is switched and
+  nothing in between, so an idle Nitrous with it on costs no CPU at all. The tray holds the request on its
+  own thread, so it survives closing the dashboard; the dashboard applies it too for an immediate response
+  to the click. Off by default.
+- The value is a plain setting, so it stays as it was left across restarts and appears in diagnostics.
+
+### Appearance
+
+- **Show scrollbars** (Settings → Appearance): the four pages can use a wide, clearly visible scrollbar
+  instead of the thin, quiet one. It is the same control either way - only the width and the thumb are
+  swapped, and the choice is remembered.
+
 ## 0.15.0-test.20 - 2026-11-26
 
 ### Display

@@ -209,6 +209,15 @@ public class DashboardViewModel : ObservableObject, IDisposable
         GpuMemoryOffset = memory;
     }
 
+    private bool _showScrollbars;
+
+    /// <summary>Appearance: the four pages use the wider, clearly visible scrollbar.</summary>
+    public bool ShowScrollbars
+    {
+        get => _showScrollbars;
+        set => SetProperty(ref _showScrollbars, value);
+    }
+
     private bool _manageGpuClocks;
     /// <summary>
     /// Explicit ownership switch for GPU core/memory clock writes. Off means read-only:
