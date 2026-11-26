@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.23 - 2026-11-27
+
+### Appearance
+
+- **Scrollbars is now a plain show/hide switch for the four pages' scrollbar.** On - the default - leaves the
+  existing thin scrollbar exactly as it always was; off hides it, and the wheel, the keyboard and touch
+  panning still scroll the page. The two earlier builds widened and restyled the bar, which was not what was
+  asked; that work is gone.
+
 ## 0.15.0-test.22 - 2026-11-27
 
 ### Appearance

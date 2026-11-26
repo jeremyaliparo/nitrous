@@ -62,12 +62,15 @@ public partial class NitrousDashboard : Window
         BuildAppearanceSwatches();
         BuildFontChoices();
 
-        // Read before the binding exists, so the toggle cannot write a default back over it.
+        // Shown unless it has been turned off; read before the binding exists so the toggle cannot
+        // write a default back over the saved choice.
+        var showScrollbars = SettingsManager.Get("ShowScrollbars", 1) == 1;
         DataContext = new DashboardViewModel
         {
-            ShowScrollbars = SettingsManager.Get("ShowScrollbars", 0) == 1
+            ShowScrollbars = showScrollbars
         };
-        ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 0) == 1);
+        ApplyScrollbarMode(showScrollbars);
+        Loaded += (_, _) => ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 1) == 1);
 
         // The tray process owns the global hotkey and writes the active profile to
         // settings. Poll that cross-process state so the dashboard follows hotkey,
@@ -967,18 +970,20 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// The whole scrollbar is a layout element, not an overlay: showing it reserves its width on all four
-    /// pages, and hiding it goes back to the thin bar that appears only when a page overflows.
+    /// Appearance: shows or hides the scrollbar on the four pages. Hidden only takes the bar away -
+    /// the wheel, the keyboard and touch panning still scroll the page.
     /// </summary>
     private void ApplyScrollbarMode(bool show)
     {
-        var mode = show ? System.Windows.Controls.ScrollBarVisibility.Visible
-                        : System.Windows.Controls.ScrollBarVisibility.Auto;
+        var mode = show ? System.Windows.Controls.ScrollBarVisibility.Auto
+                        : System.Windows.Controls.ScrollBarVisibility.Hidden;
 
         DashPage.VerticalScrollBarVisibility = mode;
         GpuPage.VerticalScrollBarVisibility = mode;
         KeyboardPage.VerticalScrollBarVisibility = mode;
         SettingsPage.VerticalScrollBarVisibility = mode;
+
+        Logger.Info($"Appearance: scrollbar {(show ? "shown" : "hidden")} on the four pages.");
     }
 
     private void Window_Activated(object sender, EventArgs e)
