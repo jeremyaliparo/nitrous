@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.24 - 2026-11-27
+
+### GPU
+
+- **The thermal limit is now genuinely per power profile.** Setting 85 C in Balanced left the driver holding
+  85 in Performance: both re-asserts skipped a profile with no saved value, and the driver keeps one global
+  thermal target, so nothing put it back. A profile with no value now restores the driver's default (87 C),
+  and a profile with a value gets that value on every mode change.
+- **The core clock limit follows the profile too.** A cap set in one profile stayed in the next for the same
+  reason; a profile without a cap now clears the driver's lock, so the GPU boosts freely there.
+- **Every mode change applies them**, including the hotkey and the mode key - the tray's cycle re-applied the
+  GPU offsets but not these two. The GPU page also refreshes its limit cards when a mode change arrives while
+  it is open, instead of leaving the previous mode's reading on screen.
+
 ## 0.15.0-test.23 - 2026-11-27
 
 ### Appearance

@@ -157,17 +157,21 @@ internal static class GpuClockLimit
         }
     }
 
-    /// <summary>Applies the profile's cap on a mode change, at start-up or after a resume.</summary>
+    /// <summary>
+    /// Applies the profile's cap on a mode change, at start-up or after a resume. A profile with no cap
+    /// clears the driver's lock: the cap is one global setting, so "this profile has none" can only mean
+    /// no lock, or the previous profile's cap would follow the user into every mode.
+    /// </summary>
     public static void Reassert(PowerProfile profile)
     {
         if (!Managing) return;
 
         var saved = SavedFor(profile);
-        if (saved == 0) return;
+        if (CurrentCapMhz() is not { } current) return;
+        if (current == saved) return;
 
-        if (CurrentCapMhz() == saved) return;
-
-        Apply(saved);
+        // Apply(null) is what clears the lock; zero would be clamped up to the floor.
+        Apply(saved == 0 ? null : saved);
     }
 
     private static PhysicalGPU? LaptopGpu() =>

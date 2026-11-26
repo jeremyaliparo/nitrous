@@ -114,20 +114,24 @@ internal static class GpuThermalTarget
     }
 
     /// <summary>
-    /// Applies the profile's chosen target - on a mode change, after a resume, or at start-up. Does
-    /// nothing unless management is on and the profile has a value other than the default.
+    /// Applies the profile's chosen target - on a mode change, after a resume, or at start-up.
+    ///
+    /// A profile with no value restores the driver's default rather than leaving the register alone: the
+    /// policy is one global target, so "this profile has none" can only mean the default, or the previous
+    /// profile's target would follow the user into every mode (measured: 85 C set in Balanced stayed on in
+    /// Performance, and GPU-Z confirmed the driver still held 85).
     /// </summary>
     public static void Reassert(PowerProfile profile)
     {
         if (!Managing) return;
 
         var saved = SavedFor(profile);
-        if (saved == 0) return;
-
         if (Read() is not { } limits) return;
-        if (limits.Current == Math.Min(saved, limits.Default)) return;
 
-        Apply(saved);
+        var target = saved == 0 ? limits.Default : Math.Min(saved, limits.Default);
+        if (limits.Current == target) return;
+
+        Apply(saved == 0 ? null : saved);
     }
 
     private static PhysicalGPU? LaptopGpu() =>

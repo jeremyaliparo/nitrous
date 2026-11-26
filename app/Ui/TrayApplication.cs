@@ -667,6 +667,12 @@ public class TrayApplication : ApplicationContext
                     await CpuPowerManager.ApplyProfileLimitsAsync(nextProfile, isOnline).ConfigureAwait(false);
 
                 await _gpuManager.ApplyPowerProfileOcAsync(nextProfile, allowStockReset: true, source: "hotkey").ConfigureAwait(false);
+
+                // These are global driver settings held per profile, so the mode change is where the next
+                // profile's values (or the defaults) are applied.
+                GpuThermalTarget.Reassert(nextProfile);
+                GpuClockLimit.Reassert(nextProfile);
+
                 ResetFanRamp();
             }
             catch (Exception ex)

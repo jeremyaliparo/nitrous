@@ -198,6 +198,18 @@ public partial class NitrousDashboard : Window
             return;
 
         RefreshCpuPowerLimits(activeMode);
+
+        // The GPU's limit cards show driver state, not the saved setting, so a mode change while the page
+        // is open has to refresh them - after the tray has had time to re-assert the new profile's values.
+        if (modeChanged && _activeNavIndex == 1)
+        {
+            RefreshGpuThermalTarget();
+            _ = Task.Delay(2200).ContinueWith(_ =>
+            {
+                if (!Dispatcher.HasShutdownStarted) Dispatcher.InvokeAsync(RefreshGpuThermalTarget);
+            });
+        }
+
         RefreshDashboardState();
     }
 
