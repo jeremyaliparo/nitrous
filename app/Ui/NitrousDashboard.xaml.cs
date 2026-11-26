@@ -73,6 +73,10 @@ public partial class NitrousDashboard : Window
         ApplyScrollbarMode(showScrollbars);
         Loaded += (_, _) => ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 1) == 1);
 
+        _setupTabLoading = true;
+        SelectSetupTab(SettingsManager.Get("SetupTab", "Power"));
+        _setupTabLoading = false;
+
         // The tray process owns the global hotkey and writes the active profile to
         // settings. Poll that cross-process state so the dashboard follows hotkey,
         // auto-switch, and AC/DC changes without being reopened.
@@ -340,6 +344,15 @@ public partial class NitrousDashboard : Window
         var bottom = key.EndsWith("-bottom");
         if (bottom) key = key[..^"-bottom".Length];
 
+        if (key.StartsWith("setup"))
+        {
+            SelectSetupTab(
+                key.Contains("system") ? "System"
+                : key.Contains("keys") || key.Contains("keyboard") || key.Contains("hotkey") ? "Keyboard"
+                : key.Contains("appearance") || key.Contains("theme") ? "Appearance"
+                : "Power");
+        }
+
         var index = key switch
         {
             "gpu" or "gpu-thermal" or "gpu-clock" => 1,
@@ -347,6 +360,9 @@ public partial class NitrousDashboard : Window
             "setup" or "settings" or "setup-hotkeys" or "setup-limits" => 3,
             _ => 0
         };
+
+        // Any setup-<category> token is the SETUP page; the category decides which tab.
+        if (key.StartsWith("setup")) index = 3;
 
         // "lighting-area", "lighting-logo", "lighting-area-dynamic" all open the same page.
         if (key.StartsWith("lighting")) index = 2;
@@ -398,7 +414,7 @@ public partial class NitrousDashboard : Window
             {
                 1 => GpuPage,
                 2 => KeyboardPage,
-                3 => SettingsPage,
+                3 => SettingsScroller,
                 _ => DashPage
             };
             scroller.ScrollToEnd();
@@ -975,6 +991,51 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>Appearance: the binding has already updated the view model; the value is remembered here.</summary>
+    private bool _setupTabLoading;
+
+    /// <summary>
+    /// SETUP shows one category at a time. The tabs are pinned above the scroller, so the header and the
+    /// categories stay reachable however long the selected one is.
+    /// </summary>
+    private void SetupTab_Checked(object sender, RoutedEventArgs e)
+    {
+        if (SetupPowerPanel is null) return;
+
+        var power = SetupPowerTab.IsChecked == true;
+        var system = SetupSystemTab.IsChecked == true;
+        var keyboard = SetupKeyboardTab.IsChecked == true;
+
+        SetupPowerPanel.Visibility = power ? Visibility.Visible : Visibility.Collapsed;
+        SetupSystemPanel.Visibility = system ? Visibility.Visible : Visibility.Collapsed;
+        SetupKeyboardPanel.Visibility = keyboard ? Visibility.Visible : Visibility.Collapsed;
+        SetupAppearancePanel.Visibility = !power && !system && !keyboard
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (_setupTabLoading) return;
+
+        SettingsScroller.ScrollToTop();
+
+        if (!_captureMode)
+        {
+            SettingsManager.Save("SetupTab",
+                power ? "Power" : system ? "System" : keyboard ? "Keyboard" : "Appearance");
+        }
+    }
+
+    private void SelectSetupTab(string? name)
+    {
+        var tab = name switch
+        {
+            "System" => SetupSystemTab,
+            "Keyboard" or "Keys" => SetupKeyboardTab,
+            "Appearance" or "Theme" => SetupAppearanceTab,
+            _ => SetupPowerTab
+        };
+
+        tab.IsChecked = true;
+    }
+
     private void Scrollbars_Toggled(object sender, RoutedEventArgs e)
     {
         var show = TogScrollbars.IsChecked == true;
@@ -994,7 +1055,7 @@ public partial class NitrousDashboard : Window
         DashPage.VerticalScrollBarVisibility = mode;
         GpuPage.VerticalScrollBarVisibility = mode;
         KeyboardPage.VerticalScrollBarVisibility = mode;
-        SettingsPage.VerticalScrollBarVisibility = mode;
+        SettingsScroller.VerticalScrollBarVisibility = mode;
 
         Logger.Info($"Appearance: scrollbar {(show ? "shown" : "hidden")} on the four pages.");
     }

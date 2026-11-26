@@ -509,6 +509,14 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- A card's status line: gone, margin and all, until it has text. -->
+        <Style x:Key="CardStatusStyle" TargetType="TextBlock">
+            <Style.Triggers>
+                <Trigger Property="Text" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="ZoneSwatchStyle" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}"/>
@@ -884,13 +892,13 @@
 					</StackPanel>
 				</ScrollViewer>
 				<!-- 2. SETTINGS PAGE (Bound to Properties) -->
-				<ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" Margin="20,10,20,0"
-				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-				              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
-					<ScrollViewer.Resources>
-						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
-					</ScrollViewer.Resources>
-					<StackPanel Margin="0,0,4,10">
+				<!-- 2. SETTINGS PAGE: the header and the category tabs stay put; only the category scrolls -->
+				<Grid x:Name="SettingsPage" Visibility="Collapsed" Margin="20,10,20,0">
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="*"/>
+					</Grid.RowDefinitions>
 					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,10" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
 							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
@@ -902,526 +910,556 @@
 							</StackPanel>
 						</StackPanel>
 					</Border>
+					<!-- One category at a time; the same tab strip the LIGHT page uses. -->
+					<Border Grid.Row="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+						<UniformGrid Rows="1" Height="32">
+							<RadioButton x:Name="SetupPowerTab" Tag="M7,2V13H10V22L17,10H13L15,2H7Z" TabIndex="0" GroupName="Setup" Content="Power" ToolTip="CPU power limits and battery" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
+							<RadioButton x:Name="SetupSystemTab" Tag="M3,17V19H9V17H3M3,5V7H13V5H3M13,21V19H21V17H13V15H11V21H13M7,9V11H3V13H7V15H9V9H7M14,9V11H21V9H14M11,3V9H13V7H21V5H13V3H11Z" TabIndex="1" GroupName="Setup" Content="System" ToolTip="Telemetry, startup, boot logo, Acer services, diagnostics" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
+							<RadioButton x:Name="SetupKeyboardTab" Tag="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M13,10H11V8H13M13,13H11V11H13M8,10H6V8H8M8,13H6V11H8M5,10H3V8H5M5,13H3V11H5M4,17H20V15H4M22,5H2A2,2 0 0,0 0,7V17A2,2 0 0,0 2,19H22A2,2 0 0,0 24,17V7A2,2 0 0,0 22,5Z" TabIndex="2" GroupName="Setup" Content="Keys" ToolTip="Hotkeys, sticky keys, backlight and sound sync" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
+							<RadioButton x:Name="SetupAppearanceTab" Tag="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" TabIndex="3" GroupName="Setup" Content="Theme" ToolTip="Accent, background, font and scrollbars" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
+						</UniformGrid>
+					</Border>
 
-					<TextBlock Text="POWER &amp; PERFORMANCE" Style="{StaticResource SetupSectionLabelStyle}"/>
+					<ScrollViewer x:Name="SettingsScroller" Grid.Row="2"
+					              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+					              BorderThickness="0" FocusVisualStyle="{x:Null}" PanningMode="VerticalOnly">
+						<ScrollViewer.Resources>
+							<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
+						</ScrollViewer.Resources>
+						<StackPanel Margin="0,0,4,10">
 
-					<!-- CPU power limits and processor boost -->
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<StackPanel>
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-									<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-										<Path Data="M7,4V6H5C3.89,6 3,6.89 3,8V10H1V12H3V14H1V16H3V18C3,19.1 3.89,20 5,20H7V22H9V20H11V22H13V20H15V22H17V20H19C20.1,20 21,19.1 21,18V16H23V14H21V12H23V10H21V8C21,6.89 20.1,6 19,6H17V4H15V6H13V4H11V6H9V4H7M5,8H19V18H5V8M7,10V16H17V10H7M9,12H15V14H9V12Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-										<TextBlock Text="CPU Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+							<StackPanel x:Name="SetupPowerPanel">
+								<TextBlock Text="POWER &amp; PERFORMANCE" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<!-- CPU power limits and processor boost -->
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+												<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+													<Path Data="M7,4V6H5C3.89,6 3,6.89 3,8V10H1V12H3V14H1V16H3V18C3,19.1 3.89,20 5,20H7V22H9V20H11V22H13V20H15V22H17V20H19C20.1,20 21,19.1 21,18V16H23V14H21V12H23V10H21V8C21,6.89 20.1,6 19,6H17V4H15V6H13V4H11V6H9V4H7M5,8H19V18H5V8M7,10V16H17V10H7M9,12H15V14H9V12Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+													<TextBlock Text="CPU Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+												</StackPanel>
+												<TextBlock Text="Adjust Windows CPU power limits and processor boost for the active profile." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+											</StackPanel>
+											<CheckBox Grid.Column="1" x:Name="TogManageCpu" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ManageCpuPower, UpdateSourceTrigger=PropertyChanged}"/>
+										</Grid>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
+										<TextBlock Text="PROCESSOR BOOST" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="Auto"/>
+												<ColumnDefinition Width="*"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Plugged in" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
+											          Style="{StaticResource CompactComboBoxStyle}"
+											          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
+											          SelectedItem="{Binding BoostAcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+											          IsEnabled="{Binding IsBoostSupported}"
+											          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
+										</Grid>
+										<Grid Margin="0,6,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="Auto"/>
+												<ColumnDefinition Width="*"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="On battery" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
+											          Style="{StaticResource CompactComboBoxStyle}"
+											          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
+											          SelectedItem="{Binding BoostDcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+											          IsEnabled="{Binding IsBoostSupported}"
+											          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Grid.Column="0" Text="{Binding BoostStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"
+											           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+											<Button Grid.Column="1" Content="RESTORE" Command="{Binding RestoreBoostCommand}"
+											        Style="{StaticResource SetupActionButtonStyle}"
+											        ToolTip="Restore the boost values Windows had before Nitrous changed them."
+											        IsEnabled="{Binding IsBoostSupported}"/>
+										</Grid>
 									</StackPanel>
-									<TextBlock Text="Adjust Windows CPU power limits and processor boost for the active profile." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-								</StackPanel>
-								<CheckBox Grid.Column="1" x:Name="TogManageCpu" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ManageCpuPower, UpdateSourceTrigger=PropertyChanged}"/>
-							</Grid>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
-							<TextBlock Text="PROCESSOR BOOST" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="Auto"/>
-									<ColumnDefinition Width="*"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="Plugged in" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
-								          Style="{StaticResource CompactComboBoxStyle}"
-								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
-								          SelectedItem="{Binding BoostAcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								          IsEnabled="{Binding IsBoostSupported}"
-								          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
-							</Grid>
-							<Grid Margin="0,6,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="Auto"/>
-									<ColumnDefinition Width="*"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="On battery" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" Width="190" HorizontalAlignment="Right"
-								          Style="{StaticResource CompactComboBoxStyle}"
-								          ItemsSource="{Binding BoostModes}" DisplayMemberPath="Name"
-								          SelectedItem="{Binding BoostDcMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-								          IsEnabled="{Binding IsBoostSupported}"
-								          ToolTip="{Binding SelectedItem.Name, RelativeSource={RelativeSource Self}}"/>
-							</Grid>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Grid.Column="0" Text="{Binding BoostStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9"
-								           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
-								<Button Grid.Column="1" Content="RESTORE" Command="{Binding RestoreBoostCommand}"
-								        Style="{StaticResource SetupActionButtonStyle}"
-								        ToolTip="Restore the boost values Windows had before Nitrous changed them."
-								        IsEnabled="{Binding IsBoostSupported}"/>
-							</Grid>
-						</StackPanel>
-					</Border>
+								</Border>
 
-					<!-- Read-only: the firmware's power limits through the PawnIO driver, when it is installed -->
-					<Border x:Name="CpuPowerLimitsCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
-						<StackPanel>
-							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-								<Path Data="M13,2L4,14H11L9,22L19,9H12L13,2Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="CPU Power Limits" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock x:Name="CpuPowerLimitsText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-							<TextBlock x:Name="CpuPowerLimitsCaption" Text="The mode&apos;s request (MCHBAR 0x59A0) and the register the CPU holds (MSR 0x610). The cap below only lowers the register, never above what this mode asks for." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
-							<Grid Margin="0,10,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-									<TextBlock Text="Sustained Limit (PL1)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
-									<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Held across mode changes."/>
-								</StackPanel>
-								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCap_Changed"/>
-							</Grid>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
-							<Grid Margin="0,10,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-									<TextBlock Text="Burst Limit (PL2)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
-									<TextBlock x:Name="CpuPowerCapBurstHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Short bursts of extra power."/>
-								</StackPanel>
-								<ComboBox Grid.Column="1" x:Name="CpuPowerCapBurstBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCapBurst_Changed"/>
-							</Grid>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock x:Name="CpuPowerCapStatus" Grid.Column="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"/>
-								<Button x:Name="CpuPowerCapResetButton" Grid.Column="1" Content="RESET" Click="CpuPowerCapReset_Click" Style="{StaticResource SetupActionButtonStyle}" ToolTip="Return both limits to this mode's own values."/>
-							</Grid>
-						</StackPanel>
-					</Border>
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<StackPanel>
-                            <StackPanel Visibility="{Binding BatteryHealthAvailable, Converter={StaticResource BoolToVis}}">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                    <Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Battery Health" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock Text="{Binding BatteryHealthDetail}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                            </StackPanel>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-                                    <TextBlock Text="80% Battery Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Extends battery lifespan by capping max charge." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                                </StackPanel>
-                                <CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
-                            </Grid>
-							<Grid Margin="0,12,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
-									<TextBlock Text="USB Charging While Off" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-									<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-										<TextBlock Text="Stop at" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
-										<ComboBox x:Name="UsbChargingFloorBox" Width="90" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="UsbChargingFloor_Changed"/>
+								<!-- Read-only: the firmware's power limits through the PawnIO driver, when it is installed -->
+								<Border x:Name="CpuPowerLimitsCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
+									<StackPanel>
+										<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+											<Path Data="M13,2L4,14H11L9,22L19,9H12L13,2Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+											<TextBlock Text="CPU Power Limits" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										</StackPanel>
+										<TextBlock x:Name="CpuPowerLimitsText" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+										<TextBlock x:Name="CpuPowerLimitsCaption" Text="The mode&apos;s request (MCHBAR 0x59A0) and the register the CPU holds (MSR 0x610). The cap below only lowers the register, never above what this mode asks for." Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+												<TextBlock Text="Sustained Limit (PL1)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+												<TextBlock x:Name="CpuPowerCapHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Held across mode changes."/>
+											</StackPanel>
+											<ComboBox Grid.Column="1" x:Name="CpuPowerCapBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCap_Changed"/>
+										</Grid>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+												<TextBlock Text="Burst Limit (PL2)" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+												<TextBlock x:Name="CpuPowerCapBurstHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0" Text="Short bursts of extra power."/>
+											</StackPanel>
+											<ComboBox Grid.Column="1" x:Name="CpuPowerCapBurstBox" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CpuPowerCapBurst_Changed"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock x:Name="CpuPowerCapStatus" Grid.Column="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"/>
+											<Button x:Name="CpuPowerCapResetButton" Grid.Column="1" Content="RESET" Click="CpuPowerCapReset_Click" Style="{StaticResource SetupActionButtonStyle}" ToolTip="Return both limits to this mode's own values."/>
+										</Grid>
 									</StackPanel>
-								</StackPanel>
-								<CheckBox Grid.Column="1" x:Name="TogUsbCharging" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Checked="UsbCharging_Toggled" Unchecked="UsbCharging_Toggled"/>
-							</Grid>
-						</StackPanel>
-					</Border>
-
-					<Border Style="{StaticResource SetupCardStyle}">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
-								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="Auto-Switch Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-								</StackPanel>
-								<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
-						</Grid>
-					</Border>
-
-					<TextBlock Text="SYSTEM" Style="{StaticResource SetupSectionLabelStyle}"/>
-
-					<Border Style="{StaticResource SetupCardStyle}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                    <!-- Eye / Monitoring Icon -->
-                                    <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Deep GPU Telemetry" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock Text="Live NVIDIA statistics." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-                            </StackPanel>
-                            <CheckBox Grid.Column="1" x:Name="TogGpuTelemetry" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding DeepGpuTelemetry, UpdateSourceTrigger=PropertyChanged}"/>
-                        </Grid>
-                    </Border>
-
-					<Border Style="{StaticResource SetupCardStyle}">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
-								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="Run on Startup" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-								</StackPanel>
-								<TextBlock Text="Launch Nitrous silently at boot." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-							</StackPanel>
-							<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
-						</Grid>
-					</Border>
-
-					<TextBlock Text="KEYBOARD" Style="{StaticResource SetupSectionLabelStyle}"/>
-
-					<!-- Custom Hotkeys -->
-					<Border Padding="12,10" Style="{StaticResource SetupCardStyle}">
-						<StackPanel>
-							<StackPanel Margin="0,0,0,2" Orientation="Horizontal">
-								<Path Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center" Data="M20,5A2,2 0 0,1 22,7V17A2,2 0 0,1 20,19H4A2,2 0 0,1 2,17V7A2,2 0 0,1 4,5H20M4,7V17H20V7H4M6,9H10V11H6V9M12,9H14V11H12V9M15,9H18V11H15V9M6,13H9V15H6V13M10,13H18V15H10V13Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" />
-								<TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Text="Global Hotkeys" />
-							</StackPanel>
-							<TextBlock Margin="0,0,0,4" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." TextWrapping="Wrap" />
-							<TextBlock Margin="0,8,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="WINDOW" />
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Open Dashboard" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="Brings the Nitrous window to the front from anywhere." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkDash" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_Dashboard"/>
-							</Grid>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0" />
-							<TextBlock Margin="0,10,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="DASHBOARD" />
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Cycle Power Mode" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="Quiet -> Balanced -> Performance -> Turbo, with the mode flash." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>
-							</Grid>
-							<Grid x:Name="HkFanRow" Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Cycle Fan Mode" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="Auto -> Max -> Custom. Custom follows the curve or the fixed speeds." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkFan" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CycleFan"/>
-							</Grid>
-							<Grid Margin="0,8,0,0" Visibility="{Binding IsNvidiaToolAvailable, Converter={StaticResource BoolToVis}}">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Open NVIDIA App" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="The vendor's driver settings and per-app profiles." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkNvidia" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_NvidiaApp"/>
-							</Grid>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0" />
-							<TextBlock Margin="0,10,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="LIGHT PAGE" />
-							<Grid x:Name="HkScreenSyncRow" Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Screen Sync" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="LIGHT -> SYNC. Follows the screen colours; press again to turn it off." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkScreenSync" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_ScreenSync"/>
-							</Grid>
-							<Grid x:Name="HkSoundSyncRow" Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Sound Sync" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="LIGHT -> SYNC. Pulses the keyboard with the system audio." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkSoundSync" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_SoundSync"/>
-							</Grid>
-							<Grid x:Name="HkEffectRow" Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
-									<TextBlock Text="Next Lighting Effect" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
-									<TextBlock Text="LIGHT -> Global or Area. Cycles the active effect while both syncs are off." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
-								</StackPanel>
-								<TextBox Grid.Column="1" x:Name="TxtHkEffect" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_NextEffect"/>
-							</Grid>
-						</StackPanel>
-					</Border>
-
-					<!-- Sticky keys: a Windows accessibility setting, not firmware -->
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<Grid>
-							<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-								<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
-								<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,58,0" TextWrapping="Wrap"/>
-							</StackPanel>
-							<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
-						</Grid>
-					</Border>
-					<!-- Brightness on models with no lighting controller; hidden where LIGHT already has it -->
-					<Border x:Name="KeyboardBrightnessCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
-						<StackPanel>
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-									<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-										<Path Data="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,2V4M12,20V22M2,12H4M20,12H22M4.9,4.9L6.3,6.3M17.7,17.7L19.1,19.1M4.9,19.1L6.3,17.7M17.7,6.3L19.1,4.9" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-										<TextBlock Text="Backlight Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+								</Border>
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+			                            <StackPanel Visibility="{Binding BatteryHealthAvailable, Converter={StaticResource BoolToVis}}">
+			                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+			                                    <Path Data="M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="10" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+			                                    <TextBlock Text="Battery Health" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+			                                </StackPanel>
+			                                <TextBlock Text="{Binding BatteryHealthDetail}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+			                            </StackPanel>
+			                            <Grid Margin="0,12,0,0">
+			                                <Grid.ColumnDefinitions>
+			                                    <ColumnDefinition Width="*"/>
+			                                    <ColumnDefinition Width="Auto"/>
+			                                </Grid.ColumnDefinitions>
+			                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+			                                    <TextBlock Text="80% Battery Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+			                                    <TextBlock Text="Extends battery lifespan by capping max charge." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+			                                </StackPanel>
+			                                <CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
+			                            </Grid>
+										<Grid Margin="0,12,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+												<TextBlock Text="USB Charging While Off" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+												<StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+													<TextBlock Text="Stop at" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center" Margin="0,0,8,0"/>
+													<ComboBox x:Name="UsbChargingFloorBox" Width="90" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="UsbChargingFloor_Changed"/>
+												</StackPanel>
+											</StackPanel>
+											<CheckBox Grid.Column="1" x:Name="TogUsbCharging" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Checked="UsbCharging_Toggled" Unchecked="UsbCharging_Toggled"/>
+										</Grid>
 									</StackPanel>
-									<TextBlock Text="Sets the keyboard backlight where no lighting controller is reachable." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-									<TextBlock x:Name="KeyboardBrightnessStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
-								</StackPanel>
-								<ComboBox Grid.Column="1" x:Name="KeyboardBrightnessBox" ToolTipService.ShowOnDisabled="True" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardBrightness_Changed"/>
-							</Grid>
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
-							<Grid Margin="0,10,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-									<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-										<Path Data="M14,3.2C17.1,4.2 19.2,7 19.2,10.3C19.2,13.6 17.1,16.4 14,17.4V15.3C16,14.4 17.2,12.5 17.2,10.3C17.2,8.1 16,6.2 14,5.3V3.2M14,7.3C15.1,7.8 15.8,8.9 15.8,10.3C15.8,11.7 15.1,12.8 14,13.3V7.3M3,9H7L12,4V20L7,15H3V9Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-										<TextBlock Text="Pulse with sound" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+								</Border>
+
+								<Border Style="{StaticResource SetupCardStyle}">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="Auto"/>
+										</Grid.ColumnDefinitions>
+										<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
+											<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+												<Path Data="M16,7V3H14V7H10V3H8V7C8,10 9.79,11.4 11,11.83V16H13V11.83C14.21,11.4 16,10 16,7M10,18H14V22H10V18Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="12" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+												<TextBlock Text="Auto-Switch Power" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+											</StackPanel>
+											<TextBlock Text="Adapts performance plan based on AC/DC state." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										</StackPanel>
+										<CheckBox Grid.Column="1" x:Name="TogAutoSwitch" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding AutoSwitch, UpdateSourceTrigger=PropertyChanged}"/>
+									</Grid>
+								</Border>
+
+							</StackPanel>
+
+							<StackPanel x:Name="SetupSystemPanel" Visibility="Collapsed">
+								<TextBlock Text="SYSTEM" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<Border Style="{StaticResource SetupCardStyle}">
+			                        <Grid>
+			                            <Grid.ColumnDefinitions>
+			                                <ColumnDefinition Width="*"/>
+			                                <ColumnDefinition Width="Auto"/>
+			                            </Grid.ColumnDefinitions>
+			                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
+			                                <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+			                                    <!-- Eye / Monitoring Icon -->
+			                                    <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="10" Margin="0,0,6,0" VerticalAlignment="Center"/>
+			                                    <TextBlock Text="Deep GPU Telemetry" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+			                                </StackPanel>
+			                                <TextBlock Text="Live NVIDIA statistics." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+			                            </StackPanel>
+			                            <CheckBox Grid.Column="1" x:Name="TogGpuTelemetry" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding DeepGpuTelemetry, UpdateSourceTrigger=PropertyChanged}"/>
+			                        </Grid>
+			                    </Border>
+
+								<Border Style="{StaticResource SetupCardStyle}">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="Auto"/>
+										</Grid.ColumnDefinitions>
+										<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="12,0,10,0">
+											<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+												<Path Data="M14,2L12.6,3.4C11.6,4.4 10.9,5.7 10.6,7.1L9.6,12L4.5,13.7C3.5,14 2.8,14.8 2.5,15.8L2.2,16.8L6.8,15.2C7.3,15 7.8,15 8.3,15.1L12.5,16.4C12.4,16.7 12.3,17 12.1,17.2L10.7,18.6L12.1,20L15.6,16.5C16.8,15.3 17.5,13.8 17.8,12.1L18.7,6.8L22,5.7C23,5.4 23.7,4.6 24,3.6L24.3,2.6L19.7,4.2C19.2,4.4 18.7,4.4 18.2,4.3L14,3C14.1,2.7 14.2,2.4 14.4,2.2L15.8,0.8L14,2Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+												<TextBlock Text="Run on Startup" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+											</StackPanel>
+											<TextBlock Text="Launch Nitrous silently at boot." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										</StackPanel>
+										<CheckBox Grid.Column="1" x:Name="TogStartup" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" Margin="0,0,12,0" IsChecked="{Binding RunOnStartup, UpdateSourceTrigger=PropertyChanged}"/>
+									</Grid>
+								</Border>
+
+								<TextBlock Text="STARTUP" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<Border x:Name="BootLogoCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
+									<StackPanel>
+										<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+											<Path Data="M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+											<TextBlock Text="Boot Logo" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										</StackPanel>
+										<TextBlock Text="Replaces Acer's splash at power-on. The picture is read from the EFI system partition; the BIOS is never modified, and REMOVE brings Acer's logo back." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<Border Height="96" Margin="0,10,0,0" CornerRadius="6" Background="#0B0B0F" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+											<Image x:Name="BootLogoPreview" Stretch="Uniform" Margin="4"/>
+										</Border>
+										<TextBlock x:Name="BootLogoStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="8"/>
+												<ColumnDefinition Width="*"/>
+											</Grid.ColumnDefinitions>
+											<Button x:Name="BootLogoChooseButton" Content="CHOOSE IMAGE" Click="BootLogoChoose_Click" Style="{StaticResource SetupActionButtonStyle}"/>
+											<Button x:Name="BootLogoRemoveButton" Grid.Column="2" Content="REMOVE" Click="BootLogoRemove_Click" Style="{StaticResource SetupActionButtonStyle}"/>
+										</Grid>
 									</StackPanel>
-									<TextBlock Text="Pulses the backlight with the system audio. Uses the five brightness steps; no colour control on this keyboard." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-									<TextBlock x:Name="BrightnessSyncStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
-									<TextBlock x:Name="BrightnessSyncLatencyHint" Foreground="{DynamicResource WarnBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"
-									           Text="Drives the backlight through the firmware: on some Acer laptops that traffic causes audio crackle. Leave it off if you hear it."/>
-								</StackPanel>
-								<CheckBox x:Name="TogBrightnessSync" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="BrightnessSync_Toggled" Unchecked="BrightnessSync_Toggled"/>
-							</Grid>
-							<StackPanel x:Name="BrightnessSyncOptions" Margin="0,10,0,0" Visibility="Collapsed">
-								<Grid Margin="0,0,0,6">
-									<TextBlock Text="Sound style" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-									<ComboBox x:Name="BrightnessSyncModeBox" Width="130" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="BrightnessSyncMode_Changed">
-										<ComboBoxItem Content="Vibe"/>
-										<ComboBoxItem Content="Beat"/>
-										<ComboBoxItem Content="Peak"/>
-									</ComboBox>
-								</Grid>
-								<Grid Margin="0,0,0,2">
-									<TextBlock Text="Sound sensitivity" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
-									<TextBlock x:Name="BrightnessSyncSensitivityText" Text="4" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
-								</Grid>
-								<Slider x:Name="BrightnessSyncSensitivity" Minimum="1" Maximum="10" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="BrightnessSyncSensitivity_Changed"/>
+								</Border>
+
+								<TextBlock Text="ACER SERVICES" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<!-- Acer Services -->
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+										<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+											<Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.66 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.02L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.02C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.66 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+											<TextBlock Text="Acer Background Services" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										</StackPanel>
+										<TextBlock Text="Stops OEM services and background telemetry. Original start types are backed up." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<TextBlock Text="{Binding AcerServicesStatusText}" Foreground="{DynamicResource TextStrongBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap"/>
+										<TextBlock Text="{Binding AcerServicesDetailText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" Margin="0,2,0,0" TextWrapping="Wrap"/>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="8"/>
+												<ColumnDefinition Width="*"/>
+											</Grid.ColumnDefinitions>
+											<Button Content="DISABLE ALL" Command="{Binding DisableAcerServicesCommand}"
+											        Style="{StaticResource SetupActionButtonStyle}"
+											        IsEnabled="{Binding CanDisableAcerServices}"
+											        ToolTip="Stops and disables all detected Acer services. Already-disabled services are left alone."
+											        ToolTipService.ShowOnDisabled="True"/>
+											<Button Grid.Column="2" Content="RESTORE" Command="{Binding RestoreAcerServicesCommand}"
+											        Style="{StaticResource SetupActionButtonStyle}"
+											        IsEnabled="{Binding CanRestoreAcerServices}"
+											        ToolTip="Restores the start types and running state saved by Nitrous. Available after Nitrous disables services."
+											        ToolTipService.ShowOnDisabled="True"/>
+										</Grid>
+									</StackPanel>
+								</Border>
+
+								<!-- Diagnostics -->
+								<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
+									<StackPanel>
+										<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+											<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+											<TextBlock Text="Diagnostics" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										</StackPanel>
+										<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. EC PROBE records this model's Acer firmware interface without changing anything. Nothing is uploaded automatically."
+										           Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<Button x:Name="ExportDiagnosticsButton" Content="EXPORT ZIP" Click="ExportDiagnostics_Click"
+											        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+											        HorizontalAlignment="Left"/>
+											<Button x:Name="EcProbeButton" Grid.Column="1" Content="EC PROBE" Click="EcProbe_Click"
+											        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+											        Margin="8,0,0,0"
+											        ToolTip="Write a read-only report of the Acer WMI methods, sensor addresses, and power-mode registers this model exposes."/>
+											<Button Grid.Column="2" Content="OPEN LOGS" Click="OpenLogFolder_Click"
+											        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
+											        Margin="8,0,0,0"/>
+										</Grid>
+										<TextBlock x:Name="ExportDiagnosticsStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
+										           TextWrapping="Wrap" Margin="0,8,0,0"/>
+									</StackPanel>
+								</Border>
 							</StackPanel>
+
+							<StackPanel x:Name="SetupKeyboardPanel" Visibility="Collapsed">
+								<TextBlock Text="KEYBOARD" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<!-- Custom Hotkeys -->
+								<Border Padding="12,10" Style="{StaticResource SetupCardStyle}">
+									<StackPanel>
+										<StackPanel Margin="0,0,0,2" Orientation="Horizontal">
+											<Path Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center" Data="M20,5A2,2 0 0,1 22,7V17A2,2 0 0,1 20,19H4A2,2 0 0,1 2,17V7A2,2 0 0,1 4,5H20M4,7V17H20V7H4M6,9H10V11H6V9M12,9H14V11H12V9M15,9H18V11H15V9M6,13H9V15H6V13M10,13H18V15H10V13Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" />
+											<TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Text="Global Hotkeys" />
+										</StackPanel>
+										<TextBlock Margin="0,0,0,4" FontSize="10.5" Foreground="{DynamicResource TextMutedBrush}" Text="Click a box and press a key combination to bind. Press ESC to clear. Changes apply immediately." TextWrapping="Wrap" />
+										<TextBlock Margin="0,8,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="WINDOW" />
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Open Dashboard" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="Brings the Nitrous window to the front from anywhere." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkDash" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_Dashboard"/>
+										</Grid>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0" />
+										<TextBlock Margin="0,10,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="DASHBOARD" />
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Cycle Power Mode" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="Quiet -> Balanced -> Performance -> Turbo, with the mode flash." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkCycle" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CyclePower"/>
+										</Grid>
+										<Grid x:Name="HkFanRow" Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Cycle Fan Mode" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="Auto -> Max -> Custom. Custom follows the curve or the fixed speeds." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkFan" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_CycleFan"/>
+										</Grid>
+										<Grid Margin="0,8,0,0" Visibility="{Binding IsNvidiaToolAvailable, Converter={StaticResource BoolToVis}}">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Open NVIDIA App" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="The vendor's driver settings and per-app profiles." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkNvidia" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_NvidiaApp"/>
+										</Grid>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0" />
+										<TextBlock Margin="0,10,0,0" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextMutedBrush}" Text="LIGHT PAGE" />
+										<Grid x:Name="HkScreenSyncRow" Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Screen Sync" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="LIGHT -> SYNC. Follows the screen colours; press again to turn it off." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkScreenSync" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_ScreenSync"/>
+										</Grid>
+										<Grid x:Name="HkSoundSyncRow" Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Sound Sync" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="LIGHT -> SYNC. Pulses the keyboard with the system audio." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkSoundSync" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_SoundSync"/>
+										</Grid>
+										<Grid x:Name="HkEffectRow" Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+												<TextBlock Text="Next Lighting Effect" FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}"/>
+												<TextBlock Text="LIGHT -> Global or Area. Cycles the active effect while both syncs are off." FontSize="9.5" Foreground="{DynamicResource TextMutedBrush}" TextWrapping="Wrap"/>
+											</StackPanel>
+											<TextBox Grid.Column="1" x:Name="TxtHkEffect" Style="{StaticResource HotkeyTextBoxStyle}" Width="120" HorizontalAlignment="Right" IsReadOnly="True" TextAlignment="Center" PreviewKeyDown="Hotkey_PreviewKeyDown" Tag="Hotkey_NextEffect"/>
+										</Grid>
+									</StackPanel>
+								</Border>
+
+								<!-- Sticky keys: a Windows accessibility setting, not firmware -->
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<Grid>
+										<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+											<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
+											<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,58,0" TextWrapping="Wrap"/>
+										</StackPanel>
+										<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
+									</Grid>
+								</Border>
+								<!-- Brightness on models with no lighting controller; hidden where LIGHT already has it -->
+								<Border x:Name="KeyboardBrightnessCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
+									<StackPanel>
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+												<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+													<Path Data="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,2V4M12,20V22M2,12H4M20,12H22M4.9,4.9L6.3,6.3M17.7,17.7L19.1,19.1M4.9,19.1L6.3,17.7M17.7,6.3L19.1,4.9" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+													<TextBlock Text="Backlight Brightness" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+												</StackPanel>
+												<TextBlock Text="Sets the keyboard backlight where no lighting controller is reachable." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+												<TextBlock x:Name="KeyboardBrightnessStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
+											</StackPanel>
+											<ComboBox Grid.Column="1" x:Name="KeyboardBrightnessBox" ToolTipService.ShowOnDisabled="True" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardBrightness_Changed"/>
+										</Grid>
+										<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,0"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+												<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+													<Path Data="M14,3.2C17.1,4.2 19.2,7 19.2,10.3C19.2,13.6 17.1,16.4 14,17.4V15.3C16,14.4 17.2,12.5 17.2,10.3C17.2,8.1 16,6.2 14,5.3V3.2M14,7.3C15.1,7.8 15.8,8.9 15.8,10.3C15.8,11.7 15.1,12.8 14,13.3V7.3M3,9H7L12,4V20L7,15H3V9Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+													<TextBlock Text="Pulse with sound" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+												</StackPanel>
+												<TextBlock Text="Pulses the backlight with the system audio. Uses the five brightness steps; no colour control on this keyboard." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+												<TextBlock x:Name="BrightnessSyncStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
+												<TextBlock x:Name="BrightnessSyncLatencyHint" Foreground="{DynamicResource WarnBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"
+												           Text="Drives the backlight through the firmware: on some Acer laptops that traffic causes audio crackle. Leave it off if you hear it."/>
+											</StackPanel>
+											<CheckBox x:Name="TogBrightnessSync" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="BrightnessSync_Toggled" Unchecked="BrightnessSync_Toggled"/>
+										</Grid>
+										<StackPanel x:Name="BrightnessSyncOptions" Margin="0,10,0,0" Visibility="Collapsed">
+											<Grid Margin="0,0,0,6">
+												<TextBlock Text="Sound style" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+												<ComboBox x:Name="BrightnessSyncModeBox" Width="130" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="BrightnessSyncMode_Changed">
+													<ComboBoxItem Content="Vibe"/>
+													<ComboBoxItem Content="Beat"/>
+													<ComboBoxItem Content="Peak"/>
+												</ComboBox>
+											</Grid>
+											<Grid Margin="0,0,0,2">
+												<TextBlock Text="Sound sensitivity" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" VerticalAlignment="Center"/>
+												<TextBlock x:Name="BrightnessSyncSensitivityText" Text="4" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"/>
+											</Grid>
+											<Slider x:Name="BrightnessSyncSensitivity" Minimum="1" Maximum="10" Value="4" TickFrequency="1" IsSnapToTickEnabled="True" Style="{StaticResource ModernSliderStyle}" ValueChanged="BrightnessSyncSensitivity_Changed"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+								<!-- The backlight auto-off lives on the embedded controller, not the lighting controller -->
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="Auto"/>
+										</Grid.ColumnDefinitions>
+										<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+											<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+												<Path Data="M12,2A10,10 0 1,0 12,22A10,10 0 1,0 12,2M12,4A8,8 0 1,1 12,20A8,8 0 1,1 12,4M11,6H13V12.2L16.5,14.3L15.5,16L11,13.4V6Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+												<TextBlock Text="Backlight Auto-off" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+											</StackPanel>
+											<TextBlock Text="Turns the keyboard backlight off after a period of inactivity." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+											<TextBlock x:Name="KeyboardTimeoutStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
+										</StackPanel>
+										<ComboBox Grid.Column="1" x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
+									</Grid>
+								</Border>
+							</StackPanel>
+
+							<StackPanel x:Name="SetupAppearancePanel" Visibility="Collapsed">
+								<TextBlock Text="APPEARANCE" Style="{StaticResource SetupSectionLabelStyle}"/>
+
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+										<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+											<Path Data="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+											<TextBlock Text="Accent Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+										</StackPanel>
+										<TextBlock Text="Nitrous violet by default. Pick a preset, choose your own colour, or follow Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
+										<Grid Margin="0,12,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Background" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed">
+												<ComboBoxItem Content="Midnight"/>
+												<ComboBoxItem Content="Black"/>
+												<ComboBoxItem Content="Graphite"/>
+												<ComboBoxItem Content="Slate"/>
+												<ComboBoxItem Content="Navy"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Sections" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="SectionsBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Sections_Changed">
+												<ComboBoxItem Content="Default"/>
+												<ComboBoxItem Content="Black"/>
+												<ComboBoxItem Content="Graphite"/>
+												<ComboBoxItem Content="Slate"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Font" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Scrollbars" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<CheckBox Grid.Column="1" x:Name="TogScrollbars" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
+											          IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
+											          ToolTip="Show the scrollbar on the four pages. Off hides it; the wheel still scrolls."/>
+										</Grid>
+									</StackPanel>
+								</Border>
+
+							</StackPanel>
+
 						</StackPanel>
-					</Border>
-					<!-- The backlight auto-off lives on the embedded controller, not the lighting controller -->
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<Grid>
-							<Grid.ColumnDefinitions>
-								<ColumnDefinition Width="*"/>
-								<ColumnDefinition Width="Auto"/>
-							</Grid.ColumnDefinitions>
-							<StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
-								<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-									<Path Data="M12,2A10,10 0 1,0 12,22A10,10 0 1,0 12,2M12,4A8,8 0 1,1 12,20A8,8 0 1,1 12,4M11,6H13V12.2L16.5,14.3L15.5,16L11,13.4V6Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-									<TextBlock Text="Backlight Auto-off" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-								</StackPanel>
-								<TextBlock Text="Turns the keyboard backlight off after a period of inactivity." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-								<TextBlock x:Name="KeyboardTimeoutStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
-							</StackPanel>
-							<ComboBox Grid.Column="1" x:Name="KeyboardTimeoutBox" ToolTipService.ShowOnDisabled="True" Width="130" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="KeyboardTimeout_Changed"/>
-						</Grid>
-					</Border>
-					<TextBlock Text="STARTUP" Style="{StaticResource SetupSectionLabelStyle}"/>
-
-					<Border x:Name="BootLogoCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Visibility="Collapsed">
-						<StackPanel>
-							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-								<Path Data="M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Boot Logo" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock Text="Replaces Acer's splash at power-on. The picture is read from the EFI system partition; the BIOS is never modified, and REMOVE brings Acer's logo back." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-							<Border Height="96" Margin="0,10,0,0" CornerRadius="6" Background="#0B0B0F" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
-								<Image x:Name="BootLogoPreview" Stretch="Uniform" Margin="4"/>
-							</Border>
-							<TextBlock x:Name="BootLogoStatus" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="8"/>
-									<ColumnDefinition Width="*"/>
-								</Grid.ColumnDefinitions>
-								<Button x:Name="BootLogoChooseButton" Content="CHOOSE IMAGE" Click="BootLogoChoose_Click" Style="{StaticResource SetupActionButtonStyle}"/>
-								<Button x:Name="BootLogoRemoveButton" Grid.Column="2" Content="REMOVE" Click="BootLogoRemove_Click" Style="{StaticResource SetupActionButtonStyle}"/>
-							</Grid>
-						</StackPanel>
-					</Border>
-
-					<TextBlock Text="APPEARANCE" Style="{StaticResource SetupSectionLabelStyle}"/>
-
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<StackPanel>
-							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-								<Path Data="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Accent Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock Text="Nitrous violet by default. Pick a preset, choose your own colour, or follow Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-							<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
-							<Grid Margin="0,12,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="Background" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed">
-									<ComboBoxItem Content="Midnight"/>
-									<ComboBoxItem Content="Black"/>
-									<ComboBoxItem Content="Graphite"/>
-									<ComboBoxItem Content="Slate"/>
-									<ComboBoxItem Content="Navy"/>
-								</ComboBox>
-							</Grid>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="Sections" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" x:Name="SectionsBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Sections_Changed">
-									<ComboBoxItem Content="Default"/>
-									<ComboBoxItem Content="Black"/>
-									<ComboBoxItem Content="Graphite"/>
-									<ComboBoxItem Content="Slate"/>
-								</ComboBox>
-							</Grid>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="Font" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-								<ComboBox Grid.Column="1" x:Name="FontBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Font_Changed" FontFamily="{DynamicResource AppFontFamily}"/>
-							</Grid>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Text="Scrollbars" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-								<CheckBox Grid.Column="1" x:Name="TogScrollbars" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
-								          IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
-								          ToolTip="Show the scrollbar on the four pages. Off hides it; the wheel still scrolls."/>
-							</Grid>
-						</StackPanel>
-					</Border>
-
-					<TextBlock Text="ACER SERVICES" Style="{StaticResource SetupSectionLabelStyle}"/>
-
-					<!-- Acer Services -->
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
-						<StackPanel>
-							<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-								<Path Data="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.98C19.47,12.66 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11.02L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.02C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.66 4.57,12.98L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.98Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Acer Background Services" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock Text="Stops OEM services and background telemetry. Original start types are backed up." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-							<TextBlock Text="{Binding AcerServicesStatusText}" Foreground="{DynamicResource TextStrongBrush}" FontSize="10" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap"/>
-							<TextBlock Text="{Binding AcerServicesDetailText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" Margin="0,2,0,0" TextWrapping="Wrap"/>
-							<Grid Margin="0,8,0,0">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="8"/>
-									<ColumnDefinition Width="*"/>
-								</Grid.ColumnDefinitions>
-								<Button Content="DISABLE ALL" Command="{Binding DisableAcerServicesCommand}"
-								        Style="{StaticResource SetupActionButtonStyle}"
-								        IsEnabled="{Binding CanDisableAcerServices}"
-								        ToolTip="Stops and disables all detected Acer services. Already-disabled services are left alone."
-								        ToolTipService.ShowOnDisabled="True"/>
-								<Button Grid.Column="2" Content="RESTORE" Command="{Binding RestoreAcerServicesCommand}"
-								        Style="{StaticResource SetupActionButtonStyle}"
-								        IsEnabled="{Binding CanRestoreAcerServices}"
-								        ToolTip="Restores the start types and running state saved by Nitrous. Available after Nitrous disables services."
-								        ToolTipService.ShowOnDisabled="True"/>
-							</Grid>
-						</StackPanel>
-					</Border>
-
-					<!-- Diagnostics -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
-						<StackPanel>
-							<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-								<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-								<TextBlock Text="Diagnostics" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
-							</StackPanel>
-							<TextBlock Text="Export a redacted ZIP with system, hardware, and Nitrous logs for troubleshooting. EC PROBE records this model's Acer firmware interface without changing anything. Nothing is uploaded automatically."
-							           Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<Button x:Name="ExportDiagnosticsButton" Content="EXPORT ZIP" Click="ExportDiagnostics_Click"
-								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
-								        HorizontalAlignment="Left"/>
-								<Button x:Name="EcProbeButton" Grid.Column="1" Content="EC PROBE" Click="EcProbe_Click"
-								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
-								        Margin="8,0,0,0"
-								        ToolTip="Write a read-only report of the Acer WMI methods, sensor addresses, and power-mode registers this model exposes."/>
-								<Button Grid.Column="2" Content="OPEN LOGS" Click="OpenLogFolder_Click"
-								        Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Padding="10,7"
-								        Margin="8,0,0,0"/>
-							</Grid>
-							<TextBlock x:Name="ExportDiagnosticsStatus" Foreground="{DynamicResource TextMutedBrush}" FontSize="10"
-							           TextWrapping="Wrap" Margin="0,8,0,0"/>
-						</StackPanel>
-					</Border>
-					</StackPanel>
-				</ScrollViewer>
+					</ScrollViewer>
+				</Grid>
 				<!-- 3. GPU PAGE -->
 				<ScrollViewer x:Name="GpuPage" Visibility="Collapsed" Margin="20,10,20,0"
 				              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"

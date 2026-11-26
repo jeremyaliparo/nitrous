@@ -3,6 +3,22 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.27 - 2026-11-27
+
+### Setup
+
+- **SETUP is now four categories, with the tabs pinned above the scroller** - Power, System, Keys and Theme.
+  The page had grown to six sections and five screens of scrolling; one category at a time now fits without
+  hunting, and the header and tabs never scroll away. The last category is remembered between openings.
+- Power holds CPU Power, CPU Power Limits, Battery Health and USB Charging While Off; System holds Deep GPU
+  Telemetry, Run on Startup, Boot Logo, Acer Services and Diagnostics; Keys holds Global Hotkeys, Sticky Keys,
+  Backlight Brightness and the sound sync; Theme holds accent, background, sections, font and scrollbars.
+- Deep links still land correctly: the hotkey capture opens Keys, the CPU limits preview opens Power.
+- **An empty status line no longer leaves a chin** at the bottom of a card. A status line with no text used to
+  keep its top margin, so the card's bottom padding looked larger than its top - visible on Diagnostics
+  (8 px) and Backlight Auto-off (4 px), and the same on Boot Logo, Backlight Brightness and the brightness
+  sync. They now collapse, margin and all, until they have something to say.
+
 ## 0.15.0-test.26 - 2026-11-27
 
 ### GPU
