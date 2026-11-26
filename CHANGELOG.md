@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.25 - 2026-11-27
+
+### GPU
+
+- **The GPU page opens without the pause.** Its limit cards read the thermal policy, the clock cap and the
+  GPU's maximum clock, and those NVAPI/NVML calls ran on the UI thread during the page switch - which is
+  where the delay came from. They now run on a worker thread and the cards paint when the answer arrives, so
+  switching to the page no longer waits for the driver.
+- Turning **Manage GPU tuning** on now applies both saved values - thermal target and clock cap - before
+  reading them back, so the cards show the result of the switch instead of the state it replaced.
+
 ## 0.15.0-test.24 - 2026-11-27
 
 ### GPU
