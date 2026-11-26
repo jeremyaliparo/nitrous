@@ -64,6 +64,282 @@ public static class DisplayManager
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int ChangeDisplaySettingsExW(string? lpszDeviceName, ref DEVMODEW lpDevMode, IntPtr hwnd, uint dwFlags, IntPtr lParam);
 
+    // --- the panel's own label: adapter, rate and signal depth ---------------------------
+
+    private const uint DisplayDeviceAttachedToDesktop = 0x00000001;
+    private const uint DisplayDevicePrimaryDevice = 0x00000004;
+    private const uint QdcOnlyActivePaths = 2;
+    private const int DeviceInfoGetSourceName = 1;
+    private const int DeviceInfoGetAdvancedColorInfo = 9;
+    private const uint OutputTechnologyInternal = 0x80000000;
+    private const int ErrorInsufficientBuffer = 122;
+
+    /// <summary>DISPLAYCONFIG_MODE_INFO is 64 bytes; it is never read here, only sized.</summary>
+    private const int ModeInfoSize = 64;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DISPLAY_DEVICEW
+    {
+        public int cb;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+        public uint StateFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Luid
+    {
+        public uint LowPart;
+        public int HighPart;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DisplayConfigRational
+    {
+        public uint Numerator;
+        public uint Denominator;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PathSourceInfo
+    {
+        public Luid AdapterId;
+        public uint Id;
+        public uint ModeInfoIdx;
+        public uint StatusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PathTargetInfo
+    {
+        public Luid AdapterId;
+        public uint Id;
+        public uint ModeInfoIdx;
+        public uint OutputTechnology;
+        public uint Rotation;
+        public uint Scaling;
+        public DisplayConfigRational RefreshRate;
+        public uint ScanLineOrdering;
+        public int TargetAvailable;
+        public uint StatusFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PathInfo
+    {
+        public PathSourceInfo SourceInfo;
+        public PathTargetInfo TargetInfo;
+        public uint Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DeviceInfoHeader
+    {
+        public int Type;
+        public uint Size;
+        public Luid AdapterId;
+        public uint Id;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct SourceDeviceName
+    {
+        public DeviceInfoHeader Header;
+
+        /// <summary>The GDI name of the adapter driving that path, e.g. "\\\\.\\DISPLAY1".</summary>
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string ViewGdiDeviceName;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AdvancedColorInfo
+    {
+        public DeviceInfoHeader Header;
+
+        /// <summary>Bitfield: bit 0 supported, bit 1 enabled, bit 2 wide colour forced.</summary>
+        public uint Value;
+
+        public int ColorEncoding;
+        public uint BitsPerColorChannel;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool EnumDisplayDevicesW(string? lpDevice, uint iDevNum, ref DISPLAY_DEVICEW lpDisplayDevice, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern int GetDisplayConfigBufferSizes(uint flags, out uint numPathArrayElements, out uint numModeInfoArrayElements);
+
+    [DllImport("user32.dll")]
+    private static extern int QueryDisplayConfig(uint flags, ref uint numPathArrayElements,
+        [Out] PathInfo[] pathArray, ref uint numModeInfoArrayElements, IntPtr modeInfoArray, IntPtr currentTopologyId);
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigGetDeviceInfo(ref AdvancedColorInfo requestPacket);
+
+    [DllImport("user32.dll", EntryPoint = "DisplayConfigGetDeviceInfo", CharSet = CharSet.Unicode)]
+    private static extern int DisplayConfigGetSourceName(ref SourceDeviceName requestPacket);
+
+    /// <summary>
+    /// The attached adapter's friendly name and GDI name, primary display first. The two travel together
+    /// so the colour depth can be read from the path of the display the name describes.
+    /// </summary>
+    private static (string? Name, string? Gdi) PrimaryAdapter()
+    {
+        try
+        {
+            (string? Name, string? Gdi)? attached = null;
+            for (uint i = 0; ; i++)
+            {
+                var device = new DISPLAY_DEVICEW { cb = Marshal.SizeOf<DISPLAY_DEVICEW>() };
+                if (!EnumDisplayDevicesW(null, i, ref device, 0)) break;
+                if ((device.StateFlags & DisplayDeviceAttachedToDesktop) == 0) continue;
+
+                var found = (device.DeviceString, device.DeviceName);
+                if ((device.StateFlags & DisplayDevicePrimaryDevice) != 0) return found;
+                attached ??= found;
+            }
+
+            return attached ?? (null, null);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not read the adapter name.", ex);
+            return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// The display adapter Windows attached to the desktop - on a laptop, the one driving the built-in
+    /// panel, e.g. "AMD Radeon 860M". Null when the display device cannot be enumerated.
+    /// </summary>
+    public static string? GetAdapterName()
+    {
+        var (name, _) = PrimaryAdapter();
+
+        // The driver's own name carries trademark marks that only make the line longer.
+        return name?
+            .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("  ", " ")
+            .Trim();
+    }
+
+    /// <summary>
+    /// Bits per colour channel the display is running at - 8, 10 or 12 - from Windows' own advanced-colour
+    /// state for that display's path. 0 when the driver does not report it.
+    /// </summary>
+    public static int GetBitsPerColorChannel()
+    {
+        var (_, gdi) = PrimaryAdapter();
+
+        try
+        {
+            // The topology can change between the size query and the read (a monitor plugged in, a mode
+            // change); the second attempt starts from fresh sizes.
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                if (GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out var pathCount, out var modeCount) != 0 ||
+                    pathCount == 0)
+                {
+                    return 0;
+                }
+
+                var paths = new PathInfo[pathCount];
+                var modes = modeCount > 0 ? Marshal.AllocHGlobal((int)modeCount * ModeInfoSize) : IntPtr.Zero;
+                try
+                {
+                    var result = QueryDisplayConfig(
+                        QdcOnlyActivePaths, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+
+                    if (result == ErrorInsufficientBuffer) continue;
+                    if (result != 0) return 0;
+
+                    return ReadBitsPerColorChannel(paths, pathCount, gdi);
+                }
+                finally
+                {
+                    if (modes != IntPtr.Zero) Marshal.FreeHGlobal(modes);
+                }
+            }
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not read the colour depth.", ex);
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// The depth of the display Windows is using: the path whose source is the named adapter, else the
+    /// built-in panel, else the first path that reports one.
+    /// </summary>
+    private static int ReadBitsPerColorChannel(PathInfo[] paths, uint pathCount, string? primaryGdi)
+    {
+        var primary = -1;
+        var internalPanel = -1;
+        var first = 0;
+
+        for (var i = 0; i < pathCount && i < paths.Length; i++)
+        {
+            var target = paths[i].TargetInfo;
+            if (target.TargetAvailable == 0) continue;
+
+            var request = new AdvancedColorInfo
+            {
+                Header = new DeviceInfoHeader
+                {
+                    Type = DeviceInfoGetAdvancedColorInfo,
+                    Size = (uint)Marshal.SizeOf<AdvancedColorInfo>(),
+                    AdapterId = target.AdapterId,
+                    Id = target.Id
+                }
+            };
+
+            if (DisplayConfigGetDeviceInfo(ref request) != 0) continue;
+            if (request.BitsPerColorChannel == 0) continue;
+
+            if (primaryGdi is not null && SourceMatches(paths[i].SourceInfo, primaryGdi))
+                primary = (int)request.BitsPerColorChannel;
+
+            if (target.OutputTechnology == OutputTechnologyInternal && internalPanel == 0)
+                internalPanel = (int)request.BitsPerColorChannel;
+
+            if (first == 0) first = (int)request.BitsPerColorChannel;
+        }
+
+        if (primary > 0) return primary;
+        if (internalPanel > 0) return internalPanel;
+        return first;
+    }
+
+    /// <summary>Whether a display path's source is the adapter with this GDI name.</summary>
+    private static bool SourceMatches(PathSourceInfo source, string gdiName)
+    {
+        try
+        {
+            var request = new SourceDeviceName
+            {
+                Header = new DeviceInfoHeader
+                {
+                    Type = DeviceInfoGetSourceName,
+                    Size = (uint)Marshal.SizeOf<SourceDeviceName>(),
+                    AdapterId = source.AdapterId,
+                    Id = source.Id
+                }
+            };
+
+            return DisplayConfigGetSourceName(ref request) == 0 &&
+                   string.Equals(request.ViewGdiDeviceName, gdiName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static int GetPrimaryMaxRefreshRate()
     {
         var maxHz = 60;
@@ -280,6 +556,8 @@ public static class DisplayManager
                 ["refreshHz"] = current.dmDisplayFrequency,
                 ["bitsPerPixel"] = current.dmBitsPerPel
             };
+            result["adapter"] = GetAdapterName();
+            result["bitsPerColorChannel"] = GetBitsPerColorChannel();
             result["supportedRefreshHz"] = supported.ToArray();
             result["maxRefreshHz"] = supported.Count > 0 ? supported.Max : current.dmDisplayFrequency;
         }

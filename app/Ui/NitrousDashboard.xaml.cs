@@ -936,7 +936,13 @@ public partial class NitrousDashboard : Window
         Logger.Info($"Dashboard: recovered the window from ({rect.Left},{rect.Top}) to ({Left:0},{Top:0}).");
     }
 
-    private void Window_Activated(object sender, EventArgs e) => SyncFnBrightnessHint();
+    private void Window_Activated(object sender, EventArgs e)
+    {
+        SyncFnBrightnessHint();
+
+        // A monitor may have been plugged in, unplugged or switched while the window was in the background.
+        RefreshDisplaySummary();
+    }
 
     /// <summary>
     /// Reads the EC backlight level once, on LIGHT open or window activation, and explains a
@@ -3348,7 +3354,7 @@ public partial class NitrousDashboard : Window
         RefreshModeBox.SelectedItem = selected;
 
         var actual = DisplayManager.GetCurrentRefreshRate();
-        DisplayCurrentText.Text = actual > 0 ? $"{actual} Hz" : string.Empty;
+        RefreshDisplaySummary();
         _lastSyncedRefreshHz = actual;
 
         _refreshControlsLoading = false;
@@ -3363,8 +3369,26 @@ public partial class NitrousDashboard : Window
         else
             DisplayManager.SetAuto();
 
-        var actual = DisplayManager.GetCurrentRefreshRate();
-        DisplayCurrentText.Text = actual > 0 ? $"{actual} Hz" : string.Empty;
+        RefreshDisplaySummary();
+    }
+
+    /// <summary>
+    /// The panel's own label: adapter, the rate it is running at, and the signal depth Windows reports -
+    /// "AMD Radeon 860M @ 144 Hz · 10-bit". Parts the machine does not answer are left out rather than
+    /// guessed.
+    /// </summary>
+    private void RefreshDisplaySummary()
+    {
+        var adapter = DisplayManager.GetAdapterName();
+        var hz = DisplayManager.GetCurrentRefreshRate();
+        var bits = DisplayManager.GetBitsPerColorChannel();
+
+        var text = adapter ?? string.Empty;
+        if (hz > 0) text = text.Length == 0 ? $"{hz} Hz" : $"{text} @ {hz} Hz";
+        if (bits > 0) text = text.Length == 0 ? $"{bits}-bit" : $"{text} · {bits}-bit";
+
+        DisplayCurrentText.Text = text;
+        DisplayCurrentText.ToolTip = text.Length > 0 ? text : null;
     }
 
     private async void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)

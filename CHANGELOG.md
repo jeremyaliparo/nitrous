@@ -3,6 +3,18 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.20 - 2026-11-26
+
+### Display
+
+- **The DISPLAY card now names the panel it is controlling**: the adapter Windows is using, the rate it is
+  running at and the signal depth - `AMD Radeon 860M @ 144 Hz · 10-bit`. The depth is Windows' own
+  advanced-colour state for that display's path, so it is the current signal (8, 10 or 12 bits per channel),
+  not what the panel could theoretically do; anything the driver does not report is left out rather than
+  guessed.
+- The line follows the display: it is rebuilt when the refresh rate changes and when the window is activated,
+  so plugging in, unplugging or switching a monitor updates it instead of leaving yesterday's adapter.
+
 ## 0.15.0-test.19 - 2026-11-25
 
 ### Lighting

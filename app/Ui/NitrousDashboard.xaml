@@ -739,8 +739,12 @@
 					</Border>
 					<!-- Display: refresh rate and panel overdrive -->
 					<Grid Margin="0,0,0,8">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
 						<TextBlock Text="DISPLAY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
-						<TextBlock x:Name="DisplayCurrentText" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+						<TextBlock x:Name="DisplayCurrentText" Grid.Column="1" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
 					</Grid>
 					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,16">
 						<StackPanel>
