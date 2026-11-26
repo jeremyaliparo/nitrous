@@ -67,6 +67,7 @@ public partial class NitrousDashboard : Window
         {
             ShowScrollbars = SettingsManager.Get("ShowScrollbars", 0) == 1
         };
+        ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 0) == 1);
 
         // The tray process owns the global hotkey and writes the active profile to
         // settings. Poll that cross-process state so the dashboard follows hotkey,
@@ -960,7 +961,24 @@ public partial class NitrousDashboard : Window
     /// <summary>Appearance: the binding has already updated the view model; the value is remembered here.</summary>
     private void Scrollbars_Toggled(object sender, RoutedEventArgs e)
     {
-        SettingsManager.Save("ShowScrollbars", TogScrollbars.IsChecked == true ? 1 : 0);
+        var show = TogScrollbars.IsChecked == true;
+        SettingsManager.Save("ShowScrollbars", show ? 1 : 0);
+        ApplyScrollbarMode(show);
+    }
+
+    /// <summary>
+    /// The whole scrollbar is a layout element, not an overlay: showing it reserves its width on all four
+    /// pages, and hiding it goes back to the thin bar that appears only when a page overflows.
+    /// </summary>
+    private void ApplyScrollbarMode(bool show)
+    {
+        var mode = show ? System.Windows.Controls.ScrollBarVisibility.Visible
+                        : System.Windows.Controls.ScrollBarVisibility.Auto;
+
+        DashPage.VerticalScrollBarVisibility = mode;
+        GpuPage.VerticalScrollBarVisibility = mode;
+        KeyboardPage.VerticalScrollBarVisibility = mode;
+        SettingsPage.VerticalScrollBarVisibility = mode;
     }
 
     private void Window_Activated(object sender, EventArgs e)

@@ -509,60 +509,105 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- The alternative: a clearly visible bar, for anyone who wants to see where they are. -->
+        <!-- The alternative: the whole scrollbar - track, arrows and thumb - for anyone who wants it. -->
         <ControlTemplate x:Key="WideScrollBarTemplate" TargetType="{x:Type ScrollBar}">
-            <Grid Width="{TemplateBinding Width}" Background="Transparent">
-                <Border Background="{DynamicResource SurfaceRaisedBrush}" CornerRadius="4" Margin="1,2"/>
-                <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True" Margin="0,4">
-                    <Track.DecreaseRepeatButton>
-                        <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
-                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                                      Focusable="False" IsTabStop="False">
-                            <RepeatButton.Template>
-                                <ControlTemplate TargetType="{x:Type RepeatButton}">
-                                    <Border Background="Transparent"/>
-                                </ControlTemplate>
-                            </RepeatButton.Template>
-                        </RepeatButton>
-                    </Track.DecreaseRepeatButton>
-                    <Track.Thumb>
-                        <Thumb MinHeight="24" Cursor="Hand">
-                            <Thumb.Template>
-                                <ControlTemplate TargetType="{x:Type Thumb}">
-                                    <Border x:Name="ThumbBorder" Background="{DynamicResource TextMutedBrush}" CornerRadius="4" Margin="3,0"/>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                                        </Trigger>
-                                        <Trigger Property="IsDragging" Value="True">
-                                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Thumb.Template>
-                        </Thumb>
-                    </Track.Thumb>
-                    <Track.IncreaseRepeatButton>
-                        <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
-                                      CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
-                                      Focusable="False" IsTabStop="False">
-                            <RepeatButton.Template>
-                                <ControlTemplate TargetType="{x:Type RepeatButton}">
-                                    <Border Background="Transparent"/>
-                                </ControlTemplate>
-                            </RepeatButton.Template>
-                        </RepeatButton>
-                    </Track.IncreaseRepeatButton>
-                </Track>
-            </Grid>
+            <Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="15"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="15"/>
+                    </Grid.RowDefinitions>
+
+                    <RepeatButton Grid.Row="0" Command="{x:Static ScrollBar.LineUpCommand}"
+                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                  Focusable="False" IsTabStop="False">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                <Border Background="Transparent" CornerRadius="5,5,0,0">
+                                    <Path x:Name="Arrow" Data="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"
+                                          Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="7" Height="7"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+
+                    <Track x:Name="PART_Track" Grid.Row="1" Orientation="Vertical" IsDirectionReversed="True">
+                        <Track.DecreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}"
+                                          CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False" IsTabStop="False">
+                                <RepeatButton.Template>
+                                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </RepeatButton.Template>
+                            </RepeatButton>
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                            <Thumb MinHeight="24" Cursor="Hand">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="{x:Type Thumb}">
+                                        <Border x:Name="ThumbBorder" Background="{DynamicResource TextMutedBrush}" CornerRadius="4" Margin="3,1"/>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsDragging" Value="True">
+                                                <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                            <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}"
+                                          CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False" IsTabStop="False">
+                                <RepeatButton.Template>
+                                    <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </RepeatButton.Template>
+                            </RepeatButton>
+                        </Track.IncreaseRepeatButton>
+                    </Track>
+
+                    <RepeatButton Grid.Row="2" Command="{x:Static ScrollBar.LineDownCommand}"
+                                  CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                  Focusable="False" IsTabStop="False">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                <Border Background="Transparent" CornerRadius="0,0,5,5">
+                                    <Path x:Name="Arrow" Data="M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"
+                                          Fill="{DynamicResource TextMutedBrush}" Stretch="Uniform" Width="7" Height="7"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+                </Grid>
+            </Border>
         </ControlTemplate>
 
         <!-- Applied by all four pages; the appearance toggle swaps the width and the template. -->
         <Style x:Key="PageScrollBarStyle" TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding ShowScrollbars}" Value="True">
-                    <Setter Property="Width" Value="12"/>
-                    <Setter Property="MinWidth" Value="12"/>
+                    <Setter Property="Width" Value="15"/>
+                    <Setter Property="MinWidth" Value="15"/>
                     <Setter Property="Template" Value="{StaticResource WideScrollBarTemplate}"/>
                 </DataTrigger>
             </Style.Triggers>
@@ -1411,7 +1456,7 @@
 								<TextBlock Text="Scrollbars" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 								<CheckBox Grid.Column="1" x:Name="TogScrollbars" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
 								          IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
-								          ToolTip="A wide, clearly visible scrollbar on every page."/>
+								          ToolTip="The whole scrollbar - track, arrows and thumb - on all four pages."/>
 							</Grid>
 						</StackPanel>
 					</Border>

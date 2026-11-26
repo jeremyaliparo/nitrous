@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.22 - 2026-11-27
+
+### Appearance
+
+- **Show scrollbars now shows the whole scrollbar**: a 15 px bar with a visible track, up and down arrows and
+  a thumb, present on all four pages all the time instead of appearing only when a page overflows. Off keeps
+  the thin bar. Arrows and the area around the thumb move by a line and a page as a normal scrollbar does.
+
 ## 0.15.0-test.21 - 2026-11-27
 
 ### Keep awake
