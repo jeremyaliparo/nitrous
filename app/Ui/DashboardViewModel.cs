@@ -133,6 +133,94 @@ public class DashboardViewModel : ObservableObject, IDisposable
     /// was in force when the window opened. The transient APPLIED!/ERROR colours are left alone;
     /// the reset after them already reads the current accent.
     /// </summary>
+    /// <summary>
+    /// Writes all four settings for the active profile: the two clock offsets and the two limits. They share
+    /// one Apply because the limits sat directly above the button, and applying them on selection made the
+    /// button look like it did less than it did.
+    /// </summary>
+    private async Task ApplyGpuTuningAsync(string source)
+    {
+        if (_isApplyingClocks) return;
+
+        _isApplyingClocks = true;
+        try
+        {
+            var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+
+            _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
+            var offsetsApplied = _gpuManager.TrySetClocks(
+                GpuCoreOffset, GpuMemoryOffset, out var error, source);
+
+            var applied = new List<string>();
+            var refused = new List<string>();
+
+            if (offsetsApplied)
+                applied.Add($"{FormatOffset(GpuCoreOffset)} / {FormatOffset(GpuMemoryOffset)} MHz offsets");
+            else if (_gpuManager.IsGpuSleeping)
+                refused.Add("the GPU is asleep, so the offsets were saved but not written");
+            else
+                refused.Add($"offsets ({error})");
+
+            if (GpuThermalEditable)
+            {
+                var target = GpuThermalLimit >= GpuThermalMaximum ? 0 : GpuThermalLimit;
+                var result = GpuThermalTarget.Apply(target == 0 ? null : target);
+                if (result.Ok)
+                {
+                    GpuThermalTarget.SaveFor(currentProfile, target);
+                    applied.Add(target == 0 ? "the driver's temperature" : $"{target} C");
+                }
+                else
+                {
+                    refused.Add($"thermal target ({result.Message})");
+                }
+            }
+
+            if (GpuClockEditable)
+            {
+                var cap = GpuClockCap >= GpuClockMaximum ? 0 : GpuClockCap;
+                var result = GpuClockLimit.Apply(cap == 0 ? null : cap);
+                if (result.Ok)
+                {
+                    GpuClockLimit.SaveFor(currentProfile, cap);
+                    applied.Add(cap == 0 ? "no clock cap" : $"{cap} MHz cap");
+                }
+                else
+                {
+                    refused.Add($"clock cap ({result.Message})");
+                }
+            }
+
+            var ok = refused.Count == 0;
+
+            ApplyBtnText = ok ? (source == "reset" ? "RESET!" : "APPLIED!") : "ERROR";
+            ApplyBtnColor = ok ? ThemeManager.SuccessHex : ThemeManager.DangerHex;
+
+            GpuClockStatusText = ok
+                ? $"Applied {string.Join(", ", applied)} to {currentProfile}."
+                : $"{currentProfile}: {string.Join("; ", refused)}.";
+
+            if (!ok) Logger.Warn($"GPU tuning: {GpuClockStatusText}");
+
+            GpuTuningApplied?.Invoke();
+
+            await Task.Delay(2000);
+            ApplyBtnText = "APPLY";
+            ApplyBtnColor = ThemeManager.AccentDeepHex;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("GPU tuning: apply failed.", ex);
+        }
+        finally
+        {
+            _isApplyingClocks = false;
+        }
+    }
+
+    /// <summary>Raised after Apply or Reset, so the page can re-read what the driver now holds.</summary>
+    public event Action? GpuTuningApplied;
+
     public void RefreshAccentColours()
     {
         if (ApplyBtnText == "APPLY") ApplyBtnColor = ThemeManager.AccentDeepHex;
@@ -183,6 +271,94 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 GpuMemoryOffset = offset;
         }
     }
+
+    // --- the two limits: staged like the offsets and committed by the same Apply -----------
+
+    private int _gpuThermalMinimum = 75;
+    public int GpuThermalMinimum
+    {
+        get => _gpuThermalMinimum;
+        set
+        {
+            if (!SetProperty(ref _gpuThermalMinimum, value)) return;
+            OnPropertyChanged(nameof(GpuThermalEditable));
+        }
+    }
+
+    private int _gpuThermalMaximum;
+    /// <summary>The policy's own default: the top of the slider, and the "follow the driver" choice.</summary>
+    public int GpuThermalMaximum
+    {
+        get => _gpuThermalMaximum;
+        set
+        {
+            if (!SetProperty(ref _gpuThermalMaximum, value)) return;
+            OnPropertyChanged(nameof(GpuThermalEditable));
+            OnPropertyChanged(nameof(GpuThermalLimitText));
+        }
+    }
+
+    private int _gpuThermalLimit;
+    public int GpuThermalLimit
+    {
+        get => _gpuThermalLimit;
+        set
+        {
+            if (GpuThermalMaximum > 0) value = Math.Clamp(value, GpuThermalMinimum, GpuThermalMaximum);
+            if (!SetProperty(ref _gpuThermalLimit, value)) return;
+            OnPropertyChanged(nameof(GpuThermalLimitText));
+        }
+    }
+
+    public string GpuThermalLimitText =>
+        GpuThermalMaximum <= 0 ? "—"
+        : GpuThermalLimit >= GpuThermalMaximum ? $"{GpuThermalLimit} C (default)"
+        : $"{GpuThermalLimit} C";
+
+    public bool GpuThermalEditable => ManageGpuClocks && GpuThermalMaximum > GpuThermalMinimum;
+
+    private int _gpuClockMinimum = GpuClockLimit.FloorMhz;
+    public int GpuClockMinimum
+    {
+        get => _gpuClockMinimum;
+        set
+        {
+            if (!SetProperty(ref _gpuClockMinimum, value)) return;
+            OnPropertyChanged(nameof(GpuClockEditable));
+        }
+    }
+
+    private int _gpuClockMaximum;
+    /// <summary>The GPU's maximum boost: the top of the slider, and the "no cap" choice.</summary>
+    public int GpuClockMaximum
+    {
+        get => _gpuClockMaximum;
+        set
+        {
+            if (!SetProperty(ref _gpuClockMaximum, value)) return;
+            OnPropertyChanged(nameof(GpuClockEditable));
+            OnPropertyChanged(nameof(GpuClockLimitText));
+        }
+    }
+
+    private int _gpuClockCap;
+    public int GpuClockCap
+    {
+        get => _gpuClockCap;
+        set
+        {
+            if (GpuClockMaximum > 0) value = Math.Clamp(value, GpuClockMinimum, GpuClockMaximum);
+            if (!SetProperty(ref _gpuClockCap, value)) return;
+            OnPropertyChanged(nameof(GpuClockLimitText));
+        }
+    }
+
+    public string GpuClockLimitText =>
+        GpuClockMaximum <= 0 ? "—"
+        : GpuClockCap >= GpuClockMaximum ? "No cap"
+        : $"{GpuClockCap} MHz";
+
+    public bool GpuClockEditable => ManageGpuClocks && GpuClockMaximum > GpuClockMinimum;
 
     private static string FormatOffset(int value) => value > 0 ? $"+{value}" : value.ToString(CultureInfo.InvariantCulture);
 
@@ -235,6 +411,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 if (!ConfirmEnableGpuClockManagement())
                 {
                     OnPropertyChanged(nameof(ManageGpuClocks));
+                OnPropertyChanged(nameof(GpuThermalEditable));
+                OnPropertyChanged(nameof(GpuClockEditable));
                     return;
                 }
 
@@ -244,6 +422,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 _manageGpuClocks = true;
                 GpuClockStatusText = "Nitrous manages GPU clocks. Applying the active profile offsets...";
                 OnPropertyChanged(nameof(ManageGpuClocks));
+                OnPropertyChanged(nameof(GpuThermalEditable));
+                OnPropertyChanged(nameof(GpuClockEditable));
                 _ = ApplyGpuClockManagementAsync();
                 return;
             }
@@ -266,6 +446,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 if (choice == MessageBoxResult.Cancel)
                 {
                     OnPropertyChanged(nameof(ManageGpuClocks));
+                OnPropertyChanged(nameof(GpuThermalEditable));
+                OnPropertyChanged(nameof(GpuClockEditable));
                     return;
                 }
 
@@ -277,6 +459,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
             SettingsManager.Save(NvidiaGpuManager.ManageGpuClocksKey, 0);
             _manageGpuClocks = false;
             OnPropertyChanged(nameof(ManageGpuClocks));
+                OnPropertyChanged(nameof(GpuThermalEditable));
+                OnPropertyChanged(nameof(GpuClockEditable));
 
             if (clearOffsets)
             {
@@ -654,74 +838,17 @@ public class DashboardViewModel : ObservableObject, IDisposable
             }
         });
 
-        ApplyGpuClocksCommand = new RelayCommand(async _ =>
-        {
-            if (_isApplyingClocks) return;
-
-            _isApplyingClocks = true;
-            try
-            {
-                var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
-
-                _gpuManager.SaveCustomProfileOc(currentProfile, GpuCoreOffset, GpuMemoryOffset);
-                var applied = _gpuManager.TrySetClocks(
-                    GpuCoreOffset, GpuMemoryOffset, out var error, "apply");
-
-                if (applied)
-                {
-                    ApplyBtnText = "APPLIED!";
-                    ApplyBtnColor = ThemeManager.SuccessHex;
-                    GpuClockStatusText =
-                        $"Applied {FormatOffset(GpuCoreOffset)} / {FormatOffset(GpuMemoryOffset)} MHz to {currentProfile}.";
-                }
-                else
-                {
-                    ApplyBtnText = "ERROR";
-                    ApplyBtnColor = ThemeManager.DangerHex;
-                    GpuClockStatusText = _gpuManager.IsGpuSleeping
-                        ? "The GPU is asleep. Nitrous saved the offsets but did not wake it to write them."
-                        : $"Could not apply GPU clocks: {error}";
-                    Logger.Warn($"GPU OC: apply failed: {error}");
-                }
-
-                await Task.Delay(2000);
-                ApplyBtnText = "APPLY";
-                ApplyBtnColor = ThemeManager.AccentDeepHex;
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("GPU OC: apply command failed.", ex);
-            }
-            finally
-            {
-                _isApplyingClocks = false;
-            }
-        });
+        ApplyGpuClocksCommand = new RelayCommand(async _ => await ApplyGpuTuningAsync("apply"));
 
         ResetGpuClocksCommand = new RelayCommand(async _ =>
         {
-            try
-            {
-                var currentProfile = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
-                await _gpuManager.ResetProfileToDefaultsAsync(currentProfile, "reset");
+            // All four go back to neutral: stock offsets, the driver's own temperature, no clock cap.
+            GpuCoreOffset = 0;
+            GpuMemoryOffset = 0;
+            if (GpuThermalMaximum > 0) GpuThermalLimit = GpuThermalMaximum;
+            if (GpuClockMaximum > 0) GpuClockCap = GpuClockMaximum;
 
-                if (_gpuManager.TryGetClocks(out var c, out var m, out var error))
-                {
-                    SetGpuOffsets(c, m);
-                    GpuClockStatusText = $"Reset {currentProfile} to 0 / 0 MHz (stock).";
-                }
-                else
-                {
-                    GpuClockStatusText = _gpuManager.IsGpuSleeping
-                        ? "The GPU is asleep. Reset saved 0 / 0; Nitrous will write it after the GPU wakes."
-                        : $"Reset saved, but the clocks could not be read back: {error}";
-                    Logger.Info($"GPU OC: could not read clocks after reset: {error}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("GPU OC: reset failed.", ex);
-            }
+            await ApplyGpuTuningAsync("reset");
         });
 
         RestoreBoostCommand = new RelayCommand(async _ => await RestoreBoostAsync());

@@ -1522,14 +1522,13 @@
 								<TextBlock Text="GPU TUNING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
 									<TextBlock Text="Manage GPU tuning" Foreground="{DynamicResource TextBodyBrush}" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,8,0" ToolTip="Let Nitrous apply per-profile GPU core offsets, memory offsets and the thermal target. When off, Nitrous never writes GPU settings."/>
-									<CheckBox x:Name="TogManageGpuClocks" Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding ManageGpuClocks, UpdateSourceTrigger=PropertyChanged}" Checked="GpuTuning_Toggled" Unchecked="GpuTuning_Toggled" ToolTip="When off, Nitrous never writes GPU clocks, memory offsets or the thermal limit."/>
+									<CheckBox x:Name="TogManageGpuClocks" Style="{StaticResource ModernToggleStyle}" IsChecked="{Binding ManageGpuClocks, UpdateSourceTrigger=PropertyChanged}" Checked="GpuTuning_Toggled" Unchecked="GpuTuning_Toggled" ToolTip="When off, Nitrous never writes GPU offsets, the temperature limit or the clock cap."/>
 								</StackPanel>
 							</Grid>
 							<TextBlock Text="{Binding GpuClockStatusText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,12"/>
-							<TextBlock Text="CLOCK OFFSETS · APPLY" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
-							<!-- Core Slider -->
+							<!-- Four values, one Apply: stock is 0 / 0, the driver's own temperature and no cap. -->
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="Core Clock" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<TextBlock Text="Core Clock Offset" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
 									<TextBox x:Name="GpuCoreInput" Text="{Binding GpuCoreOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="4" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -1540,9 +1539,9 @@
 								<TextBlock Text="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
 								<TextBlock Text="+300 MHz" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
-							<!-- Memory Slider -->
+
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="Memory Clock" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<TextBlock Text="Memory Clock Offset" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
 									<TextBox x:Name="GpuMemoryInput" Text="{Binding GpuMemoryOffsetText, UpdateSourceTrigger=LostFocus}" LostFocus="GpuOffsetInput_LostFocus" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" Background="Transparent" BorderThickness="0" MaxLength="5" Width="44" TextAlignment="Right" VerticalContentAlignment="Center" CaretBrush="{DynamicResource AccentBrush}" IsEnabled="{Binding ManageGpuClocks}"/>
 									<TextBlock Text=" MHz" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -1553,30 +1552,39 @@
 								<TextBlock Text="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
 								<TextBlock Text="+1000 MHz" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
-							<TextBlock Text="LIMITS · APPLIED IMMEDIATELY" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" Margin="0,0,0,6"/>
-							<!-- Thermal target: NVAPI has one global value, so per-profile behaviour is a write on mode change -->
+
+							<!-- Temperature limit: the driver's own default is the far right, so the slider never asks for more -->
 							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="Thermal Target" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-								<ComboBox x:Name="GpuThermalBox" Width="90" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="GpuThermal_Changed"/>
+								<TextBlock Text="Temperature Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+								<TextBlock Text="{Binding GpuThermalLimitText}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 							</Grid>
-							<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-							<TextBlock x:Name="GpuThermalStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
-							<!-- Clock cap: NVML locked clocks. No read-back exists on this driver, so the row reports acceptance only -->
-							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
+							<Slider x:Name="GpuThermalSlider" Style="{StaticResource ModernSliderStyle}" Minimum="{Binding GpuThermalMinimum}" Maximum="{Binding GpuThermalMaximum}" Value="{Binding GpuThermalLimit, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="1" IsEnabled="{Binding GpuThermalEditable}"/>
+							<Grid Margin="0,2,0,4">
+								<TextBlock Text="{Binding GpuThermalMinimum, StringFormat={}{0} C}" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
+								<TextBlock Text="driver default" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
+							</Grid>
+							<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+							<!-- Core clock limit: the far right is no cap, which is also what clearing means -->
+							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,0,10"/>
 							<Grid Margin="0,0,0,2">
 								<TextBlock Text="Core Clock Limit" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-								<ComboBox x:Name="GpuClockLimitBox" Width="110" HorizontalAlignment="Right" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="GpuClockLimit_Changed"/>
+								<TextBlock Text="{Binding GpuClockLimitText}" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 							</Grid>
-							<TextBlock x:Name="GpuClockLimitHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
-							<TextBlock x:Name="GpuClockLimitStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
+							<Slider x:Name="GpuClockLimitSlider" Style="{StaticResource ModernSliderStyle}" Minimum="{Binding GpuClockMinimum}" Maximum="{Binding GpuClockMaximum}" Value="{Binding GpuClockCap, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="100" IsEnabled="{Binding GpuClockEditable}"/>
+							<Grid Margin="0,2,0,4">
+								<TextBlock Text="{Binding GpuClockMinimum, StringFormat={}{0} MHz}" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
+								<TextBlock Text="no cap" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
+							</Grid>
+							<TextBlock x:Name="GpuClockLimitHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 							<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,10,0,10"/>
 							<!-- Compact action row: ghost RESET beside the accent APPLY -->
 							<Grid>
 								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<Button Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Height="30" Padding="14,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save 0 / 0 MHz for this profile and return the GPU to stock clocks when it is awake."/>
-									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="{DynamicResource TextPrimaryBrush}" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Save and apply these offsets to the active profile."/>
+									<Button Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Height="30" Padding="14,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Return all four to neutral: stock offsets, the driver&apos;s own temperature and no clock cap."/>
+									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="{DynamicResource TextPrimaryBrush}" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Write these four values to the active profile: both offsets, the temperature limit and the clock cap."/>
 								</StackPanel>
 							</Grid>
 						</StackPanel>

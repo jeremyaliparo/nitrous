@@ -45,8 +45,7 @@ public partial class NitrousDashboard : Window
     private bool _cpuPowerCapUpdating;
     private string? _cpuPowerCapMessage;
     private bool _cpuLimitsPreview;
-    private bool _gpuThermalUpdating;
-    private bool _gpuClockUpdating;
+
     private bool _gpuLimitsReading;
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
@@ -70,6 +69,7 @@ public partial class NitrousDashboard : Window
         {
             ShowScrollbars = showScrollbars
         };
+        if (DataContext is DashboardViewModel gpuVm) gpuVm.GpuTuningApplied += RefreshGpuThermalTarget;
         ApplyScrollbarMode(showScrollbars);
         Loaded += (_, _) => ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 1) == 1);
 
@@ -357,14 +357,14 @@ public partial class NitrousDashboard : Window
         {
             UpdateLayout();
             RefreshGpuThermalTarget();
-            GpuThermalBox.BringIntoView();
+            GpuThermalSlider.BringIntoView();
         }
 
         if (key == "gpu-clock")
         {
             UpdateLayout();
             RefreshGpuThermalTarget();
-            GpuClockLimitBox.BringIntoView();
+            GpuClockLimitSlider.BringIntoView();
         }
 
         if (key == "setup-hotkeys")
@@ -1543,127 +1543,58 @@ public partial class NitrousDashboard : Window
         int? CurrentCapMhz,
         int SavedCap);
 
-    /// <summary>Paints both limit cards from a state that was read off the UI thread.</summary>
+    /// <summary>
+    /// Paints the two limit sliders from a state that was read off the UI thread. The sliders are staged:
+    /// nothing is written until Apply, so a slider position is a choice, not a command.
+    /// </summary>
     private void RenderGpuLimits(GpuLimitState state)
     {
         UpdateGpuThermalLimitText(state.Thermal);
 
-        if (state.Thermal is not { } policy)
+        if (DataContext is DashboardViewModel vm)
         {
-            GpuThermalBox.IsEnabled = false;
-            GpuThermalHint.Text = "This GPU exposes no thermal policy, or it is asleep.";
-        }
-        else
-        {
-            GpuThermalHint.Text =
-                $"Applies to {state.Mode}. {policy.Min}-{policy.Default} C; lower runs cooler and quieter at the cost of boost.";
-
-            _gpuThermalUpdating = true;
-            try
+            if (state.Thermal is { } policy)
             {
-                var options = new List<int> { policy.Default };
-                for (var c = policy.Default - 1; c >= policy.Min; c--) options.Add(c);
-
-                GpuThermalBox.ItemsSource = options.Select(c => new GpuThermalOption(c, $"{c} C")).ToList();
-
-                var selected = state.SavedThermal == 0 ? policy.Default : Math.Min(state.SavedThermal, policy.Default);
-                var index = options.IndexOf(selected);
-                GpuThermalBox.SelectedIndex = index >= 0 ? index : 0;
-                GpuThermalBox.IsEnabled = state.Managing;
+                vm.GpuThermalMinimum = policy.Min;
+                vm.GpuThermalMaximum = policy.Default;
+                vm.GpuThermalLimit = state.SavedThermal == 0
+                    ? policy.Default
+                    : Math.Clamp(state.SavedThermal, policy.Min, policy.Default);
             }
-            finally
+            else
             {
-                _gpuThermalUpdating = false;
+                // Asleep or no policy: the slider cannot describe a range, so it is disabled and blank.
+                vm.GpuThermalMinimum = 0;
+                vm.GpuThermalMaximum = 0;
+                vm.GpuThermalLimit = 0;
             }
 
-            GpuThermalStatus.Visibility = Visibility.Collapsed;
-        }
-
-        RenderGpuClockLimit(state.Mode, state.MaximumMhz, state.CurrentCapMhz, state.SavedCap, state.Managing);
-    }
-
-    /// <summary>
-    /// The clock cap: values from the GPU's maximum boost down to the floor, plus "No cap". The row shows
-    /// what the driver holds, read back through NVAPI, rather than only what was asked for.
-    /// </summary>
-    private void PopulateGpuClockLimit()
-    {
-        var mode = ActiveProfile();
-        RenderGpuClockLimit(
-            mode,
-            GpuClockLimit.MaximumMhz(),
-            GpuClockLimit.CurrentCapMhz(),
-            GpuClockLimit.SavedFor(mode),
-            GpuClockLimit.Managing);
-    }
-
-    private void RenderGpuClockLimit(
-        PowerProfile mode, int? maximum, int? currentCap, int savedCap, bool managing)
-    {
-        _gpuClockUpdating = true;
-        try
-        {
-            if (maximum is not { } ceiling || ceiling <= GpuClockLimit.FloorMhz)
+            if (state.MaximumMhz is { } ceiling && ceiling > GpuClockLimit.FloorMhz)
             {
-                GpuClockLimitBox.ItemsSource = new List<GpuClockOption> { new(0, "No cap") };
-                GpuClockLimitBox.SelectedIndex = 0;
-                GpuClockLimitBox.IsEnabled = false;
-                GpuClockLimitHint.Text = "This GPU does not report a maximum clock while it is asleep.";
-                return;
+                vm.GpuClockMinimum = GpuClockLimit.FloorMhz;
+                vm.GpuClockMaximum = ceiling;
+                vm.GpuClockCap = state.SavedCap > 0 ? Math.Min(state.SavedCap, ceiling) : ceiling;
             }
-
-            var options = new List<GpuClockOption> { new(0, "No cap") };
-            for (var mhz = ceiling; mhz >= GpuClockLimit.FloorMhz; mhz -= 100)
-                options.Add(new GpuClockOption(mhz, $"{mhz} MHz"));
-
-            var held = currentCap ?? savedCap;
-
-            GpuClockLimitBox.ItemsSource = options;
-            GpuClockLimitBox.SelectedIndex = Math.Max(0, options.FindIndex(o => o.Mhz == held));
-            GpuClockLimitBox.IsEnabled = managing;
-
-            GpuClockLimitHint.Text = held > 0
-                ? $"Capped at {held} MHz for {mode} (max {ceiling} MHz)."
-                : $"No cap; the GPU may boost to {ceiling} MHz.";
-        }
-        finally
-        {
-            _gpuClockUpdating = false;
+            else
+            {
+                vm.GpuClockMinimum = 0;
+                vm.GpuClockMaximum = 0;
+                vm.GpuClockCap = 0;
+            }
         }
 
-        GpuClockLimitStatus.Visibility = Visibility.Collapsed;
+        GpuThermalHint.Text = state.Thermal is { } thermal
+            ? $"{thermal.Min}-{thermal.Default} C. Lower runs cooler and quieter at the cost of boost."
+            : "The GPU is asleep, so the target cannot be read or set.";
+
+        GpuClockLimitHint.Text = state.MaximumMhz is { } maximum && maximum > GpuClockLimit.FloorMhz
+            ? $"Up to {maximum} MHz. The far right is no cap; drag it left to cap the boost."
+            : "The GPU does not report a maximum clock while it is asleep.";
     }
 
-    private void GpuClockLimit_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (_gpuClockUpdating) return;
-        if (GpuClockLimitBox.SelectedItem is not GpuClockOption option) return;
-
-        var result = GpuClockLimit.Apply(option.Mhz == 0 ? null : option.Mhz);
-
-        GpuClockLimitStatus.Text = result.Message;
-        GpuClockLimitStatus.Visibility = Visibility.Visible;
-
-        if (result.Ok)
-        {
-            GpuClockLimit.SaveFor(ActiveProfile(), option.Mhz);
-            PopulateGpuClockLimit();
-            GpuClockLimitStatus.Text = result.Message;
-            GpuClockLimitStatus.Visibility = Visibility.Visible;
-        }
-    }
-
-    private readonly record struct GpuClockOption(int Mhz, string Label)
-    {
-        public override string ToString() => Label;
-    }
-
-    /// <summary>The shared "Manage GPU tuning" switch changed: the dropdown follows it.</summary>
+    /// <summary>The shared "Manage GPU tuning" switch changed: apply the profile's values, then re-read.</summary>
     private void GpuTuning_Toggled(object sender, RoutedEventArgs e)
     {
-        if (_gpuThermalUpdating) return;
-
-        // Apply the profile's saved values first, then read, so the cards show the result of the re-assert.
         if (GpuThermalTarget.Managing)
         {
             GpuThermalTarget.Reassert(ActiveProfile());
@@ -1673,32 +1604,7 @@ public partial class NitrousDashboard : Window
         RefreshGpuThermalTarget();
     }
 
-    private void GpuThermal_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (_gpuThermalUpdating) return;
-        if (GpuThermalBox.SelectedItem is not GpuThermalOption option) return;
-
-        var result = GpuThermalTarget.Apply(option.Celsius);
-        GpuThermalStatus.Text = result.Message;
-        GpuThermalStatus.Visibility = Visibility.Visible;
-
-        // Remember the choice for the profile it was made in, so the next mode change can restore it.
-        if (result.Ok && GpuThermalTarget.Read() is { } limits)
-            GpuThermalTarget.SaveFor(ActiveProfile(), option.Celsius == limits.Default ? 0 : option.Celsius);
-
-        UpdateGpuThermalLimitText(GpuThermalTarget.Read());
-    }
-
-    /// <summary>The profile settings currently point at, falling back to what the EC reports.</summary>
-    private static Nitrous.Enums.PowerProfile ActiveProfile() =>
-        AcerWmiManager.GetEcPowerMode()
-        ?? (Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Performance);
-
-    /// <summary>
-    /// The readout beside the performance state: the target the driver holds, and whether it is still the
-    /// driver's own value. Derived from the policy rather than from the saved setting, so a change made in
-    /// another tool shows as modified too.
-    /// </summary>
+    /// <summary>The readout beside the performance state: what the driver holds right now.</summary>
     private void UpdateGpuThermalLimitText(GpuThermalTarget.Limits? limits)
     {
         if (limits is not { } value)
@@ -1712,10 +1618,10 @@ public partial class NitrousDashboard : Window
             : $"{value.Current} C (modified)";
     }
 
-    private readonly record struct GpuThermalOption(int Celsius, string Label)
-    {
-        public override string ToString() => Label;
-    }
+    /// <summary>The profile the settings point at, falling back to what the EC reports.</summary>
+    private static Nitrous.Enums.PowerProfile ActiveProfile() =>
+        AcerWmiManager.GetEcPowerMode()
+        ?? (Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Performance);
 
     /// <summary>
     /// Fills both cap lists from this mode's ceilings and selects what is in use. The sustained list stops

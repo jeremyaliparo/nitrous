@@ -3,6 +3,19 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.26 - 2026-11-27
+
+### GPU
+
+- **The GPU card is four sliders with one Apply.** Core offset, memory offset, temperature limit and core
+  clock limit now sit together and are committed by the same APPLY; RESET returns all four to neutral - stock
+  offsets, the driver's own temperature and no clock cap. Before this the two limits applied as soon as they
+  were picked, so the button directly beneath them looked like it governed only the offsets.
+- The temperature slider runs from the policy's minimum to its own default, so it can only ask for less heat
+  than the driver does; the clock slider's far right is "no cap", which is exactly what clearing means.
+- Apply and Reset report every part in one line ("Applied +50 / +100 MHz offsets, 85 C, 1500 MHz cap to
+  Balanced."), and the readout beside the performance state re-reads what the driver holds afterwards.
+
 ## 0.15.0-test.25 - 2026-11-27
 
 ### GPU
