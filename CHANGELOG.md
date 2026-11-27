@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.8 - 2026-11-28
+
+### GPU
+
+- **The telemetry card names the applied limits** beneath the meters: `Thermal target 80 C · Clock cap
+  1500 MHz`. Both come from the driver (`Current` policy and the locked clock), not from the staged sliders,
+  so a chosen-but-unapplied value never looks active.
+- **The temperature slider's range is no longer ambiguous.** Its right end reads `87 C default` (with the
+  number), and the hint says `Allowed 75-87 C; 87 C is the driver default`. The value above the slider is
+  the selected target; the ends are the allowed range, which is why they do not shrink to 75-80.
+
 ## 0.16.0-test.7 - 2026-11-28
 
 ### Battery
