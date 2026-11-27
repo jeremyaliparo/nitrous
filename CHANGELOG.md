@@ -3,6 +3,60 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0 - 2026-11-27
+
+### CPU power limits
+
+- **PL1 and PL2 are two 1 W sliders with a shared APPLY**, on Intel Nitro models that already have
+  [PawnIO](https://pawnio.eu) installed. The old pickers stepped in 5 W, so 29 W or 28 W could not be
+  asked for. The sustained slider stops at the mode's own request and the burst slider starts where
+  sustained sits, so the cap can only ask for less than the firmware does and PL1 can never be set above
+  PL2. RESET stands both on the mode's request again.
+- **The cap is held per power profile and per power source.** A cap set in Balanced applies to Balanced
+  only; a profile with no cap is left alone, and clearing is the explicit RESET rather than a side effect
+  of where the machine happens to be. The ceiling is the highest request the firmware has been seen to
+  make for that profile - not the number it happens to be asking at the instant - so a dip (DTT, or the
+  charger sharing power with a charging battery) can no longer shrink the cap or hide it.
+
+### GPU tuning
+
+- **A thermal target and a core clock cap, held per profile**, beside the offsets on one four-slider GPU
+  TUNING card with a single APPLY and RESET. A profile with no value restores the driver's own thermal
+  target and clears the clock lock; every mode change, start-up and resume re-applies the active
+  profile's values. Both limits are lower-only and read back after the write.
+- The limit cards read the driver **off the UI thread**, so opening the GPU page no longer pauses, and a
+  sleeping dGPU is still never woken to draw a card.
+
+### Lighting and keys
+
+- **The LIGHT page now exists on the WMI-only Nitros** - the AN515/AN517 family, four RGB zones and no
+  ENEK HID interface - through Acer's own `SetGamingKBBacklight` and `SetGamingRgbKb` setters: zone
+  colours, brightness and the five effects that controller actually implements. Snake and Disco are no
+  longer offered where the firmware accepts their codes and leaves the keys dark. Where a BIOS only
+  accepts zone colours, the effect and speed controls say so instead of accepting changes that go
+  nowhere.
+- **The power-mode key works on the models whose firmware leaves switching to software** (Acer's
+  `APGeEvent`), and **the Nitro key is read from Acer's HID collection** as well as from the keystroke,
+  so both act where a keyboard hook never sees them.
+- Spectrum sound sync reads the live sample buffer again instead of one nothing filled, and two seconds
+  of silence is logged once, so "sound sync does nothing" can be told apart from a hardware limit.
+
+### Setup and dashboard
+
+- **SETUP is four pinned categories** - Power, System, Keys and Theme - instead of six sections and five
+  screens of scrolling. The header and tabs never scroll away, the last category is remembered, and deep
+  links open the right one.
+- **A coffee toggle keeps the machine and its screen awake** from the title bar, held by the tray through
+  a Windows execution-state request, so it survives closing the dashboard and costs no CPU while idle.
+- **Scrollbars** is now a plain show/hide of the page scrollbar, and **the DISPLAY card names the panel**
+  it is driving - adapter, rate and signal depth, read from Windows' own advanced-colour state.
+- A status line with nothing to say no longer leaves a chin at the bottom of a card.
+
+### Fixes
+
+- A cap no longer follows the firmware's request down, and a mode change no longer wipes one.
+- The lighting sync, the effect limit, the mode and Nitro keys and the GPU limits above.
+
 ## 0.15.0-test.28 - 2026-11-27
 
 ### CPU
