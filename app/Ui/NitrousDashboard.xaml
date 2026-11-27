@@ -1736,7 +1736,11 @@
 					        Visibility="{Binding GpuMuxAvailable, Converter={StaticResource BoolToVis}}">
 						<StackPanel>
 							<Grid Margin="0,0,0,2">
-								<TextBlock Text="GPU MODE (MUX)" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+									<Path Data="M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z"
+									      Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0"/>
+									<TextBlock Text="GPU MODE (MUX)" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								</StackPanel>
 								<TextBlock Text="{Binding GpuMuxCurrentText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 							</Grid>
 							<TextBlock Text="Changes which GPU drives the built-in display. Takes effect after a restart."
@@ -1768,7 +1772,11 @@
 					<Border x:Name="GpuDdsCard" Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12"
 					        Visibility="{Binding GpuDdsNoticeVisible, Converter={StaticResource BoolToVis}}">
 						<StackPanel>
-							<TextBlock Text="ADVANCED OPTIMUS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
+							<StackPanel Orientation="Horizontal">
+								<Path Data="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z"
+								      Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0"/>
+								<TextBlock Text="ADVANCED OPTIMUS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+							</StackPanel>
 							<TextBlock Text="This model switches the display live through NVIDIA Advanced Optimus. Change the display mode in the NVIDIA app; Nitrous does not write the BIOS MUX here, because that would only apply after a restart."
 							           Foreground="{DynamicResource TextMutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="0,4,0,0"/>
 						</StackPanel>
