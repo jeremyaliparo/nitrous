@@ -3,6 +3,12 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.6 - 2026-11-27
+
+### GPU
+
+- The **GPU MODE (MUX)** card carries its switch icon, and the Advanced Optimus note a display icon.
+
 ## 0.16.0-test.5 - 2026-11-27
 
 ### GPU
