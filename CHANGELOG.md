@@ -3,6 +3,26 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.5 - 2026-11-27
+
+### GPU
+
+- **The telemetry card is rebuilt around the numbers that move.** Core and memory clocks lead; a two-minute
+  power plot draws the draw against the enforced limit (dashed) with a hover readout, and `2m / 5m / 15m`
+  windows remembered across sessions; load, VRAM and temperature become meters against their own limits.
+  The temperature meter uses the driver's current thermal target, and the power plot only records while the
+  page is open, so a closed page is a gap rather than a zero.
+- **A real asleep state**: `Asleep · D3` with one explanation instead of a card full of `--` values. The
+  dGPU is still never woken to draw it.
+- **GPU MODE (MUX) on models whose firmware exposes the BIOS switch and where NVIDIA DDS is not the
+  control.** Hybrid, Discrete and - where the firmware lists it - Automatic; the mode is stored for the next
+  boot, applied only by an explicit APPLY after a confirmation, read back and reported, with Restart now or
+  Restart later. Nothing is written at startup, on a power-mode change or per profile.
+- The MUX card is hidden when the firmware does not list both Hybrid and Discrete or reports `0xFF`, and on
+  **Advanced Optimus** machines: the NVIDIA app switches the display live there, and a BIOS mode would only
+  apply after a restart. Those machines get a note pointing at the NVIDIA app instead. If the DDS probe
+  cannot run, the BIOS card is the fallback, because it is then the only switch.
+
 ## 0.16.0-test.2 - 2026-11-27
 
 ### Dashboard
