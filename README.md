@@ -42,7 +42,7 @@ OEM control centers install heavy background service stacks, telemetry daemons, 
 Quiet, Balanced, Performance, and Turbo are applied directly through the EC, so the firmware's own CPU and GPU limits follow the mode.
 
 **CPU power limits (`PL1` / `PL2`)**<br>
-On Intel Nitro models with [PawnIO](https://pawnio.eu) already installed, sustained and burst limits are shown per mode and can be lowered—AMD models never see the card. Every value is clamped to what the current mode asks, read back after the write, and reverted if it does not stick. Caps follow the mode down and return with it, survive sleep, and restore cleanly via **RESET**.
+On Intel Nitro models with [PawnIO](https://pawnio.eu) already installed, sustained and burst limits are two 1 W sliders, held per power profile and per power source—AMD models never see the card. The sustained slider stops at the mode's own request and burst starts where sustained sits, so a cap can only lower what the firmware asks and `PL1` can never exceed `PL2`. The ceiling is the highest request the firmware has been seen to make for that profile, so a dip cannot shrink a cap. **APPLY** writes both, read back after the write and reverted if it does not stick; **RESET** follows the mode again.
 
 **Fan control**<br>
 Per-profile curves alongside Auto, Max, and manual 1–100% control. Instant spin-up paired with a gradual ramp-down stops brief CPU bursts from causing revving. CoolBoost appears only where the firmware supports it.
@@ -66,8 +66,8 @@ Clock writes are **off by default**, so external tools such as Afterburner are n
 **Vendor tools**<br>
 Opens the NVIDIA App-or the Control Panel where that is what is installed-from the GPU page or with <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>N</kbd>.
 
-**Thermal target**<br>
-The temperature the GPU throttles at, lowered inside the driver's own range (75-87 °C on an RTX 5060). One global setting rather than one per profile, read back after the write and restored if the driver will not keep it.
+**Thermal target and clock cap**<br>
+The temperature the GPU throttles at, lowered inside the driver's own range (75-87 °C on an RTX 5060), and a core clock cap—held per power profile beside the clock offsets, with one **APPLY**. Both are read back after the write and re-applied on mode changes, at start-up and after resume; a profile with no value restores the driver's default target and clears the clock lock.
 
 **No idle wake**<br>
 Polls the GPU only while its tab is open, checking a sleeping dGPU through Windows' cached PnP state rather than touching it.
@@ -87,7 +87,7 @@ Panel response overdrive wherever the display reports support for it.
 ### Lighting
 
 **Global and Area presets**<br>
-One effect across the keyboard and lid, or four per-zone colours with brightness and speed, driven through the keyboard's own HID controller.
+One effect across the keyboard and lid, or four per-zone colours with brightness and speed, through the keyboard's own HID controller or—on WMI-only Nitros—Acer's lighting setters, with the effects that controller implements.
 
 **Screen and sound sync**<br>
 Follow the screen's colours, run the active effect on audio, or combine screen colours with an audio beat—with four-band Spectrum, bass Beat, the five-step Vibe engine, saturation control, and a silence floor.
@@ -99,7 +99,7 @@ Dedicated lid logo control with Static, Breathing, and Neon effects.
 Acknowledges a power-profile change in the mode's colour, matching the OEM software.
 
 **Fit to hardware**<br>
-Single-colour keyboards get one Colour chip instead of four dead zones, and models with no reachable controller omit the `LIGHT` tab entirely.
+Single-colour keyboards get one Colour chip instead of four dead zones, and models with no reachable controller omit the `LIGHT` tab entirely. WMI-only Nitros get the page through Acer's setters; where the BIOS only accepts zone colours, the effect and speed controls say so.
 
 ---
 
@@ -113,6 +113,9 @@ Five window presets—Midnight, Black, Graphite, Slate, and Navy—each rebuildi
 
 **Sections and fonts**<br>
 Configure the card surface on its own, paired with a font list built strictly from families installed on your PC so every choice applies.
+
+**Keep awake**<br>
+A coffee toggle in the title bar holds a Windows execution-state request so the machine and screen stay awake—no timer and no service, and the tray keeps it after the dashboard is closed.
 
 ---
 
@@ -233,7 +236,7 @@ Nitrous disables controls when your firmware does not respond to them rather tha
 - **Keyboard Zones:** Requires a 4-zone RGB keyboard; single-colour models get one Colour chip instead.
 - **LIGHT page:** A model with no reachable keyboard-lighting controller gets no tab at all. Its Fn keys may still change the backlight, but no user-mode interface exposes that.
 - **Cover Logo:** Confirmed once with a test colour on the first visit. If the lid's "N" did not light up, the effect controls are replaced by an explanation and nothing further is written to that device.
-- **Keyboard Auto-Off:** Requires the embedded-controller interface and now lives in **Setup → KEYBOARD**. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
+- **Keyboard Auto-Off:** Requires the embedded-controller interface and now lives in **Setup → Keys**. On models without it Nitrous cannot reach the setting, even where the OEM software still offers it.
 - **USB Charging While Off:** Requires an Acer WMI class that is only partially implemented on certain BIOS versions.
 - **CoolBoost:** Offered only where the firmware itself says APGeAction function 7 is CoolBoost. On firmware that uses that function for the power mode the switch stays hidden, because writing it would change the mode.
 
