@@ -3,6 +3,23 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.2 - 2026-11-27
+
+### Dashboard
+
+- **The temperature graph now has a scale, a time axis and a hover readout.** The range is picked from the
+  data with a 20 C floor and rounded to fives, so the lines use the plot without turning a 2 C wobble into a
+  mountain range; three labelled gridlines sit beside them and `-2m / -1m / now` under them.
+- **Hover snaps to the nearest sample** and replaces the stats with `-0:42 · CPU 52 C · GPU 47 C`, with a
+  crosshair and a dot on each visible line. The footer now reports each series' min-max and average, and the
+  fan/load peaks are labelled instead of being three unlabelled pairs.
+- **2 / 5 / 15 minute windows**, remembered across sessions and defaulting to 2. The buffer keeps fifteen
+  minutes of timestamped samples, and a gap longer than 12 s - the dashboard was hidden - breaks the line
+  instead of drawing a straight line across it.
+- Click the **CPU** or **GPU** label to hide that line; the axis refits to the one left. The chart rebuilds
+  once per 2 s poll and the hover only moves the overlay when the sample under the pointer changes, so there
+  is no timer, animation or per-frame work.
+
 ## 0.16.0-test.1 - 2026-11-27
 
 ### Setup

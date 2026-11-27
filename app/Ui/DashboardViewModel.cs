@@ -36,25 +36,166 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private ulong _cpuUser;
     private bool _haveCpuSample;
 
-    // Temperature history: one sample per poll, drawn right-aligned in a fixed 500x88 space.
-    private const int HistoryCapacity = 60;
-    private const double ChartWidth = 500;
-    private const double ChartHeight = 88;
+    // Temperature history: one timestamped sample per poll, kept for the largest window (15 min at
+    // 2 s). The 2/5/15 minute views are slices of the same data, so switching never drops samples.
+    private const int HistoryCapacity = 450;
+    private const double ChartWidth = 288;
+    private const double ChartHeight = 50;
+
+    /// <summary>A gap this long is the dashboard having been hidden, not a slow poll.</summary>
+    private static readonly TimeSpan ChartGap = TimeSpan.FromSeconds(12);
 
     private readonly object _historyGate = new();
-    private readonly List<int> _cpuHistory = new(HistoryCapacity);
-    private readonly List<int> _gpuHistory = new(HistoryCapacity);
-    private readonly List<int> _cpuRpmHistory = new(HistoryCapacity);
-    private readonly List<int> _cpuUsageHistory = new(HistoryCapacity);
-    private readonly List<int> _gpuRpmHistory = new(HistoryCapacity);
-    private readonly List<int> _gpuUsageHistory = new(HistoryCapacity);
+    private readonly List<HistorySample> _history = new(HistoryCapacity);
 
-    private string _historyPeakText = "";
-    public string HistoryPeakText
+    private int _chartSpanMinutes = 2;
+    private bool _showCpuChart = true;
+    private bool _showGpuChart = true;
+
+    /// <summary>One visible sample in chart pixels; the hover readout uses it without rebuilding anything.</summary>
+    public readonly record struct ChartSample(double X, double CpuY, double GpuY, DateTime At, int Cpu, int Gpu);
+
+    private readonly record struct HistorySample(
+        DateTime At, int Cpu, int Gpu, int CpuRpm, int GpuRpm, int CpuUsage, int GpuUsage);
+
+    private Geometry _cpuHistoryGeometry = Geometry.Empty;
+    public Geometry CpuHistoryGeometry
     {
-        get => _historyPeakText;
-        set => SetProperty(ref _historyPeakText, value);
+        get => _cpuHistoryGeometry;
+        set => SetProperty(ref _cpuHistoryGeometry, value);
     }
+
+    private Geometry _gpuHistoryGeometry = Geometry.Empty;
+    public Geometry GpuHistoryGeometry
+    {
+        get => _gpuHistoryGeometry;
+        set => SetProperty(ref _gpuHistoryGeometry, value);
+    }
+
+    private IReadOnlyList<ChartSample> _chartSamples = Array.Empty<ChartSample>();
+    public IReadOnlyList<ChartSample> ChartSamples
+    {
+        get => _chartSamples;
+        set => SetProperty(ref _chartSamples, value);
+    }
+
+    private string _chartAxisTop = "";
+    public string ChartAxisTop
+    {
+        get => _chartAxisTop;
+        set => SetProperty(ref _chartAxisTop, value);
+    }
+
+    private string _chartAxisMid = "";
+    public string ChartAxisMid
+    {
+        get => _chartAxisMid;
+        set => SetProperty(ref _chartAxisMid, value);
+    }
+
+    private string _chartAxisBottom = "";
+    public string ChartAxisBottom
+    {
+        get => _chartAxisBottom;
+        set => SetProperty(ref _chartAxisBottom, value);
+    }
+
+    private string _chartTimeLeft = "-2m";
+    public string ChartTimeLeft
+    {
+        get => _chartTimeLeft;
+        set => SetProperty(ref _chartTimeLeft, value);
+    }
+
+    private string _chartTimeMid = "-1m";
+    public string ChartTimeMid
+    {
+        get => _chartTimeMid;
+        set => SetProperty(ref _chartTimeMid, value);
+    }
+
+    private string _cpuHistoryStatsText = "";
+    public string CpuHistoryStatsText
+    {
+        get => _cpuHistoryStatsText;
+        set => SetProperty(ref _cpuHistoryStatsText, value);
+    }
+
+    private string _gpuHistoryStatsText = "";
+    public string GpuHistoryStatsText
+    {
+        get => _gpuHistoryStatsText;
+        set => SetProperty(ref _gpuHistoryStatsText, value);
+    }
+
+    private string _auxHistoryStatsText = "";
+    public string AuxHistoryStatsText
+    {
+        get => _auxHistoryStatsText;
+        set => SetProperty(ref _auxHistoryStatsText, value);
+    }
+
+    /// <summary>2, 5 or 15 minutes, remembered across sessions; anything else falls back to 2.</summary>
+    public int ChartSpanMinutes
+    {
+        get => _chartSpanMinutes;
+        set
+        {
+            if (value is not (2 or 5 or 15)) return;
+            if (!SetProperty(ref _chartSpanMinutes, value)) return;
+            SettingsManager.Save("ChartSpanMinutes", value);
+            OnPropertyChanged(nameof(ChartSpan2));
+            OnPropertyChanged(nameof(ChartSpan5));
+            OnPropertyChanged(nameof(ChartSpan15));
+            UpdateHistoryChart();
+        }
+    }
+
+    public bool ChartSpan2
+    {
+        get => _chartSpanMinutes == 2;
+        set { if (value) ChartSpanMinutes = 2; }
+    }
+
+    public bool ChartSpan5
+    {
+        get => _chartSpanMinutes == 5;
+        set { if (value) ChartSpanMinutes = 5; }
+    }
+
+    public bool ChartSpan15
+    {
+        get => _chartSpanMinutes == 15;
+        set { if (value) ChartSpanMinutes = 15; }
+    }
+
+    public bool ShowCpuChart
+    {
+        get => _showCpuChart;
+        set
+        {
+            if (!SetProperty(ref _showCpuChart, value)) return;
+            OnPropertyChanged(nameof(CpuLegendOpacity));
+            UpdateHistoryChart();
+        }
+    }
+
+    public bool ShowGpuChart
+    {
+        get => _showGpuChart;
+        set
+        {
+            if (!SetProperty(ref _showGpuChart, value)) return;
+            OnPropertyChanged(nameof(GpuLegendOpacity));
+            UpdateHistoryChart();
+        }
+    }
+
+    public double CpuLegendOpacity => _showCpuChart ? 1 : 0.35;
+    public double GpuLegendOpacity => _showGpuChart ? 1 : 0.35;
+
+    public RelayCommand ToggleCpuChartCommand { get; private set; } = null!;
+    public RelayCommand ToggleGpuChartCommand { get; private set; } = null!;
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
@@ -712,6 +853,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
         _isCurveModeEnabled = SettingsManager.Get("IsCurveModeEnabled", 0) == 1;
         _manageCpuPower = SettingsManager.Get("ManageCpuPower", 0) == 1;
 
+        var savedSpan = SettingsManager.Get("ChartSpanMinutes", 2);
+        _chartSpanMinutes = savedSpan is 2 or 5 or 15 ? savedSpan : 2;
+
         // GPU clock writes are opt-in. Default off for existing installs so an update never
         // starts writing clocks on a machine that has been tuned by another tool.
         _manageGpuClocks = NvidiaGpuManager.IsClockManagementEnabled();
@@ -839,6 +983,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
         });
 
         ApplyGpuClocksCommand = new RelayCommand(async _ => await ApplyGpuTuningAsync("apply"));
+
+        ToggleCpuChartCommand = new RelayCommand(_ => ShowCpuChart = !ShowCpuChart);
+        ToggleGpuChartCommand = new RelayCommand(_ => ShowGpuChart = !ShowGpuChart);
 
         ResetGpuClocksCommand = new RelayCommand(async _ =>
         {
@@ -1588,94 +1735,230 @@ public class DashboardViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Appends one sample to the temperature and fan history. A zero (the EC could not answer) is
-    /// skipped rather than drawn at the floor, so a sleeping dGPU does not look like a drop to
-    /// freezing.
+    /// Appends one timestamped sample. A zero (the EC could not answer) is kept as "no reading" rather
+    /// than drawn at the floor, so a sleeping dGPU does not look like a drop to freezing.
     /// </summary>
     private void AppendHistory(int cpuTemp, int gpuTemp, int cpuRpm, int gpuRpm,
         int? cpuUsage, int? gpuUsage)
     {
-        if (cpuTemp <= 0) return;
+        if (cpuTemp <= 0 && gpuTemp <= 0) return;
 
         lock (_historyGate)
         {
-            Add(_cpuHistory, cpuTemp);
-            if (cpuRpm > 0) Add(_cpuRpmHistory, cpuRpm);
+            _history.Add(new HistorySample(
+                DateTime.Now,
+                cpuTemp,
+                Math.Max(0, gpuTemp),
+                Math.Max(0, cpuRpm),
+                Math.Max(0, gpuRpm),
+                Math.Max(0, cpuUsage ?? 0),
+                Math.Max(0, gpuUsage ?? 0)));
 
-            // The GPU series keep their own length: they simply start once the firmware answers.
-            if (gpuTemp > 0) Add(_gpuHistory, gpuTemp);
-            if (gpuRpm > 0) Add(_gpuRpmHistory, gpuRpm);
-
-            if (cpuUsage is { } cpu) Add(_cpuUsageHistory, cpu);
-            if (gpuUsage is { } gpu) Add(_gpuUsageHistory, gpu);
-        }
-
-        static void Add(List<int> samples, int value)
-        {
-            samples.Add(value);
-            if (samples.Count > HistoryCapacity) samples.RemoveAt(0);
+            if (_history.Count > HistoryCapacity) _history.RemoveAt(0);
         }
     }
 
+    /// <summary>
+    /// Rebuilds the visible window: two frozen line geometries, the axis, the stats and the snapshot
+    /// the hover readout binary-searches. Runs once per poll on the UI thread; the work is bounded by
+    /// <see cref="HistoryCapacity"/> and nothing is allocated per mouse move.
+    /// </summary>
     private void UpdateHistoryChart()
     {
-        PointCollection cpu;
-        PointCollection gpu;
-        string peaks;
+        DateTime end = DateTime.Now;
+        TimeSpan span = TimeSpan.FromMinutes(_chartSpanMinutes);
+        DateTime begin = end - span;
+        bool showCpu = _showCpuChart;
+        bool showGpu = _showGpuChart;
+
+        var visible = new List<HistorySample>(_chartSpanMinutes * 30);
+        Geometry cpuGeometry;
+        Geometry gpuGeometry;
+        int yMin, yMax;
+
         lock (_historyGate)
         {
-            cpu = BuildHistoryPoints(_cpuHistory);
-            gpu = BuildHistoryPoints(_gpuHistory);
-            peaks = FormatPeaks();
+            foreach (var sample in _history)
+                if (sample.At >= begin)
+                    visible.Add(sample);
+
+            (yMin, yMax) = ChooseRange(visible, showCpu, showGpu);
+            cpuGeometry = BuildLine(visible, begin, span, yMin, yMax, cpu: true);
+            gpuGeometry = BuildLine(visible, begin, span, yMin, yMax, cpu: false);
         }
 
-        CpuHistoryPoints = cpu;
-        GpuHistoryPoints = gpu;
-        HistoryPeakText = peaks;
-
-        string FormatPeaks()
+        var samples = new List<ChartSample>(visible.Count);
+        foreach (var sample in visible)
         {
-            var parts = new List<string>(2);
-
-            if (_cpuHistory.Count > 0)
-            {
-                var cpuMax = _cpuHistory.Max();
-                var gpuMax = _gpuHistory.Count > 0 ? _gpuHistory.Max() : 0;
-                parts.Add(gpuMax > 0 ? $"peak {cpuMax}/{gpuMax} C" : $"peak {cpuMax} C");
-            }
-
-            if (_cpuRpmHistory.Count > 0)
-            {
-                var cpuMax = _cpuRpmHistory.Max();
-                var gpuMax = _gpuRpmHistory.Count > 0 ? _gpuRpmHistory.Max() : 0;
-                parts.Add(gpuMax > 0 ? $"{cpuMax}/{gpuMax} RPM" : $"{cpuMax} RPM");
-            }
-
-            if (_cpuUsageHistory.Count > 0)
-            {
-                var cpuMax = _cpuUsageHistory.Max();
-                var gpuMax = _gpuUsageHistory.Count > 0 ? _gpuUsageHistory.Max() : 0;
-                parts.Add(gpuMax > 0 ? $"{cpuMax}/{gpuMax}%" : $"{cpuMax}%");
-            }
-
-            return string.Join(" \u00b7 ", parts);
+            var x = ChartX(sample.At, begin, span);
+            samples.Add(new ChartSample(
+                x,
+                sample.Cpu > 0 ? ChartY(sample.Cpu, yMin, yMax) : double.NaN,
+                sample.Gpu > 0 ? ChartY(sample.Gpu, yMin, yMax) : double.NaN,
+                sample.At, sample.Cpu, sample.Gpu));
         }
+
+        CpuHistoryGeometry = cpuGeometry;
+        GpuHistoryGeometry = gpuGeometry;
+        ChartSamples = samples;
+
+        ChartAxisTop = $"{yMax}\u00b0";
+        ChartAxisMid = $"{Math.Round((yMin + yMax) / 2.0):0}\u00b0";
+        ChartAxisBottom = $"{yMin}\u00b0";
+
+        var half = _chartSpanMinutes / 2.0;
+        ChartTimeLeft = $"-{_chartSpanMinutes}m";
+        ChartTimeMid = half % 1 == 0
+            ? $"-{half:0}m"
+            : $"-{(int)half}:{(int)((half % 1) * 60):00}";
+
+        (CpuHistoryStatsText, GpuHistoryStatsText, AuxHistoryStatsText) =
+            FormatStats(visible, showCpu, showGpu);
     }
 
-    /// <summary>Right-aligned so the newest sample is always at the right edge, 20-100 C.</summary>
-    private static PointCollection BuildHistoryPoints(List<int> samples)
+    /// <summary>
+    /// A shared, readable range: at least 20 degrees tall, rounded to fives, so the lines use the plot
+    /// without turning two degrees of drift into a mountain range.
+    /// </summary>
+    private static (int Min, int Max) ChooseRange(List<HistorySample> samples, bool cpu, bool gpu)
     {
-        var points = new PointCollection(samples.Count);
-        var step = ChartWidth / (HistoryCapacity - 1);
+        var lo = int.MaxValue;
+        var hi = int.MinValue;
 
-        for (var i = 0; i < samples.Count; i++)
+        foreach (var sample in samples)
         {
-            var x = ChartWidth - (samples.Count - 1 - i) * step;
-            var y = Math.Clamp((100 - samples[i]) / 80.0, 0, 1) * ChartHeight;
-            points.Add(new System.Windows.Point(x, y));
+            if (cpu && sample.Cpu > 0)
+            {
+                lo = Math.Min(lo, sample.Cpu);
+                hi = Math.Max(hi, sample.Cpu);
+            }
+
+            if (gpu && sample.Gpu > 0)
+            {
+                lo = Math.Min(lo, sample.Gpu);
+                hi = Math.Max(hi, sample.Gpu);
+            }
         }
 
-        return points;
+        if (lo == int.MaxValue) return (20, 100);
+
+        if (hi - lo < 20)
+        {
+            // Centre the short range on the data, then anchor a clean 20-degree window to it.
+            var mid = (lo + hi) / 2.0;
+            lo = (int)(Math.Floor((mid - 10) / 5.0) * 5);
+            hi = lo + 20;
+        }
+        else
+        {
+            lo = (int)(Math.Floor(lo / 5.0) * 5);
+            hi = (int)(Math.Ceiling(hi / 5.0) * 5);
+        }
+
+        lo = Math.Max(0, lo);
+        hi = Math.Min(115, hi);
+        if (hi - lo < 20) lo = Math.Max(0, hi - 20);
+
+        return (lo, hi);
+    }
+
+    private static double ChartX(DateTime at, DateTime begin, TimeSpan span) =>
+        Math.Clamp((at - begin).TotalSeconds / span.TotalSeconds, 0, 1) * ChartWidth;
+
+    private static double ChartY(int value, int yMin, int yMax) =>
+        Math.Clamp((yMax - value) / (double)(yMax - yMin), 0, 1) * ChartHeight;
+
+    /// <summary>
+    /// One figure per run of samples. A gap longer than <see cref="ChartGap"/> starts a new figure, so
+    /// a window during which the dashboard was hidden is a hole rather than a straight line.
+    /// </summary>
+    private static Geometry BuildLine(List<HistorySample> samples, DateTime begin, TimeSpan span,
+        int yMin, int yMax, bool cpu)
+    {
+        var geometry = new StreamGeometry();
+        using (var context = geometry.Open())
+        {
+            var open = false;
+            DateTime previous = default;
+
+            foreach (var sample in samples)
+            {
+                var value = cpu ? sample.Cpu : sample.Gpu;
+                if (value <= 0)
+                {
+                    open = false;
+                    continue;
+                }
+
+                if (open && sample.At - previous > ChartGap) open = false;
+
+                var point = new System.Windows.Point(
+                    ChartX(sample.At, begin, span),
+                    ChartY(value, yMin, yMax));
+
+                if (open)
+                    context.LineTo(point, isStroked: true, isSmoothJoin: false);
+                else
+                {
+                    context.BeginFigure(point, isFilled: false, isClosed: false);
+                    open = true;
+                }
+
+                previous = sample.At;
+            }
+        }
+
+        geometry.Freeze();
+        return geometry;
+    }
+
+    private static (string Cpu, string Gpu, string Aux) FormatStats(
+        List<HistorySample> samples, bool showCpu, bool showGpu)
+    {
+        var cpu = showCpu ? Range(samples, cpu: true) : "-";
+        var gpu = showGpu ? Range(samples, cpu: false) : "-";
+
+        var cpuRpm = 0;
+        var gpuRpm = 0;
+        var cpuLoad = 0;
+        var gpuLoad = 0;
+
+        foreach (var sample in samples)
+        {
+            cpuRpm = Math.Max(cpuRpm, sample.CpuRpm);
+            gpuRpm = Math.Max(gpuRpm, sample.GpuRpm);
+            cpuLoad = Math.Max(cpuLoad, sample.CpuUsage);
+            gpuLoad = Math.Max(gpuLoad, sample.GpuUsage);
+        }
+
+        var aux = new List<string>(2);
+        if (cpuRpm > 0) aux.Add(gpuRpm > 0 ? $"Fans {cpuRpm}/{gpuRpm} RPM" : $"Fans {cpuRpm} RPM");
+        if (cpuLoad > 0) aux.Add(gpuLoad > 0 ? $"Load {cpuLoad}/{gpuLoad}%" : $"Load {cpuLoad}%");
+
+        return ($"CPU {cpu}", $"GPU {gpu}", string.Join(" \u00b7 ", aux));
+    }
+
+    private static string Range(List<HistorySample> samples, bool cpu)
+    {
+        var lo = int.MaxValue;
+        var hi = int.MinValue;
+        long total = 0;
+        var count = 0;
+
+        foreach (var sample in samples)
+        {
+            var value = cpu ? sample.Cpu : sample.Gpu;
+            if (value <= 0) continue;
+
+            lo = Math.Min(lo, value);
+            hi = Math.Max(hi, value);
+            total += value;
+            count++;
+        }
+
+        return count == 0
+            ? "--"
+            : $"{lo}\u2013{hi} \u00b7 avg {Math.Round((double)total / count):0} C";
     }
 
     private void StartTelemetryPolling()

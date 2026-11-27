@@ -55,6 +55,11 @@ internal static class UiCapture
                 timer.Stop();
                 try
                 {
+                    // A capture has no mouse: place the temperature readout on the newest tenth so the
+                    // shot shows the hover state, right before the frame is rendered.
+                    if (page.Contains("chart-hover", StringComparison.OrdinalIgnoreCase))
+                        window.ShowTemperatureHoverForCapture(0.9);
+
                     Save(window, outputPath, scale);
                 }
                 catch (Exception ex)

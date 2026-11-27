@@ -289,6 +289,45 @@
             <Setter Property="Height" Value="28"/>
         </Style>
 
+        <!-- Temperature chart: legend and span are text-only controls so the card stays quiet -->
+        <Style x:Key="ChartLegendStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ChartSpanStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextDimBrush}"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="7,0,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="Transparent">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="CompactComboBoxItemStyle" TargetType="ComboBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource TextStrongBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -733,24 +772,78 @@
 							</Grid>
 						</Border>
 					</Grid>
-					<!-- Temperature history: the last two minutes, one point per 2 s poll -->
+					<!-- Temperature history: timestamped samples, 2/5/15 min, hover readout -->
 					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10" Margin="0,0,0,8">
 						<StackPanel>
 							<Grid>
-								<TextBlock Text="TEMPERATURE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold"/>
-								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-									<TextBlock Text="CPU" Foreground="{DynamicResource AccentBrush}" FontSize="9.5" FontWeight="SemiBold"/>
-									<TextBlock Text="GPU" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" FontWeight="SemiBold" Margin="8,0,0,0"/>
-									<TextBlock Text="2 min" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" Margin="8,0,0,0"/>
+								<TextBlock Text="TEMPERATURE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+									<Button Style="{StaticResource ChartLegendStyle}" Command="{Binding ToggleCpuChartCommand}"
+									        Opacity="{Binding CpuLegendOpacity}" ToolTip="Show or hide the CPU line.">
+										<StackPanel Orientation="Horizontal">
+											<Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+											<TextBlock Text="{Binding CpuTempText, StringFormat=CPU {0}}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center"/>
+										</StackPanel>
+									</Button>
+									<Button Style="{StaticResource ChartLegendStyle}" Command="{Binding ToggleGpuChartCommand}"
+									        Opacity="{Binding GpuLegendOpacity}" Margin="8,0,0,0" ToolTip="Show or hide the GPU line.">
+										<StackPanel Orientation="Horizontal">
+											<Ellipse Width="6" Height="6" Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+											<TextBlock Text="{Binding GpuTempText, StringFormat=GPU {0}}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center"/>
+										</StackPanel>
+									</Button>
+									<StackPanel Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+										<RadioButton Content="2m" GroupName="ChartSpan" Style="{StaticResource ChartSpanStyle}"
+										             IsChecked="{Binding ChartSpan2, Mode=TwoWay}" ToolTip="Show the last 2 minutes."/>
+										<RadioButton Content="5m" GroupName="ChartSpan" Style="{StaticResource ChartSpanStyle}"
+										             IsChecked="{Binding ChartSpan5, Mode=TwoWay}" ToolTip="Show the last 5 minutes."/>
+										<RadioButton Content="15m" GroupName="ChartSpan" Style="{StaticResource ChartSpanStyle}"
+										             IsChecked="{Binding ChartSpan15, Mode=TwoWay}" ToolTip="Show the last 15 minutes."/>
+									</StackPanel>
 								</StackPanel>
 							</Grid>
-							<Viewbox Height="56" Stretch="Fill" Margin="0,6,0,0">
-								<Grid Width="500" Height="88">
-									<Polyline Points="{Binding GpuHistoryPoints}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
-									<Polyline Points="{Binding CpuHistoryPoints}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+
+							<Grid Margin="0,4,0,0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="20"/>
+									<ColumnDefinition Width="*"/>
+								</Grid.ColumnDefinitions>
+								<Grid Grid.Column="0" Height="50">
+									<TextBlock Text="{Binding ChartAxisTop}" Foreground="{DynamicResource TextDimBrush}" FontSize="8" VerticalAlignment="Top"/>
+									<TextBlock Text="{Binding ChartAxisMid}" Foreground="{DynamicResource TextDimBrush}" FontSize="8" VerticalAlignment="Center"/>
+									<TextBlock Text="{Binding ChartAxisBottom}" Foreground="{DynamicResource TextDimBrush}" FontSize="8" VerticalAlignment="Bottom"/>
 								</Grid>
-							</Viewbox>
-							<TextBlock Text="{Binding HistoryPeakText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" Margin="0,5,0,0"/>
+								<Grid Grid.Column="1" x:Name="TemperaturePlot" Width="288" Height="50" HorizontalAlignment="Left"
+								      Background="Transparent" MouseMove="TemperaturePlot_MouseMove" MouseLeave="TemperaturePlot_MouseLeave">
+									<Line X1="0" X2="288" Y1="0.5" Y2="0.5" Stroke="{DynamicResource BorderSubtleBrush}" StrokeThickness="1" IsHitTestVisible="False"/>
+									<Line X1="0" X2="288" Y1="25" Y2="25" Stroke="{DynamicResource BorderSubtleBrush}" StrokeThickness="1" IsHitTestVisible="False"/>
+									<Line X1="0" X2="288" Y1="49.5" Y2="49.5" Stroke="{DynamicResource BorderSubtleBrush}" StrokeThickness="1" IsHitTestVisible="False"/>
+									<Path Data="{Binding GpuHistoryGeometry}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" StrokeLineJoin="Round" IsHitTestVisible="False"/>
+									<Path Data="{Binding CpuHistoryGeometry}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" StrokeLineJoin="Round" IsHitTestVisible="False"/>
+									<Canvas IsHitTestVisible="False">
+										<Line x:Name="TemperatureHoverLine" Y1="0" Y2="50" Stroke="{DynamicResource TextDimBrush}" StrokeThickness="1" StrokeDashArray="2 2" Visibility="Collapsed"/>
+										<Ellipse x:Name="TemperatureHoverCpuDot" Width="6" Height="6" Fill="{DynamicResource AccentBrush}" Visibility="Collapsed"/>
+										<Ellipse x:Name="TemperatureHoverGpuDot" Width="6" Height="6" Fill="{DynamicResource TextMutedBrush}" Visibility="Collapsed"/>
+									</Canvas>
+								</Grid>
+							</Grid>
+
+							<Grid Margin="20,1,0,0">
+								<TextBlock Text="{Binding ChartTimeLeft}" Foreground="{DynamicResource TextDimBrush}" FontSize="8" HorizontalAlignment="Left"/>
+								<TextBlock Text="{Binding ChartTimeMid}" Foreground="{DynamicResource TextDimBrush}" FontSize="8" HorizontalAlignment="Center"/>
+								<TextBlock Text="now" Foreground="{DynamicResource TextDimBrush}" FontSize="8" HorizontalAlignment="Right"/>
+							</Grid>
+
+							<Grid Margin="0,5,0,0" MinHeight="24">
+								<StackPanel x:Name="TemperatureStats">
+									<Grid>
+										<TextBlock Text="{Binding CpuHistoryStatsText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="9" HorizontalAlignment="Left"/>
+										<TextBlock Text="{Binding GpuHistoryStatsText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" HorizontalAlignment="Right"/>
+									</Grid>
+									<TextBlock Text="{Binding AuxHistoryStatsText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,1,0,0"/>
+								</StackPanel>
+								<TextBlock x:Name="TemperatureHoverText" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="9" FontWeight="SemiBold" VerticalAlignment="Center" Visibility="Collapsed"/>
+							</Grid>
 						</StackPanel>
 					</Border>
 

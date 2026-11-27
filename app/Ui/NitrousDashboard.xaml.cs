@@ -315,6 +315,96 @@ public partial class NitrousDashboard : Window
 
     private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
 
+    private int _hoverSampleIndex = -1;
+
+    /// <summary>
+    /// Nearest sample under the pointer. The overlay only moves when the sample changes, so a mouse
+    /// sweep costs one binary search per sample column instead of a rebuild.
+    /// </summary>
+    private void TemperaturePlot_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (DataContext is DashboardViewModel vm)
+            UpdateTemperatureHover(vm, e.GetPosition(TemperaturePlot).X);
+    }
+
+    private void UpdateTemperatureHover(DashboardViewModel vm, double x)
+    {
+        var samples = vm.ChartSamples;
+        if (samples.Count == 0)
+        {
+            ClearTemperatureHover();
+            return;
+        }
+
+        var low = 0;
+        var high = samples.Count - 1;
+        while (low < high)
+        {
+            var mid = (low + high) / 2;
+            if (samples[mid].X < x) low = mid + 1;
+            else high = mid;
+        }
+
+        var index = low;
+        if (index > 0 && Math.Abs(samples[index - 1].X - x) < Math.Abs(samples[index].X - x))
+            index--;
+
+        if (index == _hoverSampleIndex) return;
+        _hoverSampleIndex = index;
+
+        var sample = samples[index];
+        var column = Math.Round(sample.X) + 0.5;
+
+        TemperatureHoverLine.X1 = column;
+        TemperatureHoverLine.X2 = column;
+        TemperatureHoverLine.Visibility = Visibility.Visible;
+
+        var cpu = vm.ShowCpuChart && sample.Cpu > 0;
+        if (cpu)
+        {
+            Canvas.SetLeft(TemperatureHoverCpuDot, sample.X - 3);
+            Canvas.SetTop(TemperatureHoverCpuDot, sample.CpuY - 3);
+        }
+        TemperatureHoverCpuDot.Visibility = cpu ? Visibility.Visible : Visibility.Collapsed;
+
+        var gpu = vm.ShowGpuChart && sample.Gpu > 0;
+        if (gpu)
+        {
+            Canvas.SetLeft(TemperatureHoverGpuDot, sample.X - 3);
+            Canvas.SetTop(TemperatureHoverGpuDot, sample.GpuY - 3);
+        }
+        TemperatureHoverGpuDot.Visibility = gpu ? Visibility.Visible : Visibility.Collapsed;
+
+        var seconds = Math.Max(0, (int)Math.Round((DateTime.Now - sample.At).TotalSeconds));
+        var when = seconds < 60 ? $"-{seconds} s" : $"-{seconds / 60}:{seconds % 60:00}";
+
+        var text = cpu ? $"{when} \u00b7 CPU {sample.Cpu} C" : when;
+        if (gpu) text += $" \u00b7 GPU {sample.Gpu} C";
+
+        TemperatureHoverText.Text = text;
+        TemperatureHoverText.Visibility = Visibility.Visible;
+        TemperatureStats.Visibility = Visibility.Collapsed;
+    }
+
+    private void TemperaturePlot_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) => ClearTemperatureHover();
+
+    private void ClearTemperatureHover()
+    {
+        _hoverSampleIndex = -1;
+        TemperatureHoverLine.Visibility = Visibility.Collapsed;
+        TemperatureHoverCpuDot.Visibility = Visibility.Collapsed;
+        TemperatureHoverGpuDot.Visibility = Visibility.Collapsed;
+        TemperatureHoverText.Visibility = Visibility.Collapsed;
+        TemperatureStats.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Capture-only: a capture has no mouse, so the readout is placed by fraction of width.</summary>
+    internal void ShowTemperatureHoverForCapture(double fraction)
+    {
+        if (DataContext is DashboardViewModel vm)
+            UpdateTemperatureHover(vm, Math.Clamp(fraction, 0, 1) * 288);
+    }
+
     private int _activeNavIndex;
 
     /// <summary>
