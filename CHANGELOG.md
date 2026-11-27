@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.15.0-test.28 - 2026-11-27
+
+### CPU
+
+- **The CPU power limits are two 1 W sliders with one Apply.** The dropdowns stepped in 5 W, so 29 W or 28 W
+  could not be asked for. Sustained and burst now move in single watts, and both are written by the same
+  APPLY, so dragging to a value cannot send a dozen writes to MSR 0x610 on the way there.
+- The sustained slider's right end is the mode's own request (the learned ceiling), and the burst slider's
+  left end follows sustained: the cap can only ask for less than the firmware does, and PL1 cannot be set
+  above PL2. A cap already above a request that has since dipped keeps its value on the dial instead of
+  being pulled down to the dip.
+- RESET stands both sliders on the mode's own request and applies that, which is what "follow this mode"
+  means; the profile is then saved as uncapped.
+
 ## 0.15.0-test.27 - 2026-11-27
 
 ### Setup

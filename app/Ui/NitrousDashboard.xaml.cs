@@ -44,6 +44,9 @@ public partial class NitrousDashboard : Window
     private (PowerProfile Mode, bool OnBattery)? _powerLimitsKey;
     private bool _cpuPowerCapUpdating;
     private string? _cpuPowerCapMessage;
+
+    /// <summary>What this mode asks for, as read on the last refresh; the sliders' top and RESET land here.</summary>
+    private CpuPowerCap.Limits? _cpuPowerCeiling;
     private bool _cpuLimitsPreview;
 
     private bool _gpuLimitsReading;
@@ -1536,15 +1539,13 @@ public partial class NitrousDashboard : Window
             CpuPowerLimitsText.Text = text;
             CpuPowerLimitsCaption.Visibility = Visibility.Collapsed;
 
-            var placeholder = new List<CpuPowerCapOption> { new(0, "—") };
-            CpuPowerCapBox.ItemsSource = placeholder;
-            CpuPowerCapBox.SelectedIndex = 0;
-            CpuPowerCapBox.IsEnabled = false;
+            _cpuPowerCeiling = null;
+            CpuPowerCapSlider.IsEnabled = false;
+            CpuPowerCapBurstSlider.IsEnabled = false;
+            CpuPowerCapApplyButton.IsEnabled = false;
             CpuPowerCapResetButton.IsEnabled = false;
-
-            CpuPowerCapBurstBox.ItemsSource = new List<CpuPowerCapOption> { new(0, "—") };
-            CpuPowerCapBurstBox.SelectedIndex = 0;
-            CpuPowerCapBurstBox.IsEnabled = false;
+            CpuPowerCapValueText.Text = "—";
+            CpuPowerCapBurstValueText.Text = "—";
 
             CpuPowerCapStatus.Text = hint;
             CpuPowerCapStatus.Visibility = hint.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -1685,47 +1686,60 @@ public partial class NitrousDashboard : Window
         ?? (Nitrous.Enums.PowerProfile)SettingsManager.Get("LastPowerMode", (int)Nitrous.Enums.PowerProfile.Performance);
 
     /// <summary>
-    /// Fills both cap lists from this mode's ceilings and selects what is in use. The sustained list stops
-    /// at the applied burst value and the burst list starts at the applied sustained value, so an invalid
-    /// pair cannot be chosen in the first place.
+    /// Fills both sliders from this mode's ceiling and stages what is in use. The sustained slider's top
+    /// is the mode's own request and the burst slider starts where sustained sits, so an invalid pair
+    /// cannot be chosen. A cap already above today's request keeps its value instead of being pulled down.
     /// </summary>
     private void PopulateCpuPowerCap(CpuPowerCap.Limits? ceilings, bool writable, PowerProfile profile)
     {
         _cpuPowerProfile = profile;
-        if (ceilings is not { } mode)
-        {
-            CpuPowerCapBox.IsEnabled = false;
-            CpuPowerCapBurstBox.IsEnabled = false;
-            return;
-        }
-
-        var saved = CpuPowerCap.SavedFor(_cpuPowerProfile);
-        var applied = CpuPowerCap.Applied() ?? mode;
 
         _cpuPowerCapUpdating = true;
         try
         {
-            // The lists reach up to the mode's request, but never hide the value the register actually
-            // holds while that request has dipped below it: the box would otherwise say 20 W over a
-            // register holding 25 W, which reads exactly like the cap being reset.
-            var sustainedCeiling = Math.Max(Math.Min(mode.Pl1, applied.Pl2), Math.Max(saved.Pl1, applied.Pl1));
-            var burstCeiling = Math.Max(mode.Pl2, Math.Max(saved.Pl2, applied.Pl2));
+            if (ceilings is not { } mode)
+            {
+                _cpuPowerCeiling = null;
+                CpuPowerCapSlider.IsEnabled = false;
+                CpuPowerCapBurstSlider.IsEnabled = false;
+                CpuPowerCapApplyButton.IsEnabled = false;
+                CpuPowerCapResetButton.IsEnabled = false;
+                return;
+            }
 
-            var sustained = Options(sustainedCeiling, CpuPowerCap.FloorWatts);
-            var burst = Options(burstCeiling, Math.Min(applied.Pl1, burstCeiling));
+            _cpuPowerCeiling = mode;
 
-            CpuPowerCapBox.ItemsSource = sustained;
-            CpuPowerCapBox.SelectedIndex = SelectCapIndex(sustained, saved.Pl1, applied.Pl1);
+            var saved = CpuPowerCap.SavedFor(_cpuPowerProfile);
+            var applied = CpuPowerCap.Applied() ?? mode;
 
-            CpuPowerCapBurstBox.ItemsSource = burst;
-            CpuPowerCapBurstBox.SelectedIndex = SelectCapIndex(burst, saved.Pl2, applied.Pl2);
+            // The sliders reach up to the mode's request, but never hide the value the register or the
+            // saved cap already holds while that request has dipped below it: the slider would otherwise
+            // show 20 W over a register holding 25 W, which reads exactly like the cap being reset.
+            var sustainedCeiling = Math.Max(CpuPowerCap.FloorWatts,
+                Math.Max(Math.Min(mode.Pl1, mode.Pl2), Math.Max(saved.Pl1, applied.Pl1)));
+            var burstCeiling = Math.Max(sustainedCeiling, Math.Max(mode.Pl2, Math.Max(saved.Pl2, applied.Pl2)));
 
-            CpuPowerCapBox.IsEnabled = writable;
-            CpuPowerCapBurstBox.IsEnabled = writable;
+            var sustained = Math.Clamp(saved.Pl1 > 0 ? saved.Pl1 : applied.Pl1,
+                CpuPowerCap.FloorWatts, sustainedCeiling);
+            var burst = Math.Clamp(saved.Pl2 > 0 ? saved.Pl2 : applied.Pl2,
+                Math.Max(CpuPowerCap.FloorWatts, sustained), burstCeiling);
+
+            CpuPowerCapSlider.Minimum = CpuPowerCap.FloorWatts;
+            CpuPowerCapSlider.Maximum = sustainedCeiling;
+            CpuPowerCapSlider.Value = sustained;
+
+            CpuPowerCapBurstSlider.Minimum = sustained;
+            CpuPowerCapBurstSlider.Maximum = burstCeiling;
+            CpuPowerCapBurstSlider.Value = burst;
+
+            UpdateCpuPowerCapLabels(mode);
+
+            CpuPowerCapSlider.IsEnabled = writable;
+            CpuPowerCapBurstSlider.IsEnabled = writable;
+            CpuPowerCapApplyButton.IsEnabled = writable;
             CpuPowerCapResetButton.IsEnabled = writable;
 
-            // The rows now carry a fixed description; results and refusals land on the status line the
-            // way the other cards report state.
+            // Results and refusals land on the status line the way the other cards report state.
             CpuPowerCapStatus.Text = !writable
                 ? "The firmware has locked the power limit until the next reboot."
                 : _cpuPowerCapMessage
@@ -1741,66 +1755,67 @@ public partial class NitrousDashboard : Window
         }
     }
 
-    /// <summary>
-    /// What the box should show: the saved choice when this mode still offers it, otherwise what the
-    /// register actually holds, otherwise Off. A cap of 55 W followed by a switch to a 35 W mode must not
-    /// leave the dropdown claiming Off while the register sits at 35 W.
-    /// </summary>
-    private static int SelectCapIndex(List<CpuPowerCapOption> options, int saved, int applied)
+    /// <summary>The live number beside each slider, and the ends of its range.</summary>
+    private void UpdateCpuPowerCapLabels(CpuPowerCap.Limits? mode)
     {
-        if (saved > 0)
-        {
-            var chosen = options.FindIndex(option => option.Watts == saved);
-            if (chosen >= 0) return chosen;
-        }
+        if (CpuPowerCapSlider is null || CpuPowerCapBurstSlider is null) return;
 
-        if (applied > 0)
-        {
-            var shown = options.FindIndex(option => option.Watts == applied);
-            if (shown >= 0) return shown;
-        }
+        var sustained = (int)Math.Round(CpuPowerCapSlider.Value);
+        var burst = (int)Math.Round(CpuPowerCapBurstSlider.Value);
 
-        return 0;
+        CpuPowerCapValueText.Text = $"{sustained} W";
+        CpuPowerCapBurstValueText.Text = $"{burst} W";
+
+        CpuPowerCapFloorText.Text = $"{CpuPowerCap.FloorWatts} W";
+        CpuPowerCapBurstFloorText.Text = $"{sustained} W";
+
+        // Only call the top "this mode" when it really is the mode's request; a value kept above a
+        // request that has since dipped needs no such claim.
+        var top = (int)Math.Round(CpuPowerCapSlider.Maximum);
+        CpuPowerCapCeilingText.Text = mode?.Pl1 == top ? $"{top} W · this mode" : $"{top} W";
+        CpuPowerCapBurstCeilingText.Text = $"{Math.Round(CpuPowerCapBurstSlider.Maximum)} W";
     }
 
-    /// <summary>
-    /// The ceiling then round steps below it. The ceiling is the "follow this mode" choice: the register
-    /// is kept at whatever the mode asks, which is what the firmware does not do by itself across a mode
-    /// change. There is no separate Off, because "stop writing" left the register holding the previous
-    /// mode's numbers and looked like a reset that had failed.
-    /// </summary>
-    private static List<CpuPowerCapOption> Options(int ceiling, int floor)
+    private void CpuPowerCapSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        var options = new List<CpuPowerCapOption> { new(ceiling, $"{ceiling} W") };
+        // The element can fire while the window is still being parsed, before the burst slider exists.
+        if (_cpuPowerCapUpdating || CpuPowerCapBurstSlider is null) return;
 
-        for (var watts = ceiling / 5 * 5; watts >= Math.Max(CpuPowerCap.FloorWatts, floor); watts -= 5)
-            if (watts != ceiling)
-                options.Add(new CpuPowerCapOption(watts, $"{watts} W"));
-
-        return options;
+        // PL1 above PL2 is not a valid pair, so raising sustained pushes burst along with it.
+        CpuPowerCapBurstSlider.Minimum = CpuPowerCapSlider.Value;
+        UpdateCpuPowerCapLabels(_cpuPowerCeiling);
     }
 
-    private async void CpuPowerCap_Changed(object sender, SelectionChangedEventArgs e) =>
-        await ApplyCpuPowerCapAsync();
+    private void CpuPowerCapBurstSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_cpuPowerCapUpdating || CpuPowerCapSlider is null) return;
+        UpdateCpuPowerCapLabels(_cpuPowerCeiling);
+    }
 
-    private async void CpuPowerCapBurst_Changed(object sender, SelectionChangedEventArgs e) =>
+    private async void CpuPowerCapApply_Click(object sender, RoutedEventArgs e) =>
         await ApplyCpuPowerCapAsync();
 
     /// <summary>
-    /// Returns both limits to this mode's own values. It selects the top entry rather than stopping the
-    /// management, so the register keeps following the mode afterwards - "stop writing" is what left a
-    /// stale number on screen and looked like a reset that had failed.
+    /// Returns both limits to this mode's own values. The sliders land on the mode's request and that pair
+    /// is applied like any other, so the register keeps following the mode and the saved cap is cleared.
     /// </summary>
     private async void CpuPowerCapReset_Click(object sender, RoutedEventArgs e)
     {
         if (_cpuPowerCapUpdating) return;
-        if (CpuPowerCapBox.Items.Count == 0 || CpuPowerCapBurstBox.Items.Count == 0) return;
+        if (_cpuPowerCeiling is not { } mode) return;
 
         _cpuPowerCapUpdating = true;
         try
         {
-            CpuPowerCapBox.SelectedIndex = 0;
-            CpuPowerCapBurstBox.SelectedIndex = 0;
+            CpuPowerCapSlider.Minimum = CpuPowerCap.FloorWatts;
+            CpuPowerCapSlider.Maximum = Math.Max(CpuPowerCap.FloorWatts, mode.Pl1);
+            CpuPowerCapSlider.Value = CpuPowerCapSlider.Maximum;
+
+            CpuPowerCapBurstSlider.Minimum = CpuPowerCapSlider.Value;
+            CpuPowerCapBurstSlider.Maximum = Math.Max(CpuPowerCapSlider.Value, mode.Pl2);
+            CpuPowerCapBurstSlider.Value = CpuPowerCapBurstSlider.Maximum;
+
+            UpdateCpuPowerCapLabels(mode);
         }
         finally
         {
@@ -1813,19 +1828,22 @@ public partial class NitrousDashboard : Window
     private async Task ApplyCpuPowerCapAsync()
     {
         if (_cpuPowerCapUpdating) return;
-        if (CpuPowerCapBox.SelectedItem is not CpuPowerCapOption sustained) return;
-        if (CpuPowerCapBurstBox.SelectedItem is not CpuPowerCapOption burst) return;
+        if (_cpuPowerCeiling is null) return;
 
-        CpuPowerCapBox.IsEnabled = false;
-        CpuPowerCapBurstBox.IsEnabled = false;
+        var sustained = (int)Math.Round(CpuPowerCapSlider.Value);
+        var burst = (int)Math.Round(CpuPowerCapBurstSlider.Value);
+
+        CpuPowerCapSlider.IsEnabled = false;
+        CpuPowerCapBurstSlider.IsEnabled = false;
+        CpuPowerCapApplyButton.IsEnabled = false;
         CpuPowerCapResetButton.IsEnabled = false;
 
-        var result = await Task.Run(() => CpuPowerCap.Apply(_cpuPowerProfile, sustained.Watts, burst.Watts));
+        var result = await Task.Run(() => CpuPowerCap.Apply(_cpuPowerProfile, sustained, burst));
 
         if (result.Ok && CpuPowerCap.Ceilings(_cpuPowerProfile) is { } ceilings)
             CpuPowerCap.SaveFor(_cpuPowerProfile,
-                sustained.Watts == ceilings.Pl1 ? 0 : sustained.Watts,
-                burst.Watts == ceilings.Pl2 ? 0 : burst.Watts);
+                sustained == ceilings.Pl1 ? 0 : sustained,
+                burst == ceilings.Pl2 ? 0 : burst);
 
         // The window can be closed while a write is in flight; nothing here is safe to touch then.
         if (Dispatcher.HasShutdownStarted) return;
@@ -1839,15 +1857,11 @@ public partial class NitrousDashboard : Window
         if (_powerLimitsKey is { } key) RefreshCpuPowerLimits(key.Mode, force: true);
         else
         {
-            CpuPowerCapBox.IsEnabled = true;
-            CpuPowerCapBurstBox.IsEnabled = true;
+            CpuPowerCapSlider.IsEnabled = true;
+            CpuPowerCapBurstSlider.IsEnabled = true;
+            CpuPowerCapApplyButton.IsEnabled = true;
             CpuPowerCapResetButton.IsEnabled = true;
         }
-    }
-
-    private readonly record struct CpuPowerCapOption(int Watts, string Label)
-    {
-        public override string ToString() => Label;
     }
 
     /// <summary>
