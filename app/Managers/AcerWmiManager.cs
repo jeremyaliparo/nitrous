@@ -1120,6 +1120,70 @@ public static class AcerWmiManager
         return true;
     }
 
+    /// <summary>
+    /// Reads the GPU MUX support mask (misc 0x09) and the stored mode (misc 0x02). Read-only: the
+    /// switch is a BIOS setting, written only from an explicit user action.
+    /// </summary>
+    public static Task<(byte Mask, byte Mode)?> ReadGpuMuxAsync() => Task.Run(() =>
+    {
+        lock (Gate)
+        {
+            var mask = ReadMiscLocked(AcerWmiProtocol.GpuMuxSupportSetting);
+            var mode = ReadMiscLocked(AcerWmiProtocol.GpuMuxSetting);
+            if (mask is not { } m || mode is not { } c) return ((byte Mask, byte Mode)?)null;
+            if ((m & 0xFF) != 0 || (c & 0xFF) != 0) return null;
+
+            return ((byte)((m >> 8) & 0xFF), (byte)((c >> 8) & 0xFF));
+        }
+    });
+
+    /// <summary>
+    /// Stores a GPU mode for the next boot. Status 0 and 8 both mean stored (the ANV16 BIOSes answer 8
+    /// for "stored, applies at the next start"); the mode is read back and returned.
+    /// </summary>
+    public static Task<(bool Ok, byte Status, byte Stored)> SetGpuMuxAsync(byte mode) => Task.Run(() =>
+    {
+        lock (Gate)
+        {
+            var raw = InvokeGamingRawLocked(AcerWmiProtocol.SetGamingMiscSetting,
+                AcerWmiProtocol.GpuMuxPayload(mode).ToString());
+            if (raw is not { } result) return (false, (byte)0xFF, (byte)0);
+
+            var status = (byte)(result & 0xFF);
+            var readBack = ReadMiscLocked(AcerWmiProtocol.GpuMuxSetting);
+            var stored = readBack is { } c ? (byte)((c >> 8) & 0xFF) : (byte)0;
+            return (status is 0 or 8, status, stored);
+        }
+    });
+
+    private static ulong? ReadMiscLocked(uint setting) =>
+        InvokeGamingRawLocked(AcerWmiProtocol.GetGamingMiscSetting, setting.ToString());
+
+    private static ulong? InvokeGamingRawLocked(string methodName, string input)
+    {
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            try
+            {
+                var instance = GetGamingInstanceLocked();
+                if (instance == null) return null;
+
+                using var inParams = instance.GetMethodParameters(methodName);
+                inParams["gmInput"] = input;
+                using var outParams = instance.InvokeMethod(methodName, inParams, null);
+                var value = outParams?.Properties["gmOutput"]?.Value ?? outParams?.Properties["outValue"]?.Value;
+                return value == null ? null : Convert.ToUInt64(value);
+            }
+            catch (Exception ex)
+            {
+                InvalidateGamingLocked();
+                if (attempt == 1) Logger.Warn($"WMI: {methodName} failed.", ex);
+            }
+        }
+
+        return null;
+    }
+
     private static bool InvokeGamingLocked(string methodName, string input)
     {
         for (var attempt = 0; attempt < 2; attempt++)

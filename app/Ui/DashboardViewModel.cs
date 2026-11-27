@@ -56,7 +56,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
     public readonly record struct ChartSample(double X, double CpuY, double GpuY, DateTime At, int Cpu, int Gpu);
 
     private readonly record struct HistorySample(
-        DateTime At, int Cpu, int Gpu, int CpuRpm, int GpuRpm, int CpuUsage, int GpuUsage);
+        DateTime At, int Cpu, int Gpu, int CpuRpm, int GpuRpm, int CpuUsage, int GpuUsage,
+        int GpuClock, double GpuPower, double GpuPowerLimit);
 
     private Geometry _cpuHistoryGeometry = Geometry.Empty;
     public Geometry CpuHistoryGeometry
@@ -196,6 +197,336 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     public RelayCommand ToggleCpuChartCommand { get; private set; } = null!;
     public RelayCommand ToggleGpuChartCommand { get; private set; } = null!;
+
+    // GPU page: power-draw history and the meters. Power is recorded only while the GPU page is open,
+    // because that is the only time NVML is polled; a closed page is a gap, not a zero.
+    private int _gpuChartSpanMinutes = 2;
+
+    /// <summary>One visible sample in the power plot; the hover readout binary-searches it.</summary>
+    public readonly record struct GpuPowerPoint(double X, double Y, DateTime At, double Watts);
+
+    private Geometry _gpuPowerLineGeometry = Geometry.Empty;
+    public Geometry GpuPowerLineGeometry
+    {
+        get => _gpuPowerLineGeometry;
+        set => SetProperty(ref _gpuPowerLineGeometry, value);
+    }
+
+    private Geometry _gpuPowerAreaGeometry = Geometry.Empty;
+    public Geometry GpuPowerAreaGeometry
+    {
+        get => _gpuPowerAreaGeometry;
+        set => SetProperty(ref _gpuPowerAreaGeometry, value);
+    }
+
+    private IReadOnlyList<GpuPowerPoint> _gpuPowerSamples = Array.Empty<GpuPowerPoint>();
+    public IReadOnlyList<GpuPowerPoint> GpuPowerSamples
+    {
+        get => _gpuPowerSamples;
+        set => SetProperty(ref _gpuPowerSamples, value);
+    }
+
+    private double _gpuPowerLimitY = ChartHeight;
+    public double GpuPowerLimitY
+    {
+        get => _gpuPowerLimitY;
+        set => SetProperty(ref _gpuPowerLimitY, value);
+    }
+
+    private bool _hasGpuPowerLimit;
+    public bool HasGpuPowerLimit
+    {
+        get => _hasGpuPowerLimit;
+        set => SetProperty(ref _hasGpuPowerLimit, value);
+    }
+
+    private string _gpuChartTimeLeft = "-2m";
+    public string GpuChartTimeLeft
+    {
+        get => _gpuChartTimeLeft;
+        set => SetProperty(ref _gpuChartTimeLeft, value);
+    }
+
+    private string _gpuChartTimeMid = "-1m";
+    public string GpuChartTimeMid
+    {
+        get => _gpuChartTimeMid;
+        set => SetProperty(ref _gpuChartTimeMid, value);
+    }
+
+    private string _gpuPowerValueText = "-- W";
+    public string GpuPowerValueText
+    {
+        get => _gpuPowerValueText;
+        set => SetProperty(ref _gpuPowerValueText, value);
+    }
+
+    private string _gpuPowerLimitText = "";
+    public string GpuPowerLimitText
+    {
+        get => _gpuPowerLimitText;
+        set => SetProperty(ref _gpuPowerLimitText, value);
+    }
+
+    private string _gpuPowerFooterText = "";
+    public string GpuPowerFooterText
+    {
+        get => _gpuPowerFooterText;
+        set => SetProperty(ref _gpuPowerFooterText, value);
+    }
+
+    private string _gpuVramShortText = "--";
+    public string GpuVramShortText
+    {
+        get => _gpuVramShortText;
+        set => SetProperty(ref _gpuVramShortText, value);
+    }
+
+    private string _gpuTempMeterText = "--";
+    public string GpuTempMeterText
+    {
+        get => _gpuTempMeterText;
+        set => SetProperty(ref _gpuTempMeterText, value);
+    }
+
+    private double _gpuLoadPercent;
+    public double GpuLoadPercent
+    {
+        get => _gpuLoadPercent;
+        set => SetProperty(ref _gpuLoadPercent, value);
+    }
+
+    private double _gpuVramPercent;
+    public double GpuVramPercent
+    {
+        get => _gpuVramPercent;
+        set => SetProperty(ref _gpuVramPercent, value);
+    }
+
+    private double _gpuTempPercent;
+    public double GpuTempPercent
+    {
+        get => _gpuTempPercent;
+        set => SetProperty(ref _gpuTempPercent, value);
+    }
+
+    private bool _gpuAsleep;
+    public bool GpuAsleep
+    {
+        get => _gpuAsleep;
+        set
+        {
+            if (!SetProperty(ref _gpuAsleep, value)) return;
+            OnPropertyChanged(nameof(GpuAwake));
+        }
+    }
+
+    public bool GpuAwake => !_gpuAsleep;
+
+    private string _gpuStateText = "Asleep";
+    public string GpuStateText
+    {
+        get => _gpuStateText;
+        set => SetProperty(ref _gpuStateText, value);
+    }
+
+    /// <summary>The driver's current thermal target as last read on the GPU page; 0 when unknown.</summary>
+    private int _gpuThermalTargetNow;
+    public int GpuThermalTargetNow
+    {
+        get => _gpuThermalTargetNow;
+        set => SetProperty(ref _gpuThermalTargetNow, value);
+    }
+
+    /// <summary>2, 5 or 15 minutes for the power plot, remembered; anything else falls back to 2.</summary>
+    public int GpuChartSpanMinutes
+    {
+        get => _gpuChartSpanMinutes;
+        set
+        {
+            if (value is not (2 or 5 or 15)) return;
+            if (!SetProperty(ref _gpuChartSpanMinutes, value)) return;
+            SettingsManager.Save("GpuChartSpanMinutes", value);
+            OnPropertyChanged(nameof(GpuChartSpan2));
+            OnPropertyChanged(nameof(GpuChartSpan5));
+            OnPropertyChanged(nameof(GpuChartSpan15));
+            UpdateHistoryChart();
+        }
+    }
+
+    public bool GpuChartSpan2
+    {
+        get => _gpuChartSpanMinutes == 2;
+        set { if (value) GpuChartSpanMinutes = 2; }
+    }
+
+    public bool GpuChartSpan5
+    {
+        get => _gpuChartSpanMinutes == 5;
+        set { if (value) GpuChartSpanMinutes = 5; }
+    }
+
+    public bool GpuChartSpan15
+    {
+        get => _gpuChartSpanMinutes == 15;
+        set { if (value) GpuChartSpanMinutes = 15; }
+    }
+
+    // GPU MUX (BIOS). Offered only where the firmware has the switch and NVIDIA DDS is not the
+    // control: Advanced Optimus machines switch the display live in the NVIDIA app.
+    private bool _gpuMuxAvailable;
+    public bool GpuMuxAvailable
+    {
+        get => _gpuMuxAvailable;
+        set
+        {
+            if (!SetProperty(ref _gpuMuxAvailable, value)) return;
+            OnPropertyChanged(nameof(GpuMuxCanApply));
+        }
+    }
+
+    private bool _gpuDdsNoticeVisible;
+    public bool GpuDdsNoticeVisible
+    {
+        get => _gpuDdsNoticeVisible;
+        set => SetProperty(ref _gpuDdsNoticeVisible, value);
+    }
+
+    private bool _gpuMuxAutomaticAvailable;
+    public bool GpuMuxAutomaticAvailable
+    {
+        get => _gpuMuxAutomaticAvailable;
+        set => SetProperty(ref _gpuMuxAutomaticAvailable, value);
+    }
+
+    private GpuMuxMode _gpuMuxSelected = GpuMuxMode.Hybrid;
+    private bool _gpuMuxLoading;
+
+    public bool GpuMuxHybrid
+    {
+        get => _gpuMuxSelected == GpuMuxMode.Hybrid;
+        set { if (value) StageGpuMux(GpuMuxMode.Hybrid); }
+    }
+
+    public bool GpuMuxDiscrete
+    {
+        get => _gpuMuxSelected == GpuMuxMode.Discrete;
+        set { if (value) StageGpuMux(GpuMuxMode.Discrete); }
+    }
+
+    public bool GpuMuxAutomatic
+    {
+        get => _gpuMuxSelected == GpuMuxMode.Automatic;
+        set { if (value) StageGpuMux(GpuMuxMode.Automatic); }
+    }
+
+    public GpuMuxMode SelectedGpuMux => _gpuMuxSelected;
+
+    private string _gpuMuxCurrentText = "";
+    public string GpuMuxCurrentText
+    {
+        get => _gpuMuxCurrentText;
+        set => SetProperty(ref _gpuMuxCurrentText, value);
+    }
+
+    private string _gpuMuxHintText = "";
+    public string GpuMuxHintText
+    {
+        get => _gpuMuxHintText;
+        set => SetProperty(ref _gpuMuxHintText, value);
+    }
+
+    private string _gpuMuxStatusText = "";
+    public string GpuMuxStatusText
+    {
+        get => _gpuMuxStatusText;
+        set => SetProperty(ref _gpuMuxStatusText, value);
+    }
+
+    private bool _gpuMuxRestartPending;
+    public bool GpuMuxRestartPending
+    {
+        get => _gpuMuxRestartPending;
+        set => SetProperty(ref _gpuMuxRestartPending, value);
+    }
+
+    private bool _gpuMuxBusy;
+    public bool GpuMuxBusy
+    {
+        get => _gpuMuxBusy;
+        set
+        {
+            if (!SetProperty(ref _gpuMuxBusy, value)) return;
+            OnPropertyChanged(nameof(GpuMuxCanApply));
+        }
+    }
+
+    public bool GpuMuxCanApply => GpuMuxAvailable && !_gpuMuxBusy;
+
+    public void LoadGpuMux(GpuMuxState? state, bool ddsSupported)
+    {
+        _gpuMuxLoading = true;
+        try
+        {
+            var capable = state is { Supported: true };
+            GpuMuxAvailable = capable && !ddsSupported;
+            GpuDdsNoticeVisible = capable && ddsSupported;
+            GpuMuxAutomaticAvailable = capable && state!.Value.Automatic;
+            GpuMuxRestartPending = false;
+            GpuMuxBusy = false;
+            GpuMuxStatusText = "";
+
+            if (GpuMuxAvailable)
+            {
+                _gpuMuxSelected = state!.Value.Current;
+                GpuMuxCurrentText = $"Stored: {GpuMux.Name(_gpuMuxSelected)}";
+                GpuMuxHintText = GpuMux.Describe(_gpuMuxSelected);
+            }
+            else
+            {
+                GpuMuxCurrentText = "";
+                GpuMuxHintText = "";
+            }
+        }
+        finally
+        {
+            _gpuMuxLoading = false;
+        }
+
+        RaiseGpuMuxSelection();
+    }
+
+    private void StageGpuMux(GpuMuxMode mode)
+    {
+        if (_gpuMuxLoading) return;
+        if (mode == GpuMuxMode.Automatic && !GpuMuxAutomaticAvailable) return;
+
+        _gpuMuxSelected = mode;
+        GpuMuxHintText = GpuMux.Describe(mode);
+        GpuMuxStatusText = "";
+        RaiseGpuMuxSelection();
+    }
+
+    private void RaiseGpuMuxSelection()
+    {
+        OnPropertyChanged(nameof(GpuMuxHybrid));
+        OnPropertyChanged(nameof(GpuMuxDiscrete));
+        OnPropertyChanged(nameof(GpuMuxAutomatic));
+    }
+
+    public void ShowGpuMuxResult(GpuMuxResult result)
+    {
+        GpuMuxBusy = false;
+        GpuMuxStatusText = result.Message;
+        GpuMuxRestartPending = result.Ok && result.Stored is not null;
+
+        if (result.Ok && result.Stored is { } stored)
+        {
+            GpuMuxCurrentText = $"Stored: {GpuMux.Name(stored)}";
+            GpuMuxHintText = GpuMux.Describe(stored);
+        }
+    }
+
     private int _deepTelemetryFailures;
     private bool _isApplyingClocks;
     private bool _disposed;
@@ -638,12 +969,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
     private string _gpuLoadText = "0%";
     public string GpuLoadText { get => _gpuLoadText; set => SetProperty(ref _gpuLoadText, value); }
 
-    private string _gpuVramText = "0 / 0 MB";
-    public string GpuVramText { get => _gpuVramText; set => SetProperty(ref _gpuVramText, value); }
-
-    private string _gpuDeepTempText = "0 C";
-    public string GpuDeepTempText { get => _gpuDeepTempText; set => SetProperty(ref _gpuDeepTempText, value); }
-
     private string _gpuPStateText = "P0";
     public string GpuPStateText { get => _gpuPStateText; set => SetProperty(ref _gpuPStateText, value); }
 
@@ -658,9 +983,6 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     private string _gpuMemClockText = "0 MHz";
     public string GpuMemClockText { get => _gpuMemClockText; set => SetProperty(ref _gpuMemClockText, value); }
-
-    private string _gpuPowerText = "0.0 W";
-    public string GpuPowerText { get => _gpuPowerText; set => SetProperty(ref _gpuPowerText, value); }
 
     // Seeded from the last run: the hardware check below runs after the window is up, so an
     // unsupported model used to show the Turbo button first and drop it a moment later.
@@ -855,6 +1177,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
         var savedSpan = SettingsManager.Get("ChartSpanMinutes", 2);
         _chartSpanMinutes = savedSpan is 2 or 5 or 15 ? savedSpan : 2;
+
+        var savedGpuSpan = SettingsManager.Get("GpuChartSpanMinutes", 2);
+        _gpuChartSpanMinutes = savedGpuSpan is 2 or 5 or 15 ? savedGpuSpan : 2;
 
         // GPU clock writes are opt-in. Default off for existing installs so an update never
         // starts writing clocks on a machine that has been tuned by another tool.
@@ -1180,15 +1505,22 @@ public class DashboardViewModel : ObservableObject, IDisposable
     {
         GpuNameText = "NVIDIA GPU (NO DATA)";
         GpuArchText = "--";
+        GpuStateText = "Deep GPU telemetry is off";
         GpuLoadText = "-- %";
         GpuLoadColor = ThemeManager.TextMutedHex;
-        GpuVramText = "-- / -- MB";
-        GpuDeepTempText = "-- C";
+        GpuLoadPercent = 0;
+        GpuVramShortText = "--";
+        GpuVramPercent = 0;
         GpuDeepTempColor = ThemeManager.TextMutedHex;
+        GpuTempMeterText = "--";
+        GpuTempPercent = 0;
         GpuPStateText = "--";
         GpuCoreClockText = "-- MHz";
         GpuMemClockText = "-- MHz";
-        GpuPowerText = "-- W";
+        GpuPowerValueText = "-- W";
+        GpuPowerLimitText = "";
+        GpuPowerFooterText = "";
+        GpuAsleep = false;
     }
 
     private bool _runOnStartup;
@@ -1739,7 +2071,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
     /// than drawn at the floor, so a sleeping dGPU does not look like a drop to freezing.
     /// </summary>
     private void AppendHistory(int cpuTemp, int gpuTemp, int cpuRpm, int gpuRpm,
-        int? cpuUsage, int? gpuUsage)
+        int? cpuUsage, int? gpuUsage, int gpuClock, double gpuPower, double gpuPowerLimit)
     {
         if (cpuTemp <= 0 && gpuTemp <= 0) return;
 
@@ -1752,7 +2084,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 Math.Max(0, cpuRpm),
                 Math.Max(0, gpuRpm),
                 Math.Max(0, cpuUsage ?? 0),
-                Math.Max(0, gpuUsage ?? 0)));
+                Math.Max(0, gpuUsage ?? 0),
+                Math.Max(0, gpuClock),
+                Math.Max(0, gpuPower),
+                Math.Max(0, gpuPowerLimit)));
 
             if (_history.Count > HistoryCapacity) _history.RemoveAt(0);
         }
@@ -1814,6 +2149,118 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
         (CpuHistoryStatsText, GpuHistoryStatsText, AuxHistoryStatsText) =
             FormatStats(visible, showCpu, showGpu);
+
+        if (_gpuTelemetryActive) UpdateGpuPowerChart(end);
+    }
+
+    /// <summary>
+    /// Rebuilds the GPU page's power plot. Only runs while that page is open: power is polled there and
+    /// nowhere else, so a closed page is a gap rather than a zero. One pair of geometries per poll.
+    /// </summary>
+    private void UpdateGpuPowerChart(DateTime end)
+    {
+        TimeSpan span = TimeSpan.FromMinutes(_gpuChartSpanMinutes);
+        DateTime begin = end - span;
+
+        var samples = new List<HistorySample>(_gpuChartSpanMinutes * 30);
+        lock (_historyGate)
+        {
+            foreach (var sample in _history)
+                if (sample.At >= begin && sample.GpuPower > 0)
+                    samples.Add(sample);
+        }
+
+        var limit = samples.Count > 0 ? samples[^1].GpuPowerLimit : 0;
+        var maxDraw = 0.0;
+        foreach (var sample in samples)
+            maxDraw = Math.Max(maxDraw, sample.GpuPower);
+
+        var yMax = Math.Max(20.0, Math.Ceiling(Math.Max(limit, maxDraw * 1.05) / 10.0) * 10.0);
+
+        var points = new List<GpuPowerPoint>(samples.Count);
+        foreach (var sample in samples)
+            points.Add(new GpuPowerPoint(
+                ChartX(sample.At, begin, span),
+                PowerY(sample.GpuPower, yMax),
+                sample.At,
+                sample.GpuPower));
+
+        GpuPowerLineGeometry = BuildPowerGeometry(samples, begin, span, yMax, area: false);
+        GpuPowerAreaGeometry = BuildPowerGeometry(samples, begin, span, yMax, area: true);
+        GpuPowerSamples = points;
+        HasGpuPowerLimit = limit > 0;
+        // Keep the 1 px dashed line inside the plot when the limit is the top of the scale.
+        GpuPowerLimitY = limit > 0 ? Math.Clamp(PowerY(limit, yMax), 0.5, ChartHeight - 0.5) : ChartHeight;
+
+        var half = _gpuChartSpanMinutes / 2.0;
+        GpuChartTimeLeft = $"-{_gpuChartSpanMinutes}m";
+        GpuChartTimeMid = half % 1 == 0
+            ? $"-{half:0}m"
+            : $"-{(int)half}:{(int)((half % 1) * 60):00}";
+    }
+
+    private static double PowerY(double watts, double yMax) =>
+        Math.Clamp((yMax - watts) / yMax, 0, 1) * ChartHeight;
+
+    /// <summary>
+    /// The line, or the same line closed to the baseline for the area fill. A gap longer than
+    /// <see cref="ChartGap"/> starts a new figure, so hidden time is a hole.
+    /// </summary>
+    private static Geometry BuildPowerGeometry(List<HistorySample> samples, DateTime begin,
+        TimeSpan span, double yMax, bool area)
+    {
+        var geometry = new StreamGeometry();
+        using (var context = geometry.Open())
+        {
+            var open = false;
+            DateTime previous = default;
+            double lastX = 0;
+
+            foreach (var sample in samples)
+            {
+                if (sample.GpuPower <= 0) continue;
+
+                var x = ChartX(sample.At, begin, span);
+                var y = PowerY(sample.GpuPower, yMax);
+
+                if (open && sample.At - previous > ChartGap)
+                {
+                    if (area) context.LineTo(new System.Windows.Point(lastX, ChartHeight), true, false);
+                    open = false;
+                }
+
+                var point = new System.Windows.Point(x, y);
+
+                if (!open)
+                {
+                    if (area)
+                    {
+                        context.BeginFigure(
+                            new System.Windows.Point(x, ChartHeight), isFilled: true, isClosed: true);
+                        context.LineTo(point, isStroked: true, isSmoothJoin: false);
+                    }
+                    else
+                    {
+                        context.BeginFigure(point, isFilled: false, isClosed: false);
+                    }
+
+                    open = true;
+                }
+                else
+                {
+                    context.LineTo(point, isStroked: true, isSmoothJoin: false);
+                }
+
+                if (area) lastX = x;
+                previous = sample.At;
+            }
+
+            if (area && open)
+                context.LineTo(new System.Windows.Point(lastX, ChartHeight), true, false);
+        }
+
+        geometry.Freeze();
+        return geometry;
     }
 
     /// <summary>
@@ -2031,7 +2478,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         var chartCpuTemp = telemetry.CpuTemp;
                         var chartGpuTemp = telemetry.GpuTemp > 0 ? telemetry.GpuTemp : driverGpuTemp;
                         AppendHistory(chartCpuTemp, chartGpuTemp, telemetry.CpuRpm, telemetry.GpuRpm,
-                            cpuUsage, smi is { HasData: true } ? smi.GpuLoad : null);
+                            cpuUsage, smi is { HasData: true } ? smi.GpuLoad : null,
+                            smi is { HasData: true } ? smi.CurrentCoreClock : 0,
+                            smi is { HasData: true } ? smi.PowerDrawW : 0,
+                            smi is { HasData: true } ? smi.EnforcedPowerLimitW : 0);
 
                         if (smi != null && !smi.HasData && DeepGpuTelemetry)
                         {
@@ -2081,41 +2531,63 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
                             UpdateHistoryChart();
 
-                            if (smi != null && !string.IsNullOrEmpty(smi.Name) && smi.Name != "Unknown")
+                            GpuAsleep = gpuAsleep;
+                            GpuStateText = smi is { HasData: true } state
+                                ? $"{state.PState} · awake"
+                                : gpuAsleep ? "Asleep · D3" : "Waiting for the driver";
+
+                            if (smi is { HasData: true } gpuData)
                             {
-                                GpuNameText = FormatGpuName(smi.Name);
-                                GpuArchText = smi.Architecture;
+                                GpuNameText = FormatGpuName(gpuData.Name);
+                                GpuArchText = gpuData.Architecture;
 
-                                GpuLoadText = $"{smi.GpuLoad}%";
-                                GpuLoadColor = smi.GpuLoad >= 95 ? ThemeManager.DangerHex : (smi.GpuLoad >= 80 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
+                                GpuLoadText = $"{gpuData.GpuLoad}%";
+                                GpuLoadPercent = Math.Clamp(gpuData.GpuLoad, 0, 100);
+                                GpuLoadColor = gpuData.GpuLoad >= 95 ? ThemeManager.DangerHex : (gpuData.GpuLoad >= 80 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
 
-                                GpuVramText = $"{smi.VramUsedMb} / {smi.VramTotalMb} MB";
+                                var target = GpuThermalTargetNow > 0
+                                    ? GpuThermalTargetNow
+                                    : GpuThermalMaximum > 0 ? GpuThermalMaximum : 87;
+                                GpuTempMeterText = $"{gpuData.CoreTemp} / {target} C";
+                                GpuTempPercent = Math.Clamp(100.0 * gpuData.CoreTemp / target, 0, 100);
 
-                                GpuDeepTempText = $"{smi.CoreTemp} C";
-                                GpuDeepTempColor = smi.CoreTemp >= 85 ? ThemeManager.DangerHex : (smi.CoreTemp >= 78 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
+                                GpuVramShortText = gpuData.VramTotalMb > 0
+                                    ? $"{gpuData.VramUsedMb / 1024.0:0.0} / {gpuData.VramTotalMb / 1024.0:0.0} GB"
+                                    : "--";
+                                GpuVramPercent = gpuData.VramTotalMb > 0
+                                    ? Math.Clamp(100.0 * gpuData.VramUsedMb / gpuData.VramTotalMb, 0, 100)
+                                    : 0;
 
-                                GpuPStateText = smi.PState;
-                                GpuCoreClockText = $"{smi.CurrentCoreClock} MHz";
-                                GpuMemClockText = $"{smi.CurrentMemoryClock} MHz";
+                                GpuDeepTempColor = gpuData.CoreTemp >= 85 ? ThemeManager.DangerHex : (gpuData.CoreTemp >= 78 ? ThemeManager.WarnHex : ThemeManager.TextPrimaryHex);
 
-                                if (smi.EnforcedPowerLimitW > 0 && smi.MaxPowerLimitW > 0)
-                                    GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} / {smi.MaxPowerLimitW:0} W";
-                                else if (smi.EnforcedPowerLimitW > 0)
-                                    GpuPowerText = $"{smi.PowerDrawW:0.0} / {smi.EnforcedPowerLimitW:0} W";
-                                else
-                                    GpuPowerText = $"{smi.PowerDrawW:0.0} W";
+                                GpuPStateText = gpuData.PState;
+                                GpuCoreClockText = $"{gpuData.CurrentCoreClock} MHz";
+                                GpuMemClockText = $"{gpuData.CurrentMemoryClock} MHz";
+
+                                GpuPowerValueText = $"{gpuData.PowerDrawW:0.0} W";
+                                GpuPowerLimitText = gpuData.EnforcedPowerLimitW > 0 ? $"/ {gpuData.EnforcedPowerLimitW:0} W" : "";
+                                GpuPowerFooterText = gpuData.EnforcedPowerLimitW > 0
+                                    ? gpuData.MaxPowerLimitW > 0
+                                        ? $"{gpuData.EnforcedPowerLimitW:0} W enforced · {gpuData.MaxPowerLimitW:0} W max"
+                                        : $"{gpuData.EnforcedPowerLimitW:0} W enforced"
+                                    : "";
                             }
-                            else if (smi != null)
+                            else
                             {
                                 // No NVML data. The GPU is either in D3 (expected, and Nitrous
                                 // deliberately does not wake it) or NVML is not reporting yet.
                                 GpuLoadText = "--";
-                                GpuVramText = "-- / -- MB";
-                                GpuDeepTempText = "-- C";
+                                GpuLoadPercent = 0;
+                                GpuVramShortText = "--";
+                                GpuVramPercent = 0;
+                                GpuTempMeterText = "--";
+                                GpuTempPercent = 0;
                                 GpuPStateText = gpuAsleep ? "Asleep" : "--";
                                 GpuCoreClockText = "-- MHz";
                                 GpuMemClockText = "-- MHz";
-                                GpuPowerText = "-- W";
+                                GpuPowerValueText = "-- W";
+                                GpuPowerLimitText = "";
+                                GpuPowerFooterText = "";
                             }
                         }, System.Windows.Threading.DispatcherPriority.Background);
                     }

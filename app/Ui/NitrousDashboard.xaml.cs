@@ -50,6 +50,7 @@ public partial class NitrousDashboard : Window
     private bool _cpuLimitsPreview;
 
     private bool _gpuLimitsReading;
+    private bool _gpuMuxReading;
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
     /// <summary>The effect lists as offered on this machine: a five-effect controller hides the last two.</summary>
@@ -405,6 +406,106 @@ public partial class NitrousDashboard : Window
             UpdateTemperatureHover(vm, Math.Clamp(fraction, 0, 1) * 288);
     }
 
+    private int _gpuHoverSampleIndex = -1;
+
+    private void GpuPowerPlot_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (DataContext is DashboardViewModel vm)
+            UpdateGpuPowerHover(vm, e.GetPosition(GpuPowerPlot).X);
+    }
+
+    private void UpdateGpuPowerHover(DashboardViewModel vm, double x)
+    {
+        var samples = vm.GpuPowerSamples;
+        if (samples.Count == 0)
+        {
+            ClearGpuPowerHover();
+            return;
+        }
+
+        var low = 0;
+        var high = samples.Count - 1;
+        while (low < high)
+        {
+            var mid = (low + high) / 2;
+            if (samples[mid].X < x) low = mid + 1;
+            else high = mid;
+        }
+
+        var index = low;
+        if (index > 0 && Math.Abs(samples[index - 1].X - x) < Math.Abs(samples[index].X - x))
+            index--;
+
+        if (index == _gpuHoverSampleIndex) return;
+        _gpuHoverSampleIndex = index;
+
+        var sample = samples[index];
+        var column = Math.Round(sample.X) + 0.5;
+
+        GpuPowerHoverLine.X1 = column;
+        GpuPowerHoverLine.X2 = column;
+        GpuPowerHoverLine.Visibility = Visibility.Visible;
+
+        Canvas.SetLeft(GpuPowerHoverDot, sample.X - 3);
+        Canvas.SetTop(GpuPowerHoverDot, sample.Y - 3);
+        GpuPowerHoverDot.Visibility = Visibility.Visible;
+
+        var seconds = Math.Max(0, (int)Math.Round((DateTime.Now - sample.At).TotalSeconds));
+        var when = seconds < 60 ? $"-{seconds} s" : $"-{seconds / 60}:{seconds % 60:00}";
+
+        GpuPowerHoverText.Text = $"{when} \u00b7 {sample.Watts:0.0} W";
+        GpuPowerHoverText.Visibility = Visibility.Visible;
+        GpuPowerValuePanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void GpuPowerPlot_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e) =>
+        ClearGpuPowerHover();
+
+    private void ClearGpuPowerHover()
+    {
+        _gpuHoverSampleIndex = -1;
+        GpuPowerHoverLine.Visibility = Visibility.Collapsed;
+        GpuPowerHoverDot.Visibility = Visibility.Collapsed;
+        GpuPowerHoverText.Visibility = Visibility.Collapsed;
+        GpuPowerValuePanel.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Capture-only: place the power readout by fraction of the plot width.</summary>
+    internal void ShowGpuPowerHoverForCapture(double fraction)
+    {
+        if (DataContext is DashboardViewModel vm)
+            UpdateGpuPowerHover(vm, Math.Clamp(fraction, 0, 1) * 288);
+    }
+
+    /// <summary>Capture-only: render the sleeping state the hardware cannot be asked to enter.</summary>
+    internal void ShowGpuAsleepForCapture()
+    {
+        if (DataContext is DashboardViewModel vm)
+        {
+            vm.GpuAsleep = true;
+            vm.GpuStateText = "Asleep · D3";
+        }
+    }
+
+    /// <summary>
+    /// Capture-only: the two MUX states. A capture runs without the elevation the WMI read needs, and
+    /// a DDS machine hides the card by design, so the layouts are rendered from the same state the
+    /// real read produces.
+    /// </summary>
+    internal void ShowGpuMuxPreviewForCapture(bool dds)
+    {
+        if (DataContext is not DashboardViewModel vm) return;
+
+        vm.LoadGpuMux(
+            dds
+                ? new GpuMuxState(Mask: 7, Mode: (byte)GpuMuxMode.Automatic)
+                : new GpuMuxState(Mask: 3, Mode: (byte)GpuMuxMode.Hybrid),
+            ddsSupported: dds);
+
+        UpdateLayout();
+        (dds ? GpuDdsCard : GpuMuxCard).BringIntoView();
+    }
+
     private int _activeNavIndex;
 
     /// <summary>
@@ -451,7 +552,7 @@ public partial class NitrousDashboard : Window
 
         var index = key switch
         {
-            "gpu" or "gpu-thermal" or "gpu-clock" => 1,
+            _ when key.StartsWith("gpu") => 1,
             "kb" or "keyboard" => 2,
             "setup" or "settings" or "setup-hotkeys" or "setup-limits" => 3,
             _ => 0
@@ -551,6 +652,7 @@ public partial class NitrousDashboard : Window
             // Opening the GPU page is what makes the thermal card readable: reading the policy is what
             // would wake a sleeping GPU, so it is only read once the page that needs it is shown.
             RefreshGpuThermalTarget();
+            RefreshGpuMux();
         }
 
         // The LIGHT page is where the Fn hint belongs; read the EC only when it is shown.
@@ -1742,6 +1844,80 @@ public partial class NitrousDashboard : Window
         });
     }
 
+    /// <summary>
+    /// Reads the BIOS MUX registers and the NVIDIA DDS status. On a DDS-capable machine the BIOS
+    /// switch is not offered: the NVIDIA app changes the display live, and a stored BIOS mode would
+    /// only apply at the next boot. Both reads are off the UI thread; neither writes anything.
+    /// </summary>
+    private void RefreshGpuMux()
+    {
+        if (_gpuMuxReading) return;
+        _gpuMuxReading = true;
+
+        _ = Task.Run(async () =>
+        {
+            GpuMuxState? state = null;
+            bool? dds = null;
+            try
+            {
+                state = await GpuMux.ReadAsync();
+                if (state is { Supported: true }) dds = NvidiaDds.IsSupported();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("GPU MUX: the state could not be read.", ex);
+            }
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                _gpuMuxReading = false;
+                if (DataContext is DashboardViewModel vm) vm.LoadGpuMux(state, dds == true);
+            });
+        });
+    }
+
+    private async void GpuMuxApply_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not DashboardViewModel vm || !vm.GpuMuxCanApply) return;
+
+        var mode = vm.SelectedGpuMux;
+        var answer = MessageBox.Show(
+            $"Switch the GPU mode to {GpuMux.Name(mode)}?\n\n{GpuMux.Describe(mode)}\n\n" +
+            "This is stored in the firmware and only takes effect after a restart. Save your work before restarting.",
+            "Nitrous - GPU mode",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        vm.GpuMuxBusy = true;
+        var result = await GpuMux.ApplyAsync(mode);
+        vm.ShowGpuMuxResult(result);
+    }
+
+    private void GpuMuxRestart_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            "Restart now to apply the stored GPU mode?\n\nSave your work first.",
+            "Nitrous - Restart",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                "shutdown", "/r /t 5 /c \"Nitrous: applying the GPU mode\"")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("GPU MUX: the restart could not be started.", ex);
+        }
+    }
+
     private readonly record struct GpuLimitState(
         PowerProfile Mode,
         GpuThermalTarget.Limits? Thermal,
@@ -1757,12 +1933,11 @@ public partial class NitrousDashboard : Window
     /// </summary>
     private void RenderGpuLimits(GpuLimitState state)
     {
-        UpdateGpuThermalLimitText(state.Thermal);
-
         if (DataContext is DashboardViewModel vm)
         {
             if (state.Thermal is { } policy)
             {
+                vm.GpuThermalTargetNow = policy.Current;
                 vm.GpuThermalMinimum = policy.Min;
                 vm.GpuThermalMaximum = policy.Default;
                 vm.GpuThermalLimit = state.SavedThermal == 0
@@ -1772,6 +1947,7 @@ public partial class NitrousDashboard : Window
             else
             {
                 // Asleep or no policy: the slider cannot describe a range, so it is disabled and blank.
+                vm.GpuThermalTargetNow = 0;
                 vm.GpuThermalMinimum = 0;
                 vm.GpuThermalMaximum = 0;
                 vm.GpuThermalLimit = 0;
@@ -1810,20 +1986,6 @@ public partial class NitrousDashboard : Window
         }
 
         RefreshGpuThermalTarget();
-    }
-
-    /// <summary>The readout beside the performance state: what the driver holds right now.</summary>
-    private void UpdateGpuThermalLimitText(GpuThermalTarget.Limits? limits)
-    {
-        if (limits is not { } value)
-        {
-            GpuThermalLimitText.Text = "--";
-            return;
-        }
-
-        GpuThermalLimitText.Text = value.Current == value.Default
-            ? $"{value.Current} C (default)"
-            : $"{value.Current} C (modified)";
     }
 
     /// <summary>The profile the settings point at, falling back to what the EC reports.</summary>

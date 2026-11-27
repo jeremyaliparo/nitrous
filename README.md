@@ -69,6 +69,9 @@ Opens the NVIDIA App-or the Control Panel where that is what is installed-from t
 **Thermal target and clock cap**<br>
 The temperature the GPU throttles at, lowered inside the driver's own range (75-87 °C on an RTX 5060), and a core clock cap—held per power profile beside the clock offsets, with one **APPLY**. Both are read back after the write and re-applied on mode changes, at start-up and after resume; a profile with no value restores the driver's default target and clears the clock lock.
 
+**GPU MUX (BIOS)**<br>
+On models whose firmware exposes the switch and where NVIDIA Advanced Optimus is not the control, the built-in display can be set to **Hybrid** or **Discrete** (and **Automatic** where the firmware lists it). The mode is stored for the next boot, applied only after a confirmation, and never re-applied in the background. Advanced Optimus models switch the display live in the NVIDIA app instead, so Nitrous leaves the BIOS setting alone there.
+
 **No idle wake**<br>
 Polls the GPU only while its tab is open, checking a sleeping dGPU through Windows' cached PnP state rather than touching it.
 

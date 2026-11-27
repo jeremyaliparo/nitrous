@@ -59,6 +59,14 @@ internal static class UiCapture
                     // shot shows the hover state, right before the frame is rendered.
                     if (page.Contains("chart-hover", StringComparison.OrdinalIgnoreCase))
                         window.ShowTemperatureHoverForCapture(0.9);
+                    if (page.Contains("gpu-hover", StringComparison.OrdinalIgnoreCase))
+                        window.ShowGpuPowerHoverForCapture(0.95);
+                    if (page.Contains("gpu-asleep", StringComparison.OrdinalIgnoreCase))
+                        window.ShowGpuAsleepForCapture();
+                    if (page.Contains("gpu-mux-preview", StringComparison.OrdinalIgnoreCase))
+                        window.ShowGpuMuxPreviewForCapture(dds: false);
+                    if (page.Contains("gpu-dds-preview", StringComparison.OrdinalIgnoreCase))
+                        window.ShowGpuMuxPreviewForCapture(dds: true);
 
                     Save(window, outputPath, scale);
                 }

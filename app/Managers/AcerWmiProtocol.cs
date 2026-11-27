@@ -33,6 +33,14 @@ internal static class AcerWmiProtocol
     // GetGamingMiscSetting(0x0A) returns the supported-profiles bitmap.
     public const uint SupportedProfilesSetting = 0x0A;
 
+    // GetGamingMiscSetting(0x09) is the GPU MUX mask (1 hybrid, 2 discrete, 4 automatic) and
+    // (0x02) the stored mode (1/2/3). SetGamingMiscSetting(0x02 | mode << 8) stores it for the
+    // next boot; status 0 or 8 both mean stored. Same contract as OpenSense and Nitro-Hub.
+    public const uint GpuMuxSetting = 0x02;
+    public const uint GpuMuxSupportSetting = 0x09;
+
+    public static ulong GpuMuxPayload(byte mode) => GpuMuxSetting | ((ulong)mode << 8);
+
     // CoolBoost, where APGeAction function 7 is it (marker 1): sub-function 2 reads the state from
     // byte 1, and a set carries it in byte 2.
     public const uint CoolBoostRead = 0x0207;
