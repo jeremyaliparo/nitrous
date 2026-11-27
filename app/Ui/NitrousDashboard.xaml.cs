@@ -329,10 +329,13 @@ public partial class NitrousDashboard : Window
         _captureMode = true;
 
         // The card is hidden on this machine (AMD), so its Intel-only states cannot be reached here
-        // without a hardware-specific override. "setup-limits" previews the not-installed state.
-        if (page?.ToLowerInvariant().Contains("limits") == true) ShowCpuPowerLimitsInstallNeeded();
+        // without an override. "setup-limits" previews the not-installed state; "setup-limits-card"
+        // fills the card with representative numbers so the site shot can show the sliders.
+        var requested = page?.ToLowerInvariant() ?? string.Empty;
+        if (requested.Contains("limits-card")) ShowCpuPowerCapPreview();
+        else if (requested.Contains("limits")) ShowCpuPowerLimitsInstallNeeded();
 
-        var key = page?.ToLowerInvariant() ?? string.Empty;
+        var key = requested;
 
         // Renders the three-tab navigation a model without a lighting controller would get.
         if (key.Contains("nolight"))
@@ -390,6 +393,19 @@ public partial class NitrousDashboard : Window
         {
             UpdateLayout();
             TxtHkCycle.BringIntoView();
+        }
+
+        if (requested.Contains("limits-card"))
+        {
+            // The pinned tabs sit outside the scroller, so scrolling the card to the top of the
+            // viewport - not merely into view - is what puts both sliders in the frame.
+            UpdateLayout();
+            if (SettingsScroller.Content is FrameworkElement content)
+            {
+                var top = CpuPowerLimitsCard.TransformToAncestor(content)
+                    .Transform(new System.Windows.Point(0, 0)).Y;
+                SettingsScroller.ScrollToVerticalOffset(Math.Max(0, top - 8));
+            }
         }
 
         if (key.StartsWith("lighting"))
@@ -1527,6 +1543,46 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
+    /// Capture-only: the Intel card with representative numbers. The card is hidden on this AMD machine,
+    /// and a site screenshot of it has no other way to exist. Nothing is read or written; the values are
+    /// the known ANV15-51 case - Balanced asks 45 W / 115 W, capped to 29 W sustained.
+    /// </summary>
+    private void ShowCpuPowerCapPreview()
+    {
+        _cpuLimitsPreview = true;
+
+        CpuPowerLimitsCard.Visibility = Visibility.Visible;
+        CpuPowerLimitsText.Text = "Balanced mode · asks 45 W / 115 W · register 29 W / 115 W";
+        CpuPowerLimitsCaption.Visibility = Visibility.Visible;
+
+        _cpuPowerCapUpdating = true;
+        try
+        {
+            CpuPowerCapSlider.Minimum = CpuPowerCap.FloorWatts;
+            CpuPowerCapSlider.Maximum = 45;
+            CpuPowerCapSlider.Value = 29;
+
+            CpuPowerCapBurstSlider.Minimum = 29;
+            CpuPowerCapBurstSlider.Maximum = 115;
+            CpuPowerCapBurstSlider.Value = 115;
+
+            UpdateCpuPowerCapLabels(new CpuPowerCap.Limits(45, 115));
+        }
+        finally
+        {
+            _cpuPowerCapUpdating = false;
+        }
+
+        CpuPowerCapSlider.IsEnabled = true;
+        CpuPowerCapBurstSlider.IsEnabled = true;
+        CpuPowerCapApplyButton.IsEnabled = true;
+        CpuPowerCapResetButton.IsEnabled = true;
+
+        CpuPowerCapStatus.Text = "Holding 29 W sustained / 115 W burst.";
+        CpuPowerCapStatus.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
     /// The single shape of "no numbers to show": present, explained, the controls inert. Both the
     /// not-installed and the did-not-answer cases go through here so they cannot drift apart.
     /// </summary>
@@ -1758,8 +1814,6 @@ public partial class NitrousDashboard : Window
     /// <summary>The live number beside each slider, and the ends of its range.</summary>
     private void UpdateCpuPowerCapLabels(CpuPowerCap.Limits? mode)
     {
-        if (CpuPowerCapSlider is null || CpuPowerCapBurstSlider is null) return;
-
         var sustained = (int)Math.Round(CpuPowerCapSlider.Value);
         var burst = (int)Math.Round(CpuPowerCapBurstSlider.Value);
 
@@ -1778,8 +1832,9 @@ public partial class NitrousDashboard : Window
 
     private void CpuPowerCapSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        // The element can fire while the window is still being parsed, before the burst slider exists.
-        if (_cpuPowerCapUpdating || CpuPowerCapBurstSlider is null) return;
+        // Minimum/Maximum in the markup fire this while the window is still being parsed, before the
+        // elements declared below the slider exist; there is nothing to show yet in that case.
+        if (_cpuPowerCapUpdating || !IsLoaded) return;
 
         // PL1 above PL2 is not a valid pair, so raising sustained pushes burst along with it.
         CpuPowerCapBurstSlider.Minimum = CpuPowerCapSlider.Value;
@@ -1788,7 +1843,7 @@ public partial class NitrousDashboard : Window
 
     private void CpuPowerCapBurstSlider_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_cpuPowerCapUpdating || CpuPowerCapSlider is null) return;
+        if (_cpuPowerCapUpdating || !IsLoaded) return;
         UpdateCpuPowerCapLabels(_cpuPowerCeiling);
     }
 
