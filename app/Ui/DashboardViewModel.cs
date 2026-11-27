@@ -338,6 +338,41 @@ public class DashboardViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _gpuThermalTargetNow, value);
     }
 
+    /// <summary>The driver's current core-clock cap as last read on the GPU page; 0 when none.</summary>
+    private int _gpuClockCapNow;
+    public int GpuClockCapNow
+    {
+        get => _gpuClockCapNow;
+        set => SetProperty(ref _gpuClockCapNow, value);
+    }
+
+    private string _gpuLimitSummaryText = "";
+    public string GpuLimitSummaryText
+    {
+        get => _gpuLimitSummaryText;
+        set => SetProperty(ref _gpuLimitSummaryText, value);
+    }
+
+    /// <summary>
+    /// The applied limits, shown beside the live telemetry so the meters and the tuning card agree.
+    /// Uses the values read from the driver, not the staged sliders: a chosen-but-unapplied limit
+    /// must not appear as active.
+    /// </summary>
+    public void UpdateGpuLimitSummary()
+    {
+        var parts = new List<string>(2);
+
+        var thermal = GpuThermalTargetNow > 0 ? GpuThermalTargetNow : GpuThermalMaximum;
+        if (thermal > 0) parts.Add($"Thermal target {thermal} C");
+
+        if (GpuClockMaximum > 0)
+            parts.Add(GpuClockCapNow > 0 && GpuClockCapNow < GpuClockMaximum
+                ? $"Clock cap {GpuClockCapNow} MHz"
+                : "No clock cap");
+
+        GpuLimitSummaryText = string.Join(" \u00b7 ", parts);
+    }
+
     /// <summary>2, 5 or 15 minutes for the power plot, remembered; anything else falls back to 2.</summary>
     public int GpuChartSpanMinutes
     {

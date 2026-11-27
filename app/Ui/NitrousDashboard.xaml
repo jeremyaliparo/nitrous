@@ -1726,6 +1726,7 @@
 									</StackPanel>
 								</Grid>
 								<TextBlock Text="{Binding GpuPowerFooterText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,6,0,0"/>
+								<TextBlock Text="{Binding GpuLimitSummaryText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,2,0,0"/>
 							</StackPanel>
 
 							<TextBlock Text="The GPU is asleep in D3. Telemetry resumes when it wakes; Nitrous will not wake it."
@@ -1831,7 +1832,7 @@
 							<Slider x:Name="GpuThermalSlider" Style="{StaticResource ModernSliderStyle}" Minimum="{Binding GpuThermalMinimum}" Maximum="{Binding GpuThermalMaximum}" Value="{Binding GpuThermalLimit, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="1" IsEnabled="{Binding GpuThermalEditable}"/>
 							<Grid Margin="0,2,0,4">
 								<TextBlock Text="{Binding GpuThermalMinimum, StringFormat={}{0} C}" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
-								<TextBlock Text="driver default" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
+								<TextBlock Text="{Binding GpuThermalMaximum, StringFormat={}{0} C default}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
 							<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 

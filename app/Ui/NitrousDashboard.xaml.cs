@@ -1953,6 +1953,8 @@ public partial class NitrousDashboard : Window
                 vm.GpuThermalLimit = 0;
             }
 
+            vm.GpuClockCapNow = state.CurrentCapMhz ?? 0;
+
             if (state.MaximumMhz is { } ceiling && ceiling > GpuClockLimit.FloorMhz)
             {
                 vm.GpuClockMinimum = GpuClockLimit.FloorMhz;
@@ -1965,10 +1967,13 @@ public partial class NitrousDashboard : Window
                 vm.GpuClockMaximum = 0;
                 vm.GpuClockCap = 0;
             }
+
+            vm.UpdateGpuLimitSummary();
         }
 
         GpuThermalHint.Text = state.Thermal is { } thermal
-            ? $"{thermal.Min}-{thermal.Default} C. Lower runs cooler and quieter at the cost of boost."
+            ? $"Allowed {thermal.Min}-{thermal.Default} C; {thermal.Default} C is the driver default. " +
+              "Lower runs cooler and quieter at the cost of boost."
             : "The GPU is asleep, so the target cannot be read or set.";
 
         GpuClockLimitHint.Text = state.MaximumMhz is { } maximum && maximum > GpuClockLimit.FloorMhz
