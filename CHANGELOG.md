@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.9 - 2026-11-28
+
+### Battery
+
+- **Battery health comes from Windows' battery class driver**, not the WMI classes the AN16S-61's battery
+  refuses to instantiate (`BatteryStaticData` answers "Invalid query"). `IOCTL_BATTERY_QUERY_INFORMATION`
+  returns the design capacity, full-charge capacity and cycle count directly, without administrator rights
+  and without spawning `powercfg`. The WMI classes and the `powercfg` report remain as fallbacks, including
+  for packs that report capacities in relative units.
+
 ## 0.16.0-test.8 - 2026-11-28
 
 ### GPU
