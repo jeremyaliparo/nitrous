@@ -3,6 +3,12 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.1 - 2026-11-27
+
+### Setup
+
+- Sticky Keys now carries an icon in **Setup -> Keys**, like the other cards on the page.
+
 ## 0.15.0 - 2026-11-27
 
 ### CPU power limits
@@ -1410,3 +1416,4 @@ Nitrous no longer writes GPU clocks unless you explicitly allow it.
 - Restored the power-profile OSD and hardened hardware, ACPI, and GPU state handling.
 - Built-in GPU profile defaults are stock `0/0`, and legacy automatic offsets are migrated
   to `0/0` on first run.
+

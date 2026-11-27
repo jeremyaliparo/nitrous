@@ -1319,8 +1319,11 @@
 								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
 									<Grid>
 										<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-											<TextBlock Text="Sticky Keys" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
-											<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,2,58,0" TextWrapping="Wrap"/>
+											<StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+												<Path Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center" Data="M15,1V3H9V1H7V4C7,4.55 7.45,5 8,5H10V21H14V5H16C16.55,5 17,4.55 17,4V1H15Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" />
+												<TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" Text="Sticky Keys" />
+											</StackPanel>
+											<TextBlock Text="Press one key at a time for keyboard shortcuts." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,0,58,0" TextWrapping="Wrap"/>
 										</StackPanel>
 										<CheckBox x:Name="TogStickyKeys" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource ModernToggleStyle}" Checked="StickyKeys_Toggled" Unchecked="StickyKeys_Toggled"/>
 									</Grid>
