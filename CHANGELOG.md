@@ -3,6 +3,57 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0 - 2026-11-28
+
+### Dashboard
+
+- **The temperature graph has a scale, a time axis and a hover readout.** The range is chosen from the data
+  with a 20 C floor and rounded to fives, so the lines use the plot without exaggerating a small wobble;
+  three labelled gridlines sit beside them and `-2m / -1m / now` under them. Hover snaps to the nearest
+  timestamped sample and replaces the stats with its age and values, with a crosshair and a dot per visible
+  line; the CPU/GPU labels toggle their lines. **2 / 5 / 15 minute windows**, remembered and defaulting to 2,
+  slice a fifteen-minute buffer; a gap longer than 12 s breaks the line instead of drawing through it. The
+  footer reports min-max and average per series and labels the fan/load peaks.
+
+### GPU
+
+- **The telemetry card is rebuilt around the numbers that move.** Core and memory clocks lead; a two-minute
+  power plot draws the draw against the enforced limit (dashed) with a hover readout; load, VRAM and
+  temperature become meters against their own limits, with the temperature meter using the driver's current
+  thermal target. A real `Asleep · D3` state replaces the `--` rows. The applied limits are named beneath the
+  meters (`Thermal target 80 C · Clock cap 1500 MHz`), read from the driver rather than the staged sliders.
+  The temperature slider now shows `87 C default` at its right end and `Allowed 75-87 C` in its hint, so the
+  selected target is not mistaken for the range.
+- **GPU MODE (MUX) on models whose firmware exposes the BIOS switch and where NVIDIA DDS is not the
+  control.** Hybrid, Discrete and - where the firmware lists it - Automatic; the mode is stored for the next
+  boot, written only by an explicit APPLY after a confirmation, accepted on status 0 or 8, read back and
+  reported, with Restart now or Restart later. Nothing is written at startup, on a power-mode change or per
+  profile. Advanced Optimus machines get a note pointing at the NVIDIA app; a mask of Hybrid + Discrete is
+  treated as BIOS-only without loading `nvcpl.dll`. Verified end-to-end on an AN16S-61: Automatic -> Hybrid ->
+  Discrete -> Automatic, every reboot clean, the dGPU driving the display in Discrete.
+
+### Battery
+
+- **The 80% limit is re-asserted on every charger event**, not only at startup and resume. The firmware can
+  drop its charge-limit latch on a plug or unplug, and the toggle only shows the saved setting, so the cap
+  could be off in hardware while the Setup page said on. Every AC/DC transition, resume and startup now
+  writes it again, logs the write, and shows a refusal on the card instead of leaving the toggle looking
+  successful. Applying the limit does not force a battery already above 80% down to it; it stops the next
+  charge at 80%.
+- **Battery health is read from Windows' battery class driver** (`IOCTL_BATTERY_QUERY_INFORMATION`) instead
+  of the WMI classes some batteries refuse to instantiate (`BatteryStaticData` answers "Invalid query" on the
+  AN16S-61). The WMI classes and the `powercfg` report remain as fallbacks, including for packs that report
+  relative capacities.
+
+### Setup
+
+- Sticky Keys carries its icon, matching the other cards in Setup -> Keys.
+
+### Fixes
+
+- Hovering just below the GPU power line no longer makes the readout flicker: the header keeps a fixed size,
+  so the plot cannot move under the pointer.
+
 ## 0.16.0-test.10 - 2026-11-28
 
 ### GPU
