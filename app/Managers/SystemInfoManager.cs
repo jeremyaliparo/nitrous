@@ -4,6 +4,7 @@ using System.Linq;
 using System.Management;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Xml.Linq;
 using System.Xml;
 using Nitrous.Diagnostics;
@@ -38,11 +39,74 @@ public static class SystemInfoManager
     /// involved, so it works on every laptop. Null when the pack reports no design capacity, which
     /// would make a percentage meaningless.
     /// </summary>
-    public static BatteryHealthInfo? GetBatteryHealth() => ReadBatteryClasses() ?? ReadBatteryReport();
+    public static BatteryHealthInfo? GetBatteryHealth() =>
+        ReadBatteryClassDriver() ?? ReadBatteryClasses() ?? ReadBatteryReport();
 
     /// <summary>
-    /// The direct WMI classes. Some battery drivers fail to instantiate BatteryStaticData even
-    /// though the class is listed (the AN16S-61 does), hence the report fallback below.
+    /// Windows' battery class driver: <c>IOCTL_BATTERY_QUERY_INFORMATION</c> on the battery device
+    /// returns the design and full-charge capacities and the cycle count, without spawning
+    /// <c>powercfg</c> and without the WMI classes some battery drivers refuse to instantiate (the
+    /// AN16S-61's <c>BatteryStaticData</c> answers "Invalid query"). Read-only, no administrator
+    /// rights. OpenSense uses the same surface (§TGP notes).
+    /// </summary>
+    private static BatteryHealthInfo? ReadBatteryClassDriver()
+    {
+        var batteryClass = BatteryInterfaceGuid;
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            if (CM_Get_Device_Interface_List_Size(out var length, ref batteryClass, null, 0) != 0 || length == 0)
+                return null;
+
+            var paths = new char[length];
+            var result = CM_Get_Device_Interface_List(ref batteryClass, null, paths, length, 0);
+            if (result == 0x1A) continue; // a battery arrived between the two calls: ask again
+            if (result != 0) return null;
+
+            foreach (var path in new string(paths).Split('\0', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var handle = CreateFile(path, 0xC0000000, 3, IntPtr.Zero, 3, 0x80, IntPtr.Zero);
+                if (handle == InvalidHandleValue) continue;
+
+                try
+                {
+                    uint wait = 0, tag = 0;
+                    if (!DeviceIoControl(handle, IoctlBatteryQueryTag, ref wait, sizeof(uint),
+                            ref tag, sizeof(uint), out _, IntPtr.Zero) || tag == 0)
+                        continue;
+
+                    var query = new BatteryQueryInformation { BatteryTag = tag, InformationLevel = 0 };
+                    var info = new BatteryInformation();
+                    if (!DeviceIoControl(handle, IoctlBatteryQueryInformation, ref query,
+                            (uint)Marshal.SizeOf<BatteryQueryInformation>(), ref info,
+                            (uint)Marshal.SizeOf<BatteryInformation>(), out _, IntPtr.Zero))
+                        continue;
+
+                    // Relative units are not mWh: the report below is the reliable source for those.
+                    if ((info.Capabilities & BatteryCapacityRelative) != 0) return null;
+                    if (info.DesignedCapacity == 0 || info.FullChargedCapacity == 0) return null;
+
+                    var cycles = info.CycleCount is > 0 and < uint.MaxValue ? (int)info.CycleCount : (int?)null;
+                    Logger.Info($"System info: battery health from the battery class driver " +
+                                $"({info.DesignedCapacity} / {info.FullChargedCapacity} mWh).");
+                    return new BatteryHealthInfo(
+                        (int)info.DesignedCapacity, (int)info.FullChargedCapacity, cycles);
+                }
+                finally
+                {
+                    CloseHandle(handle);
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The direct WMI classes, the fallback where the battery class driver does not answer. Some
+    /// battery drivers fail to instantiate BatteryStaticData even though the class is listed (the
+    /// AN16S-61 does), hence the report fallback below.
     /// </summary>
     private static BatteryHealthInfo? ReadBatteryClasses()
     {
@@ -402,4 +466,56 @@ public static class SystemInfoManager
             _ => value.ToString()
         };
     }
+
+    // --- battery class driver -------------------------------------------------------------
+
+    private const uint IoctlBatteryQueryTag = 0x294040;
+    private const uint IoctlBatteryQueryInformation = 0x294044;
+    private const uint BatteryCapacityRelative = 0x40000000;
+
+    private static readonly Guid BatteryInterfaceGuid = new("72631E54-78A4-11D0-BCF7-00AA00B7B32A");
+    private static readonly IntPtr InvalidHandleValue = new(-1);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BatteryQueryInformation
+    {
+        public uint BatteryTag;
+        public uint InformationLevel;
+        public int AtRate;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 36)]
+    private struct BatteryInformation
+    {
+        [FieldOffset(0)] public uint Capabilities;
+        [FieldOffset(12)] public uint DesignedCapacity;
+        [FieldOffset(16)] public uint FullChargedCapacity;
+        [FieldOffset(32)] public uint CycleCount;
+    }
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    private static extern int CM_Get_Device_Interface_List_Size(
+        out uint length, ref Guid interfaceClass, string? deviceId, uint flags);
+
+    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
+    private static extern int CM_Get_Device_Interface_List(
+        ref Guid interfaceClass, string? deviceId, [Out] char[] buffer, uint bufferLength, uint flags);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateFile(
+        string fileName, uint desiredAccess, uint shareMode, IntPtr securityAttributes,
+        uint creationDisposition, uint flagsAndAttributes, IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool DeviceIoControl(
+        IntPtr device, uint ioControlCode, ref uint input, uint inputSize,
+        ref uint output, uint outputSize, out uint returned, IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool DeviceIoControl(
+        IntPtr device, uint ioControlCode, ref BatteryQueryInformation input, uint inputSize,
+        ref BatteryInformation output, uint outputSize, out uint returned, IntPtr overlapped);
 }
