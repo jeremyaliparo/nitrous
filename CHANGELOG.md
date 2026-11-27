@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.7 - 2026-11-28
+
+### Battery
+
+- **The 80% limit is re-asserted on every charger event**, not only at startup and resume. The firmware can
+  drop its charge-limit latch on a plug or unplug, and the toggle only shows the saved setting, so the cap
+  could be off in hardware while the setup page still said on. Startup and resume already wrote it; AC/DC
+  transitions now do too, with a log line for every write.
+- **A refused write is visible.** The EC has no charge-limit readback, so the write is the only signal;
+  the card now says when the firmware refused it instead of leaving the toggle looking successful.
+- Applying the limit does not force a battery that is already above 80% down to it; it stops the next charge
+  at 80%. On this machine the write was verified at 99% (`uReturn=0`), so the remaining 99% is the battery's
+  existing charge, not a failed limit.
+
 ## 0.16.0-test.6 - 2026-11-27
 
 ### GPU
