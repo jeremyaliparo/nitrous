@@ -1194,6 +1194,8 @@
 			                                </StackPanel>
 			                                <CheckBox Grid.Column="1" x:Name="TogCharge" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="{Binding ChargeLimit, UpdateSourceTrigger=PropertyChanged}"/>
 			                            </Grid>
+										<TextBlock Text="{Binding ChargeLimitStatus}" Style="{StaticResource CardStatusStyle}"
+										           Foreground="{DynamicResource TextDimBrush}" FontSize="9" TextWrapping="Wrap" Margin="0,4,0,0"/>
 										<Grid Margin="0,12,0,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*"/>

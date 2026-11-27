@@ -1073,7 +1073,7 @@ public static class AcerWmiManager
         }
     }
 
-    public static Task SetChargeLimitAsync(bool enable)
+    public static Task<bool> SetChargeLimitAsync(bool enable)
     {
         return Task.Run(() =>
         {
@@ -1089,7 +1089,7 @@ public static class AcerWmiManager
                             Logger.Warn("WMI: BatteryControl is not available; charge limit was not applied.");
                             _batteryFailureLogged = true;
                         }
-                        return;
+                        return false;
                     }
 
                     using var inParams = instance.GetMethodParameters(AcerWmiProtocol.SetBatteryHealthControl);
@@ -1097,12 +1097,19 @@ public static class AcerWmiManager
                     inParams["uFunctionMask"] = AcerWmiProtocol.BatteryFunctionMask;
                     inParams["uFunctionStatus"] = (byte)(enable ? 1 : 0);
                     inParams["uReservedIn"] = new byte[] { 0, 0, 0, 0, 0 };
-                    instance.InvokeMethod(AcerWmiProtocol.SetBatteryHealthControl, inParams, null);
+
+                    using var outParams = instance.InvokeMethod(AcerWmiProtocol.SetBatteryHealthControl, inParams, null);
+                    var rawStatus = outParams?.Properties["uReturn"]?.Value;
+                    var status = rawStatus == null ? 0 : Convert.ToUInt16(rawStatus);
+                    Logger.Info($"Battery charge limit: {(enable ? "80%" : "full")} requested" +
+                                (status == 0 ? "." : $"; the EC answered {status}."));
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     Logger.Warn("WMI: failed to set the battery charge limit.", ex);
                     InvalidateBatteryLocked();
+                    return false;
                 }
             }
         });

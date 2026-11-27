@@ -480,13 +480,12 @@ public class TrayApplication : ApplicationContext
 
             DisplayManager.Apply(isOnline);
 
-            // Charge limit is a hardware latch; re-assert it on startup/resume so it survives
-            // an EC reset. It is cheap and harmless on AC/DC transitions, but we avoid churn.
-            if (isStartup || force)
-            {
-                var chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
-                await AcerWmiManager.SetChargeLimitAsync(chargeLimit);
-            }
+            // Charge limit is a hardware latch with no readback: the toggle shows the saved
+            // setting, not what the EC holds. Re-assert it on every power event (startup, resume
+            // and AC/DC), because an EC reset on a charger change otherwise leaves it off while
+            // the setup page still says on. The write is cheap and idempotent.
+            var chargeLimit = SettingsManager.Get("ChargeLimit", 0) == 1;
+            await AcerWmiManager.SetChargeLimitAsync(chargeLimit);
 
             await _gpuManager.ApplyPowerProfileOcAsync(
                 profile,

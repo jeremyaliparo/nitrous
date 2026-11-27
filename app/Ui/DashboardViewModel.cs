@@ -1462,8 +1462,30 @@ public class DashboardViewModel : ObservableObject, IDisposable
             if (!SetProperty(ref _chargeLimit, value)) return;
 
             SettingsManager.Save("ChargeLimit", value ? 1 : 0);
-            _ = AcerWmiManager.SetChargeLimitAsync(value);
+            _ = ApplyChargeLimitAsync(value);
         }
+    }
+
+    private string _chargeLimitStatus = "";
+    public string ChargeLimitStatus
+    {
+        get => _chargeLimitStatus;
+        set => SetProperty(ref _chargeLimitStatus, value);
+    }
+
+    /// <summary>
+    /// The EC has no charge-limit readback, so the only honest signal is whether the write was
+    /// accepted. The setting stays where the user put it - the tray re-asserts it on the next power
+    /// event - and a refusal is shown instead of leaving the toggle looking successful.
+    /// </summary>
+    private async Task ApplyChargeLimitAsync(bool enable)
+    {
+        var ok = await AcerWmiManager.SetChargeLimitAsync(enable);
+        ChargeLimitStatus = ok
+            ? ""
+            : enable
+                ? "The firmware refused the limit. Connect the charger with the battery below 80%, then try again."
+                : "The firmware refused the change; the limit may still be in force.";
     }
 
     private bool _autoSwitch;
