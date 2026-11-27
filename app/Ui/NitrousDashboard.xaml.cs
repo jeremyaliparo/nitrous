@@ -1861,7 +1861,11 @@ public partial class NitrousDashboard : Window
             try
             {
                 state = await GpuMux.ReadAsync();
-                if (state is { Supported: true }) dds = NvidiaDds.IsSupported();
+
+                // Only a mask that lists Automatic can be an Advanced Optimus machine. A mask of
+                // Hybrid + Discrete is a BIOS MUX by definition (the ANV16-41 answers 3), so it is
+                // shown without loading nvcpl.dll at all.
+                if (state is { Supported: true, Automatic: true }) dds = NvidiaDds.IsSupported();
             }
             catch (Exception ex)
             {

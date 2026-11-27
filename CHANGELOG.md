@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.16.0-test.10 - 2026-11-28
+
+### GPU
+
+- **The MUX gate only consults NVIDIA DDS where the firmware lists Automatic.** A mask of Hybrid +
+  Discrete (3) cannot be an Advanced Optimus machine, so the BIOS card is shown without loading
+  `nvcpl.dll`; the ANV16-41 probe answers exactly that (mask 3, stored Hybrid).
+
 ## 0.16.0-test.9 - 2026-11-28
 
 ### Battery
