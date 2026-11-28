@@ -3,6 +3,26 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.1 - 2026-11-28
+
+### Sound
+
+- **Acer TrueHarmony.** The DTS APO4 preset is now a dashboard control: Off, Music, Movie, Voice,
+  Game 1-3 and Custom, on whichever output is in use - built-in speakers, headphones or an external
+  device. It drives the DTS controller's own COM interface rather than writing its registry, keeps
+  the output suffix so a headphone preset never lands on the speakers, and reads the mode back, so a
+  refused change leaves the card showing what DTS is actually running. The card is hidden where the
+  controller does not answer.
+
+### Display
+
+- **Refresh rate per monitor.** With more than one display attached, a Monitor selector appears
+  above the refresh list and every display keeps its own rate: the chosen rate on AC and 60 Hz on
+  battery in Auto, or the chosen rate on both in Fixed. The rate is applied through that display's
+  own GDI device and re-applied when a monitor is attached or the layout changes. A monitor Nitrous
+  has never been asked to configure keeps Windows' mode, and an existing single-display choice
+  carries over to the built-in panel.
+
 ## 0.19.0 - 2026-11-28
 
 ### Appearance
