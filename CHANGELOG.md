@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.4 - 2026-11-29
+
+### Display
+
+- **Rates a monitor has run at stay offered.** 120 Hz on the built-in panel is not in its EDID, so
+  it would otherwise disappear from the list after switching to 60 or 180. Nitrous now remembers the
+  rates each display has been switched to and keeps them in the list, so the way back is never lost.
+
 ## 0.20.0-test.3 - 2026-11-29
 
 ### Display
