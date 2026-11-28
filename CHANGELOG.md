@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.5 - 2026-11-28
+
+### Appearance
+
+- **The toast no longer draws the coloured dot at its right edge.** The mode accent remains in the
+  left bar and in the Nitro mark; the Minimal design keeps its left-hand dot, which is part of its
+  layout rather than a right-edge indicator.
+
 ## 0.19.0-test.4 - 2026-11-28
 
 ### Power
