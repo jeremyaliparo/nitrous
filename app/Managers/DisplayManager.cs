@@ -296,7 +296,8 @@ public static class DisplayManager
                     current.dmPelsWidth,
                     current.dmPelsHeight,
                     current.dmDisplayFrequency,
-                    FilterRates(driverRates, declared, current.dmDisplayFrequency)));
+                    FilterRates(driverRates, declared, current.dmDisplayFrequency,
+                        SeenRates(device.DeviceName))));
             }
         }
         catch (Exception ex)
@@ -549,25 +550,34 @@ public static class DisplayManager
     private static IReadOnlyList<int> FilterRates(
         IReadOnlyList<int> driverRates,
         IReadOnlyList<(int Width, int Height, double Hz)>? declared,
-        int currentHz)
+        int currentHz,
+        IReadOnlyList<int> seen)
     {
         if (declared is null || declared.Count == 0 || driverRates.Count < 2)
             return driverRates;
 
-        var matches = new List<int>();
+        var keep = new SortedSet<int>();
         foreach (var hz in driverRates)
         {
             if (declared.Any(t => Math.Abs(t.Hz - hz) <= 0.75))
-                matches.Add(hz);
+                keep.Add(hz);
         }
 
         // One declared rate is a scaled/non-native resolution, not the monitor's discrete mode set.
-        if (matches.Count < 2) return driverRates;
+        if (keep.Count < 2) return driverRates;
 
-        if (currentHz > 0 && !matches.Contains(currentHz))
-            matches.Add(currentHz);
+        // Rates this display has actually run at stay offered: 120 Hz on the BOE panel is not in
+        // its EDID but the panel runs it, and dropping it after switching to 180 would strand the
+        // user with no way back.
+        foreach (var hz in seen)
+        {
+            if (driverRates.Contains(hz)) keep.Add(hz);
+        }
 
-        return matches.OrderBy(hz => hz).ToArray();
+        if (currentHz > 0 && driverRates.Contains(currentHz))
+            keep.Add(currentHz);
+
+        return keep.ToArray();
     }
 
     /// <summary>
@@ -792,6 +802,18 @@ public static class DisplayManager
         var gdi = ResolveGdi(gdiDeviceName);
         SettingsManager.Save(DisplayKey("RefreshAcHz", gdi), hz);
         SettingsManager.Save(DisplayKey("RefreshMode", gdi), (int)RefreshMode.Fixed);
+
+        // Remember what this display has run at, so a rate the EDID does not list stays reachable.
+        var current = GetCurrentRefreshRate(gdi);
+        var seen = SeenRates(gdi)
+            .Append(current)
+            .Append(hz)
+            .Where(h => h > 0)
+            .Distinct()
+            .OrderBy(h => h)
+            .TakeLast(12);
+        SettingsManager.Save(DisplayKey("RefreshSeen", gdi), string.Join(',', seen));
+
         ApplyDisplay(gdi, IsOnAc());
     }
 
@@ -856,8 +878,26 @@ public static class DisplayManager
     /// One registry value per display. The GDI name ("\\.\DISPLAY1") is reduced to letters and
     /// digits so the value name stays a plain registry name.
     /// </summary>
+    private static string IdFor(string gdiDeviceName) =>
+        string.Concat(gdiDeviceName.Where(char.IsLetterOrDigit));
+
     private static string DisplayKey(string baseKey, string gdiDeviceName) =>
-        $"{baseKey}_{string.Concat(gdiDeviceName.Where(char.IsLetterOrDigit))}";
+        $"{baseKey}_{IdFor(gdiDeviceName)}";
+
+    /// <summary>The rates this display has been switched to, newest last; empty before any choice.</summary>
+    private static IReadOnlyList<int> SeenRates(string gdiDeviceName)
+    {
+        var text = SettingsManager.Get(DisplayKey("RefreshSeen", gdiDeviceName), "");
+        if (string.IsNullOrWhiteSpace(text)) return Array.Empty<int>();
+
+        var rates = new List<int>();
+        foreach (var part in text.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (int.TryParse(part, out var hz) && hz > 0) rates.Add(hz);
+        }
+
+        return rates;
+    }
 
     private static void ApplyDisplay(string gdiDeviceName, bool isAcPower)
     {
