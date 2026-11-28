@@ -20,6 +20,11 @@ internal static class DtsTrueHarmony
 {
     private const string Clsid = "0113592D-0FDC-481F-88C8-294E28635456";
 
+    /// <summary>The operating-mode control the APO exposes on every mode object.</summary>
+    private const string OperatingModeControlName = "APO4-Operating Mode";
+
+    private const string AutomaticBase = "APO4-Automatic";
+
     /// <summary>The preset names as the controller spells them, with the labels Nitrous shows.</summary>
     public static readonly (string Key, string Label)[] Presets =
     [
@@ -39,7 +44,8 @@ internal static class DtsTrueHarmony
         string FriendlyName,
         string CurrentBase,
         string OutputSuffix,
-        IReadOnlyList<string> Bases);
+        IReadOnlyList<string> Bases,
+        bool Automatic);
 
     private static bool _loggedUnavailable;
 
@@ -104,6 +110,7 @@ internal static class DtsTrueHarmony
         result["available"] = true;
         result["endpoint"] = state.FriendlyName;
         result["currentPreset"] = state.CurrentBase;
+        result["automatic"] = state.Automatic;
         result["output"] = state.OutputSuffix;
         result["presets"] = state.Bases.ToArray();
         return result;
@@ -124,6 +131,19 @@ internal static class DtsTrueHarmony
         var suffix = string.IsNullOrWhiteSpace(state.OutputSuffix)
             ? "APO4-Internal Stereo"
             : state.OutputSuffix;
+
+        // Automatic is not a mode object: the APO's operating-mode control takes it directly and
+        // keeps the last preset's output (speakers, headphones) as the speaker type.
+        if (string.Equals(baseName, AutomaticBase, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!WriteOperatingModeControl(endpoint, AutomaticBase))
+                return (null, "This output does not offer Automatic.");
+
+            var applied = ReadEndpoint(endpoint);
+            return applied is { Automatic: true }
+                ? (applied, $"{LabelFor(AutomaticBase)} · {OutputLabel(applied.OutputSuffix)}")
+                : (null, "DTS did not keep Automatic.");
+        }
 
         IDTSOperatingMode? target = null;
         IDTSOperatingMode? fallback = null;
@@ -170,6 +190,10 @@ internal static class DtsTrueHarmony
 
             var hr = endpoint.SetMode(target);
             if (hr != 0) return (null, $"DTS returned 0x{hr:X8}.");
+
+            // The mode object can already be this preset - the user may be coming from Automatic -
+            // and then SetMode is a no-op; the control is what the APO actually processes.
+            WriteOperatingModeControl(endpoint, baseName);
 
             // Read back: the UI must not claim a mode DTS refused.
             var after = ReadEndpoint(endpoint);
@@ -275,17 +299,26 @@ internal static class DtsTrueHarmony
         if (endpoint.GetMode(out var current) != 0 || current is null) return null;
 
         string? currentName = null;
+        string? controlValue = null;
         try
         {
             current.Name(out currentName);
+            controlValue = ReadOperatingModeControl(current);
         }
         finally
         {
             Marshal.ReleaseComObject(current);
         }
 
-        if (!TryParse(currentName, out var currentBase, out var suffix) || currentBase.Length == 0)
+        if (!TryParse(currentName, out var modeBase, out var suffix) || modeBase.Length == 0)
             return null;
+
+        // The control, not the mode object, is what the APO processes: it also carries
+        // "APO4-Automatic", which has no mode object of its own.
+        var automaticSupported = TryParse(controlValue, out var controlBase, out _);
+        var automatic = automaticSupported &&
+                        string.Equals(controlBase, AutomaticBase, StringComparison.OrdinalIgnoreCase);
+        var currentBase = automaticSupported ? controlBase : modeBase;
 
         var bases = new List<string>();
         if (endpoint.GetOpModeEnumerator(out var modes) == 0 && modes is not null)
@@ -297,11 +330,11 @@ internal static class DtsTrueHarmony
                     try
                     {
                         mode.Name(out var name);
-                        if (TryParse(name, out var modeBase, out _) &&
-                            Presets.Any(p => string.Equals(p.Key, modeBase, StringComparison.OrdinalIgnoreCase)) &&
-                            !bases.Contains(modeBase, StringComparer.OrdinalIgnoreCase))
+                        if (TryParse(name, out var candidate, out _) &&
+                            Presets.Any(p => string.Equals(p.Key, candidate, StringComparison.OrdinalIgnoreCase)) &&
+                            !bases.Contains(candidate, StringComparer.OrdinalIgnoreCase))
                         {
-                            bases.Add(modeBase);
+                            bases.Add(candidate);
                         }
                     }
                     finally
@@ -316,6 +349,7 @@ internal static class DtsTrueHarmony
             }
         }
 
+        if (automaticSupported) bases.Add(AutomaticBase);
         if (bases.Count == 0) return null;
 
         // Keep the curated order, so the dropdown does not follow the controller's own order.
@@ -324,7 +358,72 @@ internal static class DtsTrueHarmony
             .Select(p => p.Key)
             .ToList();
 
-        return new State(friendly, currentBase, suffix, ordered);
+        return new State(friendly, currentBase, suffix, ordered, automatic);
+    }
+
+    /// <summary>
+    /// The APO's operating-mode string for a mode object, e.g. "APO4-Music" or "APO4-Automatic".
+    /// This is the value the DTS:X app writes; it is read back after every change.
+    /// </summary>
+    private static string? ReadOperatingModeControl(IDTSOperatingMode mode)
+    {
+        using var control = OpenOperatingModeControl(mode);
+        if (control is null) return null;
+
+        return control.Value.GetStrValue(out var value) == 0 ? value : null;
+    }
+
+    /// <summary>Writes the APO's operating-mode string; false when the control is absent or refused it.</summary>
+    private static bool WriteOperatingModeControl(IDTSEndpointInfo endpoint, string value)
+    {
+        if (endpoint.GetMode(out var mode) != 0 || mode is null) return false;
+
+        try
+        {
+            using var control = OpenOperatingModeControl(mode);
+            return control is not null && control.Value.SetStrValue(value) == 0;
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(mode);
+        }
+    }
+
+    private static ControlHandle? OpenOperatingModeControl(IDTSOperatingMode mode)
+    {
+        if (mode.DTSAPOControlEnumerator(0, out var pointer) != 0 || pointer == IntPtr.Zero)
+            return null;
+
+        var enumerator = (IDTSAPOControlEnumerator2)Marshal.GetObjectForIUnknown(pointer);
+        Marshal.Release(pointer);
+
+        try
+        {
+            if (enumerator.GetControlFromName(OperatingModeControlName, out var control) != 0 ||
+                control is null)
+            {
+                return null;
+            }
+
+            return new ControlHandle(control, enumerator);
+        }
+        catch
+        {
+            Marshal.ReleaseComObject(enumerator);
+            throw;
+        }
+    }
+
+    /// <summary>Owns the control and the enumerator it came from, so both are released together.</summary>
+    private sealed class ControlHandle(IDTSAPOControl2 value, object owner) : IDisposable
+    {
+        public IDTSAPOControl2 Value { get; } = value;
+
+        public void Dispose()
+        {
+            Marshal.ReleaseComObject(Value);
+            Marshal.ReleaseComObject(owner);
+        }
     }
 
     internal static bool TryParse(string? modeName, out string baseName, out string suffix)
@@ -441,5 +540,25 @@ internal static class DtsTrueHarmony
     {
         [PreserveSig] int DTSAPOControlEnumerator(int type, out IntPtr controlEnumerator);
         [PreserveSig] int Name([MarshalAs(UnmanagedType.BStr)] out string name);
+    }
+
+    [ComImport, Guid("00b60358-499c-489d-881c-0d10da751c8f"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDTSAPOControlEnumerator2
+    {
+        [PreserveSig] int Next(out IDTSAPOControl2 control);
+        [PreserveSig] int GetControlFromName([MarshalAs(UnmanagedType.BStr)] string name, out IDTSAPOControl2 control);
+    }
+
+    [ComImport, Guid("a128945a-0990-4156-b00c-dbadba10065e"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IDTSAPOControl2
+    {
+        [PreserveSig] int DisplayValue([MarshalAs(UnmanagedType.BStr)] out string value);
+        [PreserveSig] int Scale(out int scale);
+        [PreserveSig] int MinValue(out int value);
+        [PreserveSig] int MaxValue(out int value);
+        [PreserveSig] int GetValue(out int value);
+        [PreserveSig] int SetValue(int value);
+        [PreserveSig] int GetStrValue([MarshalAs(UnmanagedType.BStr)] out string value);
+        [PreserveSig] int SetStrValue([MarshalAs(UnmanagedType.BStr)] string value);
     }
 }
