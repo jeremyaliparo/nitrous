@@ -659,16 +659,6 @@ public sealed class OsdForm : Form
             new RectangleF(textX, captionY, width - textX - rightPad, captionHeight), textFormat);
         graphics.DrawString(title, titleFont, titleBrush,
             new RectangleF(textX, titleY, width - textX - rightPad, titleHeight), textFormat);
-
-        if (design != UiPreferences.ToastDesign.Minimal)
-        {
-            var dotX = width - (design == UiPreferences.ToastDesign.Compact ? 22f : 28f) * scale;
-            var dotY = height / 2f;
-            using var glow = new SolidBrush(Color.FromArgb(40, accent));
-            graphics.FillEllipse(glow, dotX - 8f * scale, dotY - 8f * scale, 16f * scale, 16f * scale);
-            using var dot = new SolidBrush(accent);
-            graphics.FillEllipse(dot, dotX - 4f * scale, dotY - 4f * scale, 8f * scale, 8f * scale);
-        }
     }
 
     private static GraphicsPath RoundedRect(RectangleF bounds, float radius)
