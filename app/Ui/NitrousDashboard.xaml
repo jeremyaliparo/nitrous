@@ -940,6 +940,12 @@
 					</Grid>
 					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="12,10" Margin="0,0,0,16">
 						<StackPanel>
+							<!-- Monitor: one entry per attached display, hidden when there is only one -->
+							<Grid x:Name="DisplaySelectRow" Margin="0,0,0,10" Visibility="Collapsed">
+								<TextBlock Text="Monitor" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+								<ComboBox x:Name="DisplaySelectBox" HorizontalContentAlignment="Center" Width="170" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="DisplaySelect_Changed"/>
+							</Grid>
+
 							<!-- Refresh rate -->
 							<Grid>
 								<TextBlock Text="Refresh" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
@@ -952,6 +958,23 @@
 								<CheckBox x:Name="TogLcdOverdrive" ToolTipService.ShowOnDisabled="True" Style="{StaticResource ModernToggleStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Checked="LcdOverdrive_Toggled" Unchecked="LcdOverdrive_Toggled"/>
 							</Grid>
 						</StackPanel>
+					</Border>
+					</StackPanel>
+					<!-- Sound: the DTS APO4 preset (Acer TrueHarmony) for the active output -->
+					<StackPanel x:Name="SoundSection" Visibility="Collapsed">
+					<Grid Margin="0,0,0,8">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+						<TextBlock Text="SOUND" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
+						<TextBlock x:Name="SoundCurrentText" Grid.Column="1" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
+					</Grid>
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="12,10" Margin="0,0,0,16">
+						<Grid>
+							<TextBlock Text="TrueHarmony" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+							<ComboBox x:Name="SoundPresetBox" HorizontalContentAlignment="Center" Width="120" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="SoundPreset_Changed"/>
+						</Grid>
 					</Border>
 					</StackPanel>
 					<!-- Fans -->

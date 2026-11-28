@@ -216,13 +216,63 @@ public static class DisplayManager
     public static string? GetAdapterName()
     {
         var (name, _) = PrimaryAdapter();
+        var cleaned = CleanAdapterName(name);
+        return cleaned.Length == 0 ? null : cleaned;
+    }
 
+    private static string CleanAdapterName(string? name) =>
         // The driver's own name carries trademark marks that only make the line longer.
-        return name?
+        name?
             .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
             .Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
             .Replace("  ", " ")
-            .Trim();
+            .Trim() ?? "";
+
+    /// <summary>
+    /// One display Windows is driving: its GDI adapter name, the mode it is in now, and the rates it
+    /// offers at that resolution. The name is what <c>ChangeDisplaySettingsExW</c> takes, so a rate
+    /// can be applied to this display alone.
+    /// </summary>
+    public sealed record DisplayTarget(
+        string GdiName,
+        string Adapter,
+        bool IsPrimary,
+        int Width,
+        int Height,
+        int CurrentHz,
+        IReadOnlyList<int> Rates);
+
+    /// <summary>Attached displays, primary first. Empty when the desktop cannot be enumerated.</summary>
+    public static IReadOnlyList<DisplayTarget> GetDisplays()
+    {
+        var displays = new List<DisplayTarget>();
+        try
+        {
+            for (uint i = 0; ; i++)
+            {
+                var device = new DISPLAY_DEVICEW { cb = Marshal.SizeOf<DISPLAY_DEVICEW>() };
+                if (!EnumDisplayDevicesW(null, i, ref device, 0)) break;
+                if ((device.StateFlags & DisplayDeviceAttachedToDesktop) == 0) continue;
+
+                var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+                if (!EnumDisplaySettingsW(device.DeviceName, ENUM_CURRENT_SETTINGS, ref current)) continue;
+
+                displays.Add(new DisplayTarget(
+                    device.DeviceName,
+                    CleanAdapterName(device.DeviceString),
+                    (device.StateFlags & DisplayDevicePrimaryDevice) != 0,
+                    current.dmPelsWidth,
+                    current.dmPelsHeight,
+                    current.dmDisplayFrequency,
+                    SupportedRates(device.DeviceName, current.dmPelsWidth, current.dmPelsHeight)));
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not enumerate the attached displays.", ex);
+        }
+
+        return displays.OrderByDescending(d => d.IsPrimary).ToList();
     }
 
     /// <summary>
@@ -370,13 +420,13 @@ public static class DisplayManager
         return maxHz;
     }
 
-    /// <summary>The refresh rate Windows is actually running right now.</summary>
-    public static int GetCurrentRefreshRate()
+    /// <summary>The refresh rate Windows is actually running right now on that display.</summary>
+    public static int GetCurrentRefreshRate(string? gdiDeviceName = null)
     {
         try
         {
             var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            return EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref mode)
+            return EnumDisplaySettingsW(gdiDeviceName, ENUM_CURRENT_SETTINGS, ref mode)
                 ? mode.dmDisplayFrequency
                 : 0;
         }
@@ -386,78 +436,98 @@ public static class DisplayManager
         }
     }
 
-    /// <summary>Distinct refresh rates the display advertises at its current resolution.</summary>
-    public static IReadOnlyList<int> GetSupportedRefreshRates()
+    /// <summary>Distinct refresh rates a display advertises at its current resolution.</summary>
+    public static IReadOnlyList<int> GetSupportedRefreshRates(string? gdiDeviceName = null)
     {
-        var rates = new SortedSet<int>();
         try
         {
             var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref current))
+            if (!EnumDisplaySettingsW(gdiDeviceName, ENUM_CURRENT_SETTINGS, ref current))
                 return Array.Empty<int>();
 
-            var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            for (var i = 0; EnumDisplaySettingsW(null, i, ref mode); i++)
-            {
-                if (mode.dmPelsWidth == current.dmPelsWidth &&
-                    mode.dmPelsHeight == current.dmPelsHeight &&
-                    mode.dmDisplayFrequency > 0)
-                {
-                    rates.Add(mode.dmDisplayFrequency);
-                }
-            }
+            return SupportedRates(gdiDeviceName, current.dmPelsWidth, current.dmPelsHeight);
         }
         catch (Exception ex)
         {
             Logger.Warn("Display: could not enumerate refresh rates.", ex);
+            return Array.Empty<int>();
+        }
+    }
+
+    private static IReadOnlyList<int> SupportedRates(string? gdiDeviceName, int width, int height)
+    {
+        var rates = new SortedSet<int>();
+        var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
+        for (var i = 0; i < 4096 && EnumDisplaySettingsW(gdiDeviceName, i, ref mode); i++)
+        {
+            if (mode.dmPelsWidth == width &&
+                mode.dmPelsHeight == height &&
+                mode.dmDisplayFrequency > 0)
+            {
+                rates.Add(mode.dmDisplayFrequency);
+            }
         }
 
         return rates.ToArray();
     }
 
-    /// <summary>The rate the user picked; 0 when nothing has been picked yet.</summary>
-    public static int GetChosenRefreshRate()
+    /// <summary>The rate the user picked for that display; 0 when nothing has been picked yet.</summary>
+    public static int GetChosenRefreshRate(string? gdiDeviceName = null)
     {
         Migrate();
-        return SettingsManager.Get("RefreshAcHz", 0);
+
+        var gdi = ResolveGdi(gdiDeviceName);
+        var saved = SettingsManager.Get(DisplayKey("RefreshAcHz", gdi), -1);
+
+        // A display this build has never saved inherits the single-display setting of an older
+        // install, so a refresh choice made before per-display targets keeps working.
+        return saved >= 0 ? saved : SettingsManager.Get("RefreshAcHz", 0);
     }
 
-    public static RefreshMode GetMode()
+    public static RefreshMode GetMode(string? gdiDeviceName = null)
     {
         Migrate();
-        return (RefreshMode)SettingsManager.Get("RefreshMode", (int)RefreshMode.Auto);
+
+        var gdi = ResolveGdi(gdiDeviceName);
+        var saved = SettingsManager.Get(DisplayKey("RefreshMode", gdi), -1);
+
+        return saved >= 0
+            ? (RefreshMode)saved
+            : (RefreshMode)SettingsManager.Get("RefreshMode", (int)RefreshMode.Auto);
     }
 
-    /// <summary>Picks a fixed rate: applied on AC and on battery, and remembered for Auto.</summary>
-    public static void SetFixedRate(int hz)
+    /// <summary>Picks a fixed rate for one display; applied on AC and on battery.</summary>
+    public static void SetFixedRate(int hz, string? gdiDeviceName = null)
     {
-        SettingsManager.Save("RefreshAcHz", hz);
-        SettingsManager.Save("RefreshMode", (int)RefreshMode.Fixed);
-        Apply(isAcPower: IsOnAc());
+        var gdi = ResolveGdi(gdiDeviceName);
+        SettingsManager.Save(DisplayKey("RefreshAcHz", gdi), hz);
+        SettingsManager.Save(DisplayKey("RefreshMode", gdi), (int)RefreshMode.Fixed);
+        ApplyDisplay(gdi, IsOnAc());
     }
 
-    /// <summary>Auto: the chosen rate on AC, 60 Hz on battery.</summary>
-    public static void SetAuto()
+    /// <summary>Auto for one display: the chosen rate on AC, 60 Hz on battery.</summary>
+    public static void SetAuto(string? gdiDeviceName = null)
     {
-        SettingsManager.Save("RefreshMode", (int)RefreshMode.Auto);
-        Apply(isAcPower: IsOnAc());
+        var gdi = ResolveGdi(gdiDeviceName);
+        SettingsManager.Save(DisplayKey("RefreshMode", gdi), (int)RefreshMode.Auto);
+        ApplyDisplay(gdi, IsOnAc());
     }
 
     /// <summary>
-    /// Applies the saved profile. Auto uses the chosen rate on AC and 60 Hz on battery; Fixed uses
-    /// the chosen rate on both.
+    /// Applies the saved profile to every display the user has configured. A display this build
+    /// has no choice for keeps Windows' own mode: attaching a monitor must not change it.
     /// </summary>
     public static void Apply(bool isAcPower)
     {
         Migrate();
 
-        var mode = GetMode();
-        var chosen = GetChosenRefreshRate();
-        var targetHz = mode == RefreshMode.Auto && !isAcPower
-            ? 60
-            : chosen > 0 ? chosen : GetPrimaryMaxRefreshRate();
+        foreach (var display in GetDisplays())
+        {
+            var configured = SettingsManager.Get(DisplayKey("RefreshMode", display.GdiName), -1) >= 0;
+            if (!configured && !display.IsPrimary) continue;
 
-        ApplyRefreshRate(targetHz, mode);
+            ApplyFor(display, isAcPower);
+        }
     }
 
     /// <summary>
@@ -483,45 +553,81 @@ public static class DisplayManager
         System.Windows.Forms.SystemInformation.PowerStatus.PowerLineStatus ==
         System.Windows.Forms.PowerLineStatus.Online;
 
-    private static void ApplyRefreshRate(int targetHz, RefreshMode mode)
+    /// <summary>The GDI name behind a null/empty hint, so the primary display is the default.</summary>
+    private static string ResolveGdi(string? gdiDeviceName)
+    {
+        if (!string.IsNullOrWhiteSpace(gdiDeviceName)) return gdiDeviceName;
+
+        var displays = GetDisplays();
+        return (displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault())?.GdiName ?? "";
+    }
+
+    /// <summary>
+    /// One registry value per display. The GDI name ("\\.\DISPLAY1") is reduced to letters and
+    /// digits so the value name stays a plain registry name.
+    /// </summary>
+    private static string DisplayKey(string baseKey, string gdiDeviceName) =>
+        $"{baseKey}_{string.Concat(gdiDeviceName.Where(char.IsLetterOrDigit))}";
+
+    private static void ApplyDisplay(string gdiDeviceName, bool isAcPower)
+    {
+        var display = GetDisplays().FirstOrDefault(d =>
+            string.Equals(d.GdiName, gdiDeviceName, StringComparison.OrdinalIgnoreCase));
+
+        if (display is null)
+        {
+            Logger.Warn($"Display: '{gdiDeviceName}' is no longer attached; nothing to apply.");
+            return;
+        }
+
+        ApplyFor(display, isAcPower);
+    }
+
+    private static void ApplyFor(DisplayTarget display, bool isAcPower)
+    {
+        var mode = GetMode(display.GdiName);
+        var chosen = GetChosenRefreshRate(display.GdiName);
+        var max = display.Rates.Count > 0 ? display.Rates.Max() : display.CurrentHz;
+
+        var targetHz = mode == RefreshMode.Auto && !isAcPower
+            ? 60
+            : chosen > 0 ? chosen : max;
+
+        ApplyRefreshRate(display, targetHz, mode);
+    }
+
+    private static void ApplyRefreshRate(DisplayTarget display, int targetHz, RefreshMode mode)
     {
         try
         {
-            var modeStruct = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (!EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref modeStruct))
-            {
-                Logger.Warn("Display: could not read the current display mode.");
-                return;
-            }
+            Logger.Info($"Display: {display.GdiName} {mode} -> target {targetHz} Hz " +
+                        $"(current {display.CurrentHz} Hz at {display.Width}x{display.Height}).");
 
-            Logger.Info($"Display: {mode} -> target {targetHz} Hz " +
-                        $"(current {modeStruct.dmDisplayFrequency} Hz at {modeStruct.dmPelsWidth}x{modeStruct.dmPelsHeight}).");
-
-            if (modeStruct.dmDisplayFrequency == targetHz)
+            if (display.CurrentHz == targetHz)
             {
-                Logger.Info($"Display: already at {targetHz} Hz; nothing to change.");
+                Logger.Info($"Display: {display.GdiName} already at {targetHz} Hz; nothing to change.");
                 return;
             }
 
             // Apply the driver's own entry for this resolution and refresh instead of mutating the
             // current mode. Asking for a mode the driver advertised cannot be "bad mode".
-            if (!TryFindMode(modeStruct.dmPelsWidth, modeStruct.dmPelsHeight, targetHz, out var target))
+            if (!TryFindMode(display.GdiName, display.Width, display.Height, targetHz, out var target))
             {
-                Logger.Warn($"Display: {targetHz} Hz is not supported at " +
-                            $"{modeStruct.dmPelsWidth}x{modeStruct.dmPelsHeight}; leaving the current mode unchanged.");
+                Logger.Warn($"Display: {targetHz} Hz is not supported on {display.GdiName} at " +
+                            $"{display.Width}x{display.Height}; leaving the current mode unchanged.");
                 return;
             }
 
-            var result = ChangeDisplaySettingsExW(null, ref target, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
+            var result = ChangeDisplaySettingsExW(display.GdiName, ref target, IntPtr.Zero, CDS_UPDATEREGISTRY, IntPtr.Zero);
             if (result != DispChangeSuccessful)
             {
-                Logger.Warn($"Display: ChangeDisplaySettingsExW returned {DescribeResult(result)} " +
-                            $"while switching to {targetHz} Hz.");
+                Logger.Warn($"Display: ChangeDisplaySettingsExW on {display.GdiName} returned " +
+                            $"{DescribeResult(result)} while switching to {targetHz} Hz.");
             }
         }
         catch (Exception ex)
         {
-            Logger.Warn("Display: refresh-profile change failed.", ex);
+            Logger.Warn($"Display: refresh-profile change failed on {display.GdiName}.", ex);
         }
     }
 
@@ -560,6 +666,18 @@ public static class DisplayManager
             result["bitsPerColorChannel"] = GetBitsPerColorChannel();
             result["supportedRefreshHz"] = supported.ToArray();
             result["maxRefreshHz"] = supported.Count > 0 ? supported.Max : current.dmDisplayFrequency;
+            result["displays"] = GetDisplays().Select(d => new Dictionary<string, object?>
+            {
+                ["gdiName"] = d.GdiName,
+                ["adapter"] = d.Adapter,
+                ["primary"] = d.IsPrimary,
+                ["width"] = d.Width,
+                ["height"] = d.Height,
+                ["refreshHz"] = d.CurrentHz,
+                ["mode"] = GetMode(d.GdiName).ToString(),
+                ["chosenHz"] = GetChosenRefreshRate(d.GdiName),
+                ["supportedRefreshHz"] = d.Rates
+            }).ToArray();
         }
         catch (Exception ex)
         {
@@ -573,34 +691,18 @@ public static class DisplayManager
     /// <summary>
     /// The driver's own mode entry for a resolution and refresh, so it can be applied whole.
     /// </summary>
-    private static bool TryFindMode(int width, int height, int targetHz, out DEVMODEW mode)
+    private static bool TryFindMode(string gdiDeviceName, int width, int height, int targetHz, out DEVMODEW mode)
     {
         mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
         var candidate = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
 
-        for (var i = 0; EnumDisplaySettingsW(null, i, ref candidate); i++)
+        for (var i = 0; EnumDisplaySettingsW(gdiDeviceName, i, ref candidate); i++)
         {
             if (candidate.dmPelsWidth == width &&
                 candidate.dmPelsHeight == height &&
                 candidate.dmDisplayFrequency == targetHz)
             {
                 mode = candidate;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsRefreshSupported(int width, int height, int targetHz)
-    {
-        var mode = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-        for (var i = 0; EnumDisplaySettingsW(null, i, ref mode); i++)
-        {
-            if (mode.dmPelsWidth == width &&
-                mode.dmPelsHeight == height &&
-                mode.dmDisplayFrequency == targetHz)
-            {
                 return true;
             }
         }

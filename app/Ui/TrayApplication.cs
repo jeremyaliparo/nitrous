@@ -20,6 +20,7 @@ public class TrayApplication : ApplicationContext
     private readonly NvidiaGpuManager _gpuManager = new();
     private bool? _wasOnAcPower;
     private int _powerEventId;
+    private int _displayEventId;
     private readonly SemaphoreSlim _powerGate = new(1, 1);
 
     private readonly CancellationTokenSource _engineCts = new();
@@ -174,6 +175,7 @@ public class TrayApplication : ApplicationContext
         RefreshTrayIcon();
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
         _ = Task.Run(() => UpdateManager.CheckForUpdatesAsync(true, ExitFromAnyThread));
 
@@ -499,6 +501,22 @@ public class TrayApplication : ApplicationContext
             if (_processWatcher is { IsRunning: true }) _processWatcher.Resync();
             else _ = EvaluateAppProfilesAsync("resume");
         }
+    }
+
+    /// <summary>
+    /// A monitor was attached, removed or re-arranged. Windows drops a display's refresh rate when
+    /// the topology changes, so re-assert the saved profile on the displays the user configured
+    /// once the compositor settles. The apply is idempotent, so the event our own change raises
+    /// resolves on the next pass without a loop.
+    /// </summary>
+    private async void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        var eventId = Interlocked.Increment(ref _displayEventId);
+        await Task.Delay(1200);
+        if (eventId != Volatile.Read(ref _displayEventId) || _shuttingDown) return;
+
+        var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        DisplayManager.Apply(isOnline);
     }
 
     private static PowerProfile GetBasePowerProfile(bool isOnline)
@@ -1820,6 +1838,7 @@ public class TrayApplication : ApplicationContext
         FirmwareEvents.Stop();
         _nitroHook.Dispose();
         SystemEvents.PowerModeChanged -= OnPowerStateChanged;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
 
         // Close the dashboard before restoring the CPU. The dashboard is a separate process
         // and could otherwise write its managed CPU values again after our restore. Never do

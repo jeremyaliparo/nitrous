@@ -115,6 +115,7 @@ public partial class NitrousDashboard : Window
         InitializeUsbCharging();
         InitializeLcdOverdrive();
         InitializeBootLogo();
+        InitializeTrueHarmony();
 
         _keepAwakeLoading = true;
         BtnKeepAwake.IsChecked = SettingsManager.Get("KeepAwake", 0) == 1;
@@ -153,8 +154,14 @@ public partial class NitrousDashboard : Window
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
         // A monitor was added, removed, or rearranged. Let the compositor settle, then make
-        // sure the saved position still has a reachable title bar.
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(EnsureWindowVisible));
+        // sure the saved position still has a reachable title bar and the monitor list matches
+        // what is attached now.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            EnsureWindowVisible();
+            if (WindowState != WindowState.Minimized && DisplaySection.Visibility == Visibility.Visible)
+                SyncRefreshControls();
+        }));
     }
 
     private void OnPowerStateChanged(object sender, PowerModeChangedEventArgs e)
@@ -2216,6 +2223,9 @@ public partial class NitrousDashboard : Window
 
         // A monitor may have been plugged in, unplugged or switched while the window was in the background.
         RefreshDisplaySummary();
+
+        // The DTS preset follows the audio jack, so the sound card may be showing another output now.
+        if (SoundSection.Visibility == Visibility.Visible) RefreshTrueHarmony();
     }
 
     /// <summary>
@@ -4670,27 +4680,64 @@ public partial class NitrousDashboard : Window
 
     private sealed record RefreshChoice(string Label, int? Hz);
 
+    private sealed record DisplayChoice(string Label, string GdiName);
+
     private bool _refreshControlsLoading;
     private bool _keepAwakeLoading;
 
     /// <summary>
-    /// Fills the dropdown with Auto and the rates the display advertises, and marks the saved
-    /// choice. The current rate is shown separately, so the dropdown says what was chosen and the
-    /// label says what is actually running.
+    /// Fills the monitor list - shown only when more than one display is attached - then the rate
+    /// dropdown with Auto and the rates that monitor advertises. The current rate is shown
+    /// separately, so the dropdown says what was chosen and the label says what is running.
     /// </summary>
     private void SyncRefreshControls()
     {
         _refreshControlsLoading = true;
 
+        var displays = DisplayManager.GetDisplays();
+        var choices = new List<DisplayChoice>();
+
+        for (var i = 0; i < displays.Count; i++)
+        {
+            var display = displays[i];
+            var label = $"{i + 1} · {display.Width}×{display.Height}";
+            if (display.IsPrimary) label += " · Primary";
+            choices.Add(new DisplayChoice(label, display.GdiName));
+        }
+
+        // Keep the monitor the user is looking at across a re-sync; fall back to the primary,
+        // which GetDisplays lists first.
+        var remembered = (DisplaySelectBox.SelectedItem as DisplayChoice)?.GdiName
+                         ?? SettingsManager.Get("RefreshDisplay", "");
+
+        DisplaySelectBox.ItemsSource = choices;
+        DisplaySelectBox.DisplayMemberPath = nameof(DisplayChoice.Label);
+
+        var selected = choices.FirstOrDefault(c =>
+                           string.Equals(c.GdiName, remembered, StringComparison.OrdinalIgnoreCase))
+                       ?? choices.FirstOrDefault();
+
+        DisplaySelectRow.Visibility = choices.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+        DisplaySelectBox.SelectedItem = selected;
+
+        PopulateRefreshChoices(selected?.GdiName);
+        RefreshDisplaySummary();
+
+        _refreshControlsLoading = false;
+    }
+
+    /// <summary>Auto and the rates one monitor advertises at its current resolution.</summary>
+    private void PopulateRefreshChoices(string? gdiDeviceName)
+    {
         var choices = new List<RefreshChoice> { new("Auto", null) };
-        foreach (var hz in DisplayManager.GetSupportedRefreshRates())
+        foreach (var hz in DisplayManager.GetSupportedRefreshRates(gdiDeviceName))
             choices.Add(new RefreshChoice($"{hz} Hz", hz));
 
         RefreshModeBox.ItemsSource = choices;
         RefreshModeBox.DisplayMemberPath = nameof(RefreshChoice.Label);
 
-        var mode = DisplayManager.GetMode();
-        var chosen = DisplayManager.GetChosenRefreshRate();
+        var mode = DisplayManager.GetMode(gdiDeviceName);
+        var chosen = DisplayManager.GetChosenRefreshRate(gdiDeviceName);
 
         var selected = choices[0];
         if (mode != RefreshMode.Auto)
@@ -4706,43 +4753,168 @@ public partial class NitrousDashboard : Window
         }
 
         RefreshModeBox.SelectedItem = selected;
+    }
 
-        var actual = DisplayManager.GetCurrentRefreshRate();
-        RefreshDisplaySummary();
-        _lastSyncedRefreshHz = actual;
+    private void DisplaySelect_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_refreshControlsLoading || DisplaySelectBox.SelectedItem is not DisplayChoice choice) return;
 
+        SettingsManager.Save("RefreshDisplay", choice.GdiName);
+
+        _refreshControlsLoading = true;
+        PopulateRefreshChoices(choice.GdiName);
         _refreshControlsLoading = false;
+
+        RefreshDisplaySummary();
     }
 
     private void RefreshMode_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_refreshControlsLoading || RefreshModeBox.SelectedItem is not RefreshChoice choice) return;
 
+        // The rate belongs to the monitor on screen, so the other display keeps its own.
+        var gdi = (DisplaySelectBox.SelectedItem as DisplayChoice)?.GdiName;
+
         if (choice.Hz is { } hz)
-            DisplayManager.SetFixedRate(hz);
+            DisplayManager.SetFixedRate(hz, gdi);
         else
-            DisplayManager.SetAuto();
+            DisplayManager.SetAuto(gdi);
 
         RefreshDisplaySummary();
     }
 
     /// <summary>
-    /// The panel's own label: adapter, the rate it is running at, and the signal depth Windows reports -
-    /// "AMD Radeon 860M @ 144 Hz · 10-bit". Parts the machine does not answer are left out rather than
-    /// guessed.
+    /// The selected monitor's own label: adapter, the rate it is running at, and - for the built-in
+    /// panel, the only path whose depth is read - the signal depth Windows reports:
+    /// "AMD Radeon 860M @ 144 Hz · 10-bit". Parts the machine does not answer are left out.
     /// </summary>
     private void RefreshDisplaySummary()
     {
-        var adapter = DisplayManager.GetAdapterName();
-        var hz = DisplayManager.GetCurrentRefreshRate();
-        var bits = DisplayManager.GetBitsPerColorChannel();
+        var gdi = (DisplaySelectBox.SelectedItem as DisplayChoice)?.GdiName;
+        var displays = DisplayManager.GetDisplays();
 
-        var text = adapter ?? string.Empty;
-        if (hz > 0) text = text.Length == 0 ? $"{hz} Hz" : $"{text} @ {hz} Hz";
-        if (bits > 0) text = text.Length == 0 ? $"{bits}-bit" : $"{text} · {bits}-bit";
+        var display = displays.FirstOrDefault(d =>
+                          string.Equals(d.GdiName, gdi, StringComparison.OrdinalIgnoreCase))
+                      ?? displays.FirstOrDefault();
+
+        if (display is null)
+        {
+            DisplayCurrentText.Text = string.Empty;
+            DisplayCurrentText.ToolTip = null;
+            return;
+        }
+
+        var bits = display.IsPrimary ? DisplayManager.GetBitsPerColorChannel() : 0;
+
+        var text = display.Adapter;
+        if (display.CurrentHz > 0)
+            text = text.Length == 0 ? $"{display.CurrentHz} Hz" : $"{text} @ {display.CurrentHz} Hz";
+        if (bits > 0)
+            text = text.Length == 0 ? $"{bits}-bit" : $"{text} · {bits}-bit";
 
         DisplayCurrentText.Text = text;
         DisplayCurrentText.ToolTip = text.Length > 0 ? text : null;
+
+        // The profile sync compares the primary rate, because that is what Windows reports for the
+        // default display; a secondary selection must not make that check fail every tick.
+        _lastSyncedRefreshHz = displays.FirstOrDefault(d => d.IsPrimary)?.CurrentHz ?? display.CurrentHz;
+    }
+
+    private sealed record SoundChoice(string Label, string Key);
+
+    private bool _soundLoading;
+    private DtsTrueHarmony.State? _soundState;
+
+    /// <summary>
+    /// Acer TrueHarmony, which is the DTS APO4 preset. The controller is COM and can take a moment,
+    /// so the first read runs off the UI thread; the card appears only when it answers with a real
+    /// endpoint and presets.
+    /// </summary>
+    private void InitializeTrueHarmony()
+    {
+        _ = Task.Run(() =>
+        {
+            var state = DtsTrueHarmony.Read();
+            if (state is null) return;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() => ApplySoundState(state, null)));
+            }
+            catch (InvalidOperationException) { }
+        });
+    }
+
+    /// <summary>The preset follows the audio jack, so re-read on activation and after a change.</summary>
+    private void RefreshTrueHarmony()
+    {
+        _ = Task.Run(() =>
+        {
+            var state = DtsTrueHarmony.Read();
+            if (state is null) return;
+
+            try
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    // A change in flight owns the dropdown; its read-back will land next.
+                    if (!_soundLoading) ApplySoundState(state, null);
+                }));
+            }
+            catch (InvalidOperationException) { }
+        });
+    }
+
+    private void ApplySoundState(DtsTrueHarmony.State state, string? message)
+    {
+        _soundState = state;
+
+        var choices = state.Bases
+            .Select(key => new SoundChoice(DtsTrueHarmony.LabelFor(key), key))
+            .ToList();
+
+        // DTS can report a mode the endpoint no longer lists (an older preset); show it rather
+        // than leaving the dropdown blank.
+        if (!choices.Any(c => string.Equals(c.Key, state.CurrentBase, StringComparison.OrdinalIgnoreCase)))
+            choices.Insert(0, new SoundChoice(DtsTrueHarmony.LabelFor(state.CurrentBase), state.CurrentBase));
+
+        _soundLoading = true;
+        SoundPresetBox.ItemsSource = choices;
+        SoundPresetBox.DisplayMemberPath = nameof(SoundChoice.Label);
+        SoundPresetBox.SelectedItem = choices.FirstOrDefault(c =>
+            string.Equals(c.Key, state.CurrentBase, StringComparison.OrdinalIgnoreCase));
+        _soundLoading = false;
+
+        SoundCurrentText.Text = message ?? DtsTrueHarmony.OutputLabel(state.OutputSuffix);
+        SoundCurrentText.ToolTip = $"{state.FriendlyName} · {state.OutputSuffix}";
+        SoundSection.Visibility = choices.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void SoundPreset_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_soundLoading || SoundPresetBox.SelectedItem is not SoundChoice choice) return;
+
+        _soundLoading = true;
+        try
+        {
+            var (applied, message) = await Task.Run(() => DtsTrueHarmony.Set(choice.Key));
+
+            if (applied is not null)
+            {
+                Logger.Info($"TrueHarmony: {message}");
+                ApplySoundState(applied, null);
+            }
+            else
+            {
+                Logger.Warn($"TrueHarmony: {message}");
+                // Put the dropdown back on what DTS is actually running.
+                if (_soundState is not null) ApplySoundState(_soundState, message);
+            }
+        }
+        finally
+        {
+            _soundLoading = false;
+        }
     }
 
     private async void LcdOverdrive_Toggled(object sender, RoutedEventArgs e)
