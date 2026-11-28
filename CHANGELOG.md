@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.5 - 2026-11-28
+
+### Appearance
+
+- **The power-profile toast now matches the keyboard flash.** Quiet is white, Balanced orange,
+  Performance crimson and Turbo violet. Each mode has a swatch in Theme > Overlay and tray, so the
+  toast and the "Mode colour" tray icon can use a custom colour; the keyboard flash itself stays
+  whatever the controller is fixed to. RESET returns all four to the firmware colours.
+- **Tray icon changes are immediate.** The dashboard signals the tray through a named event when the
+  icon style, a mode colour, the accent or the temperature unit changes. The ten-second poll stays
+  as a fallback for a tray that started before the event existed.
+- The README's Appearance section now covers the presets, card visibility, units, corners, compact
+  navigation, opacity and toast/tray choices.
+
 ## 0.17.0-test.4 - 2026-11-28
 
 ### Appearance
