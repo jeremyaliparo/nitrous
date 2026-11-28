@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.3 - 2026-11-28
+
+### Power
+
+- **Whisper Mode and the keyboard flash now agree across the tray and dashboard.** Each process
+  kept its own "last requested" and "last flashed" mode, so after the tray cycled to Quiet a click on
+  Performance in the dashboard skipped both the NVAPI release and the keyboard flash. The flash uses
+  the persisted `LastBlinkedMode`, and Whisper Mode re-checks the stored `WhisperActive` flag before
+  short-circuiting. The dashboard also only shows "Whisper Mode: On" while the active mode is Quiet,
+  so a stale request cannot follow a switch to Performance.
+
 ## 0.19.0-test.2 - 2026-11-28
 
 ### Appearance
