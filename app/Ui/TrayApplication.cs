@@ -42,6 +42,7 @@ public class TrayApplication : ApplicationContext
 
     private readonly GlobalHotkeyManager _hotkeys = new();
     private readonly EventWaitHandle _hotkeyChanged = HotkeyChangeSignal.CreateReceiver();
+    private readonly EventWaitHandle _appearanceChanged = AppearanceChangeSignal.CreateReceiver();
 
     /// <summary>The keep-awake value this tray has applied; the engine tick watches for a change.</summary>
     private bool _keepAwakeWanted;
@@ -242,7 +243,8 @@ public class TrayApplication : ApplicationContext
 
         if (string.Equals(style, "mode", StringComparison.Ordinal))
         {
-            icon = TrayIconRenderer.Create(profile.ToString()[..1], ProfileColor(profile), ink);
+            var fill = ModeColors.For(profile);
+            icon = TrayIconRenderer.Create(profile.ToString()[..1], fill, ModeColors.InkFor(fill));
             tooltip = $"Nitrous \u00b7 {profile}";
         }
         else if (string.Equals(style, "temperature", StringComparison.Ordinal))
@@ -263,15 +265,6 @@ public class TrayApplication : ApplicationContext
         previous?.Dispose();
         trayIcon.Text = tooltip.Length > 63 ? tooltip[..63] : tooltip;
     }
-
-    /// <summary>The OSD's mode colours, so the tray and the toast agree.</summary>
-    private static Color ProfileColor(PowerProfile profile) => profile switch
-    {
-        PowerProfile.Quiet => Color.FromArgb(52, 199, 89),
-        PowerProfile.Balanced => Color.FromArgb(10, 132, 255),
-        PowerProfile.Performance => Color.FromArgb(255, 159, 10),
-        _ => Color.FromArgb(255, 69, 58)
-    };
 
     private static Color AccentColor()
     {
@@ -753,14 +746,7 @@ public class TrayApplication : ApplicationContext
     {
         if (_shuttingDown) return;
 
-        var color = profile switch
-        {
-            PowerProfile.Quiet => Color.FromArgb(52, 199, 89),
-            PowerProfile.Balanced => Color.FromArgb(10, 132, 255),
-            PowerProfile.Performance => Color.FromArgb(255, 159, 10),
-            PowerProfile.Turbo => Color.FromArgb(255, 69, 58),
-            _ => Color.White
-        };
+        var color = ModeColors.For(profile);
 
         // The hardware awaits use ConfigureAwait(false), so this may run on a worker thread.
         // Marshal through the control whose handle was created on the UI thread; the OSD form
@@ -975,6 +961,24 @@ public class TrayApplication : ApplicationContext
                 {
                     if (WaitHandle.WaitAny(handles) != 0) break;
                     RunOnUi(ReloadHotkeys);
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (OperationCanceledException) { }
+        });
+
+        // Tray-visible appearance choices (icon style, colours, accent) wake the icon at once;
+        // the ten-second poll below remains the fallback if no signal arrives.
+        Task.Run(() =>
+        {
+            var handles = new WaitHandle[] { _appearanceChanged, _engineCts.Token.WaitHandle };
+
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    if (WaitHandle.WaitAny(handles) != 0) break;
+                    RunOnUi(RefreshTrayIcon);
                 }
             }
             catch (ObjectDisposedException) { }
@@ -1250,6 +1254,7 @@ public class TrayApplication : ApplicationContext
 
         SafeDispose(_hotkeys, "hotkey registration");
         SafeDispose(_hotkeyChanged, "hotkey change event");
+        SafeDispose(_appearanceChanged, "appearance change event");
         SafeDispose(_osd, "on-screen display");
         SafeDispose(_uiInvoker, "UI invoker");
         SafeDispose(_gpuManager, "GPU manager");

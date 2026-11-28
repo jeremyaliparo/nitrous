@@ -1734,7 +1734,7 @@
 								<TextBlock Text="OVERLAY AND TRAY" Style="{StaticResource SetupSectionLabelStyle}" Margin="0,14,0,6"/>
 								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
 									<StackPanel>
-										<TextBlock Text="The power-profile toast and the tray icon. The tray picks changes up within ten seconds." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,4"/>
+										<TextBlock Text="The power-profile toast and the tray icon. Changes reach the tray at once; a ten-second poll is the fallback." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,4"/>
 										<Grid Margin="0,6,0,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*"/>
@@ -1787,6 +1787,15 @@
 												<ComboBoxItem Content="CPU temperature"/>
 											</ComboBox>
 										</Grid>
+										<Grid Margin="0,12,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Toast and tray colours" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="The colour each mode shows in the power-profile toast and the tray icon. The keyboard flash itself is fixed by the controller."/>
+											<Button Grid.Column="1" x:Name="OsdColourResetButton" Content="RESET" Click="OsdColourReset_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,2" ToolTip="Return all four to the colours the firmware flashes."/>
+										</Grid>
+										<StackPanel x:Name="OsdColourRow" Orientation="Horizontal" Margin="0,6,0,0"/>
 									</StackPanel>
 								</Border>
 

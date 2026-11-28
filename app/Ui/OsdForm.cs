@@ -47,10 +47,6 @@ public sealed class OsdForm : Form
     private readonly Stopwatch _clock = new();
     private readonly Dictionary<CardKey, CardSurface> _cards = new();
     private readonly Dictionary<string, CardSurface> _statusCards = new();
-    private readonly Color _quiet = Color.FromArgb(52, 199, 89);
-    private readonly Color _balanced = Color.FromArgb(10, 132, 255);
-    private readonly Color _performance = Color.FromArgb(255, 159, 10);
-    private readonly Color _turbo = Color.FromArgb(255, 69, 58);
 
     private Bitmap? _logo;
     private CardSurface? _surface;
@@ -58,7 +54,6 @@ public sealed class OsdForm : Form
     private Point _baseLocation;
     private int _slide;
     private float _scale = 1f;
-    private Color _accent = Color.White;
     private TimeSpan _hold = DefaultHold;
     private Phase _phase = Phase.Idle;
     private TimeSpan _phaseStart;
@@ -74,7 +69,7 @@ public sealed class OsdForm : Form
         Out
     }
 
-    private readonly record struct CardKey(PowerProfile Profile, int Width, int Height);
+    private readonly record struct CardKey(PowerProfile Profile, int Width, int Height, int Accent);
 
     private readonly record struct OsdLayout(Screen Screen, int Dpi, Size Size, Point BaseLocation, int Slide);
 
@@ -128,7 +123,7 @@ public sealed class OsdForm : Form
 
             var layout = ComputeLayout();
             foreach (var profile in Enum.GetValues<PowerProfile>())
-                GetSurface(profile, layout);
+                GetSurface(profile, ModeColors.For(profile), layout);
         }
         catch (Exception ex)
         {
@@ -149,10 +144,8 @@ public sealed class OsdForm : Form
 
         try
         {
-            _accent = color;
-
             var layout = ComputeLayout();
-            ShowSurface(GetSurface(profile, layout), layout);
+            ShowSurface(GetSurface(profile, color, layout), layout);
         }
         catch (Exception ex)
         {
@@ -181,8 +174,6 @@ public sealed class OsdForm : Form
 
         try
         {
-            _accent = color;
-
             var layout = ComputeLayout();
             var key = $"{caption}|{title}|{color.ToArgb()}|{layout.Size.Width}x{layout.Size.Height}";
             if (!_statusCards.TryGetValue(key, out var surface))
@@ -452,19 +443,19 @@ public sealed class OsdForm : Form
         }
     }
 
-    private CardSurface GetSurface(PowerProfile profile, OsdLayout layout)
+    private CardSurface GetSurface(PowerProfile profile, Color accent, OsdLayout layout)
     {
-        var key = new CardKey(profile, layout.Size.Width, layout.Size.Height);
+        var key = new CardKey(profile, layout.Size.Width, layout.Size.Height, accent.ToArgb());
         if (_cards.TryGetValue(key, out var existing)) return existing;
 
         var surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
-            graphics => RenderCard(graphics, layout.Size, profile));
+            graphics => RenderCard(graphics, layout.Size, profile, accent));
         _cards[key] = surface;
         return surface;
     }
 
-    private void RenderCard(Graphics graphics, Size size, PowerProfile profile) =>
-        RenderCardCore(graphics, size, GetAccent(profile), "POWER PROFILE",
+    private void RenderCard(Graphics graphics, Size size, PowerProfile profile, Color accent) =>
+        RenderCardCore(graphics, size, accent, "POWER PROFILE",
             profile.ToString().ToUpperInvariant());
 
     private void RenderCardCore(Graphics graphics, Size size, Color accent, string caption, string title)
@@ -558,15 +549,6 @@ public sealed class OsdForm : Form
         using (var dot = new SolidBrush(accent))
             graphics.FillEllipse(dot, dotX - 4f * scale, dotY - 4f * scale, 8f * scale, 8f * scale);
     }
-
-    private Color GetAccent(PowerProfile profile) => profile switch
-    {
-        PowerProfile.Quiet => _quiet,
-        PowerProfile.Balanced => _balanced,
-        PowerProfile.Performance => _performance,
-        PowerProfile.Turbo => _turbo,
-        _ => _accent
-    };
 
     private static GraphicsPath RoundedRect(RectangleF bounds, float radius)
     {

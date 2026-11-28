@@ -68,6 +68,7 @@ public partial class NitrousDashboard : Window
         InitializeAppearanceCustomizations();
         BuildAppearanceSwatches();
         BuildFontChoices();
+        BuildOsdColourSwatches();
 
         // Shown unless it has been turned off; read before the binding exists so the toggle cannot
         // write a default back over the saved choice.
@@ -1104,6 +1105,7 @@ public partial class NitrousDashboard : Window
             : TemperatureDisplay.Celsius;
         SettingsManager.Save("TemperatureUnit", unit);
         (DataContext as DashboardViewModel)?.RefreshTemperatureLabels();
+        AppearanceChangeSignal.Notify();
     }
 
     private void OsdPosition_Changed(object sender, SelectionChangedEventArgs e)
@@ -1136,6 +1138,85 @@ public partial class NitrousDashboard : Window
 
         SettingsManager.Save("TrayIconStyle",
             UiPreferences.TrayIconStyles[Math.Min(TrayIconBox.SelectedIndex, UiPreferences.TrayIconStyles.Length - 1)]);
+        AppearanceChangeSignal.Notify();
+    }
+
+    /// <summary>
+    /// One swatch per mode for the toast and the tray icon. The initial tells them apart without a
+    /// label, and its ink flips for a light fill.
+    /// </summary>
+    private void BuildOsdColourSwatches()
+    {
+        OsdColourRow.Children.Clear();
+
+        foreach (var (profile, name, _) in ModeColors.Choices)
+        {
+            var colour = ModeColors.For(profile);
+            var ink = ModeColors.InkFor(colour);
+
+            var inner = new Border
+            {
+                Width = 22,
+                Height = 22,
+                Background = new SolidColorBrush(
+                    Color.FromRgb(colour.R, colour.G, colour.B)),
+                Child = new TextBlock
+                {
+                    Text = name[..1],
+                    FontSize = 9,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(ink.R, ink.G, ink.B)),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    VerticalAlignment = System.Windows.VerticalAlignment.Center
+                }
+            };
+            inner.SetResourceReference(Border.CornerRadiusProperty, "ChipCornerRadius");
+
+            var ring = new Border
+            {
+                Width = 28,
+                Height = 28,
+                BorderThickness = new Thickness(1),
+                BorderBrush = (Brush)FindResource("BorderSubtleBrush"),
+                Child = inner
+            };
+            ring.SetResourceReference(Border.CornerRadiusProperty, "SwatchRingCornerRadius");
+
+            var button = new Button
+            {
+                Style = (Style)FindResource("AccentSwatchStyle"),
+                Content = ring,
+                ToolTip = $"{name}: change the toast and tray colour",
+                Margin = new Thickness(0, 0, 4, 0)
+            };
+            button.Click += (_, _) => PickOsdColour(profile, name);
+            OsdColourRow.Children.Add(button);
+        }
+    }
+
+    private void PickOsdColour(Nitrous.Enums.PowerProfile profile, string name)
+    {
+        using var dialog = CreateColourDialog(ModeColors.For(profile));
+
+        try
+        {
+            if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+
+            ModeColors.Save(profile, dialog.Color);
+            BuildOsdColourSwatches();
+            AppearanceChangeSignal.Notify();
+        }
+        finally
+        {
+            RememberCustomColours(dialog);
+        }
+    }
+
+    private void OsdColourReset_Click(object sender, RoutedEventArgs e)
+    {
+        ModeColors.Reset();
+        BuildOsdColourSwatches();
+        AppearanceChangeSignal.Notify();
     }
 
     private void LoadUiScaleOptions(int saved)
@@ -1267,6 +1348,7 @@ public partial class NitrousDashboard : Window
     {
         ApplyNavColours();
         RefreshAppearanceSelection();
+        AppearanceChangeSignal.Notify();
 
         // The GPU APPLY button's colour is a captured string, not a resource, so it has to be
         // re-read explicitly when the accent changes.
