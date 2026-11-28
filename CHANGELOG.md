@@ -3,6 +3,13 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.2 - 2026-11-28
+
+### Diagnostics
+
+- The diagnostics bundle records the DTS endpoint, the preset it is running and the output it is on,
+  so a report shows whether TrueHarmony is present and what state it holds.
+
 ## 0.20.0-test.1 - 2026-11-28
 
 ### Sound
