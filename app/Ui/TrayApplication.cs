@@ -1120,6 +1120,17 @@ public class TrayApplication : ApplicationContext
     private void OnProcessChanged(string name, bool started)
     {
         if (!_appWatchNames.Contains(name)) return;
+
+        // A start event already added the name to the count and can be evaluated immediately; a
+        // WMI start can arrive before the process is visible to a fresh snapshot, so do not scan.
+        // A stop event is where packaged apps leave a stale count: reconcile against the live
+        // process table for this one event, then evaluate.
+        if (!started && _processWatcher is { IsRunning: true })
+        {
+            _processWatcher.Resync();
+            return;
+        }
+
         _ = EvaluateAppProfilesAsync(started ? "process started" : "process stopped");
     }
 
@@ -1144,6 +1155,9 @@ public class TrayApplication : ApplicationContext
         _appStartupSweepDone = true;
         SettingsManager.Delete(AppProfileStore.RestoreKey);
         SettingsManager.Delete(AppProfileStore.FanRestoreKey);
+        // A previous tray may have been killed while a rule was active; the new tray has no
+        // matching app, so the label must not keep claiming one.
+        SettingsManager.Save(AppProfileStore.ActiveKey, "");
     }
 
     private void ReloadHotkeys()
