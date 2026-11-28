@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.18.0-test.1 - 2026-11-28
+
+### Power
+
+- **App profiles.** Add an executable (browse for it or pick a running app) and choose the power mode
+  it should use. The tray watches once every three seconds, applies the rule when the app starts, and
+  restores the pre-rule mode when it closes. The first matching rule wins; the AC/DC base is never
+  overwritten; a manual mode change while a rule is active becomes the mode restored on exit. Rules
+  are stored as one JSON value, and an empty list costs no process scans.
+
 ## 0.17.0 - 2026-11-28
 
 ### Appearance
