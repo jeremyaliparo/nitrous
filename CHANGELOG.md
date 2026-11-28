@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.18.0-test.2 - 2026-11-28
+
+### Power
+
+- **Per-app fan modes.** Each rule can leave the fans alone (the default) or ask for Auto, Max or
+  Custom while the app runs. The pre-rule fan mode is restored on exit, the AC/DC fan slot is not
+  overwritten, and a manual fan change during a rule wins for the rest of that session. Custom uses
+  the saved custom speeds, or the fan curve when curve mode is on.
+
 ## 0.18.0-test.1 - 2026-11-28
 
 ### Power
