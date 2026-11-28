@@ -3,6 +3,27 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.4 - 2026-11-28
+
+### Appearance
+
+- **Theme presets.** Nitrous, Ice, Ember and Mono set the accent, background and sections together.
+  Editing any of the three switches the picker to Custom, so the presets never claim a look they are
+  not showing.
+- **Dashboard cards on or off.** The temperature graph, Power modes, Display and Fans can each be
+  hidden from Theme. A hidden card still works; only its place on the page is removed.
+- **Celsius or Fahrenheit.** Every reading follows the choice: the two telemetry cards, the chart
+  axes and history ranges, the hover readout, the GPU thermal limit and its hint, and the fan curve
+  editor's axis and waypoint readout. Values are still read, stored and written in Celsius.
+- **Corners: Rounded, Soft or Square.** Replaces the binary toggle. Soft halves every radius;
+  Square removes them. The fan curve editor follows, including its own window.
+- **Compact navigation.** Hides the four labels in the bottom bar and shortens it from 54 to 42 px.
+- **Window opacity.** 92-100%, so the frame can sit a little lighter over bright content.
+- **Overlay and tray choices.** The power-profile toast can sit at the bottom centre (default), top
+  centre, bottom left or bottom right; it can last 1-4 seconds and scale 80-120%. The tray icon can
+  be the app logo, the active mode's initial in its colour, or the CPU temperature. The tray picks
+  changes up within ten seconds; only the temperature style reads the sensor, once per refresh.
+
 ## 0.17.0-test.3 - 2026-11-28
 
 ### Appearance
