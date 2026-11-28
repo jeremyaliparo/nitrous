@@ -45,7 +45,10 @@ internal static class DtsTrueHarmony
         string CurrentBase,
         string OutputSuffix,
         IReadOnlyList<string> Bases,
-        bool Automatic);
+        bool Automatic,
+        string RegistryPath,
+        bool ApoEnabled,
+        bool AutoContentModeEnabled);
 
     private static bool _loggedUnavailable;
 
@@ -109,9 +112,13 @@ internal static class DtsTrueHarmony
 
         result["available"] = true;
         result["endpoint"] = state.FriendlyName;
+        result["endpointGuid"] = EndpointGuid(state.RegistryPath);
         result["currentPreset"] = state.CurrentBase;
         result["automatic"] = state.Automatic;
         result["output"] = state.OutputSuffix;
+        result["apoEnabled"] = state.ApoEnabled;
+        result["autoContentModeEnabled"] = state.AutoContentModeEnabled;
+        result["enhancementsDisabled"] = EnhancementsDisabled(state.RegistryPath);
         result["presets"] = state.Bases.ToArray();
         return result;
     }
@@ -296,14 +303,19 @@ internal static class DtsTrueHarmony
     private static State? ReadEndpoint(IDTSEndpointInfo endpoint)
     {
         endpoint.FriendlyName(out var friendly);
+        endpoint.RegistryPath(out var registryPath);
         if (endpoint.GetMode(out var current) != 0 || current is null) return null;
 
         string? currentName = null;
         string? controlValue = null;
+        var apoEnabled = false;
+        var autoContentMode = false;
         try
         {
             current.Name(out currentName);
             controlValue = ReadOperatingModeControl(current);
+            apoEnabled = current.GetApoEnable(out var apo) == 0 && apo != 0;
+            autoContentMode = current.GetAutoContentModeEnable(out var auto) == 0 && auto != 0;
         }
         finally
         {
@@ -358,7 +370,39 @@ internal static class DtsTrueHarmony
             .Select(p => p.Key)
             .ToList();
 
-        return new State(friendly, currentBase, suffix, ordered, automatic);
+        return new State(friendly, currentBase, suffix, ordered, automatic,
+            registryPath ?? "", apoEnabled, autoContentMode);
+    }
+
+    /// <summary>The endpoint GUID the controller's registry path carries, e.g. "{096836A5-...}".</summary>
+    private static string? EndpointGuid(string? registryPath)
+    {
+        if (string.IsNullOrWhiteSpace(registryPath)) return null;
+        var open = registryPath.LastIndexOf('{');
+        return open >= 0 ? registryPath[open..].Trim() : null;
+    }
+
+    /// <summary>
+    /// Windows' own "disable audio enhancements" flag for the endpoint. When it is set, the DTS APO
+    /// is not in the processing chain: the controller still accepts a mode, but nothing is heard.
+    /// </summary>
+    private static bool? EnhancementsDisabled(string? registryPath)
+    {
+        var guid = EndpointGuid(registryPath);
+        if (guid is null) return null;
+
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(
+                $@"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guid}\Properties");
+
+            if (key is null) return null;
+            return key.GetValue("{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5") is int value && value != 0;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -540,6 +584,11 @@ internal static class DtsTrueHarmony
     {
         [PreserveSig] int DTSAPOControlEnumerator(int type, out IntPtr controlEnumerator);
         [PreserveSig] int Name([MarshalAs(UnmanagedType.BStr)] out string name);
+        [PreserveSig] int RestoreDefaults();
+        [PreserveSig] int GetApoEnable(out int value);
+        [PreserveSig] int SetApoEnable(int value);
+        [PreserveSig] int GetAutoContentModeEnable(out int value);
+        [PreserveSig] int SetAutoContentModeEnable(int value);
     }
 
     [ComImport, Guid("00b60358-499c-489d-881c-0d10da751c8f"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
