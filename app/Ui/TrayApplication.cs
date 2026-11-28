@@ -62,6 +62,7 @@ public class TrayApplication : ApplicationContext
 
     private readonly Icon _appIcon;
     private Icon? _generatedIcon;
+    private string _trayIconKey = "";
 
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
@@ -238,31 +239,51 @@ public class TrayApplication : ApplicationContext
             SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online);
 
         var icon = _appIcon;
+        var key = "logo";
         var tooltip = "Nitrous";
         var ink = Color.FromArgb(18, 18, 20);
 
         if (string.Equals(style, "mode", StringComparison.Ordinal))
         {
             var fill = ModeColors.For(profile);
-            icon = TrayIconRenderer.Create(profile.ToString()[..1], fill, ModeColors.InkFor(fill));
+            key = $"mode|{profile}|{fill.ToArgb()}";
             tooltip = $"Nitrous \u00b7 {profile}";
+            if (!string.Equals(key, _trayIconKey, StringComparison.Ordinal))
+                icon = TrayIconRenderer.Create(profile.ToString()[..1], fill, ModeColors.InkFor(fill));
         }
         else if (string.Equals(style, "temperature", StringComparison.Ordinal))
         {
             var temperature = AcerWmiManager.GetSystemTelemetry().CpuTemp;
             if (temperature > 0)
             {
-                icon = TrayIconRenderer.Create(
-                    $"{TemperatureDisplay.Convert(temperature)}", AccentColor(), ink);
+                var accent = AccentColor();
+                key = $"temperature|{TemperatureDisplay.Convert(temperature)}|{accent.ToArgb()}";
                 tooltip = $"Nitrous \u00b7 CPU {TemperatureDisplay.Short(temperature)}";
+                if (!string.Equals(key, _trayIconKey, StringComparison.Ordinal))
+                {
+                    icon = TrayIconRenderer.Create(
+                        $"{TemperatureDisplay.Convert(temperature)}", accent, ink);
+                }
+            }
+            else
+            {
+                key = "temperature|none";
             }
         }
 
-        // Assign before disposing: the old icon is still on screen until the new one is set.
-        var previous = _generatedIcon;
-        _generatedIcon = ReferenceEquals(icon, _appIcon) ? null : icon;
-        trayIcon.Icon = icon;
-        previous?.Dispose();
+        // Rebuild only when the drawn content changes: at a steady temperature this skips the
+        // bitmap, PNG and icon allocation on every refresh.
+        if (!string.Equals(key, _trayIconKey, StringComparison.Ordinal))
+        {
+            _trayIconKey = key;
+
+            // Assign before disposing: the old icon is still on screen until the new one is set.
+            var previous = _generatedIcon;
+            _generatedIcon = ReferenceEquals(icon, _appIcon) ? null : icon;
+            trayIcon.Icon = icon;
+            previous?.Dispose();
+        }
+
         trayIcon.Text = tooltip.Length > 63 ? tooltip[..63] : tooltip;
     }
 
