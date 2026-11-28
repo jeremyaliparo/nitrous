@@ -11,6 +11,19 @@ another round trip with a tester.
 Write down what was measured, on which machine, and how. Cite the file and line when a finding
 explains a specific check.
 
+## Branching
+
+Every release line has its own branch, cut from `master` and merged back after the release is
+tagged. `master` always reflects the latest stable release; work for the next version never lands
+on it directly.
+
+```
+0.18.0    the next release line
+master    0.17.0, the last stable
+```
+
+Test builds and the final release are tagged from the release branch.
+
 ## Build and publish
 
 Test builds go to `bin\<release>\Nitrous-<version>.exe` — the folder is the release line, the file name is
