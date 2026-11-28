@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.5 - 2026-11-29
+
+### Sound
+
+- **Automatic.** The TrueHarmony list now offers Automatic, the way DTS:X Ultra does. It is not a
+  separate mode object: the APO exposes an `APO4-Operating Mode` string control that accepts
+  `APO4-Automatic`, and that is the value the DTS:X app writes. Nitrous reads that control on every
+  refresh, so the card shows Automatic while it is active, and selecting a preset writes the control
+  back so Automatic turns off. Verified on the AN16S-61 with the value read back in both directions.
+
 ## 0.20.0-test.4 - 2026-11-29
 
 ### Display
