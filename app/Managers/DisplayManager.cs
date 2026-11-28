@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 using Nitrous.Diagnostics;
 using Nitrous.Enums;
 
@@ -70,6 +71,7 @@ public static class DisplayManager
     private const uint DisplayDevicePrimaryDevice = 0x00000004;
     private const uint QdcOnlyActivePaths = 2;
     private const int DeviceInfoGetSourceName = 1;
+    private const int DeviceInfoGetTargetName = 2;
     private const int DeviceInfoGetAdvancedColorInfo = 9;
     private const uint OutputTechnologyInternal = 0x80000000;
     private const int ErrorInsufficientBuffer = 122;
@@ -164,6 +166,23 @@ public static class DisplayManager
         public uint BitsPerColorChannel;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct TargetDeviceName
+    {
+        public DeviceInfoHeader Header;
+        public uint Flags;
+        public uint OutputTechnology;
+        public ushort EdidManufactureId;
+        public ushort EdidProductCodeId;
+        public uint ConnectorInstance;
+
+        /// <summary>The monitor's own name from its EDID, e.g. "27G64" or "NE160QDM-NYL".</summary>
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string MonitorFriendlyDeviceName;
+
+        /// <summary>The monitor's device interface path, which leads to its EDID in the registry.</summary>
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string MonitorDevicePath;
+    }
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool EnumDisplayDevicesW(string? lpDevice, uint iDevNum, ref DISPLAY_DEVICEW lpDisplayDevice, uint dwFlags);
 
@@ -179,6 +198,9 @@ public static class DisplayManager
 
     [DllImport("user32.dll", EntryPoint = "DisplayConfigGetDeviceInfo", CharSet = CharSet.Unicode)]
     private static extern int DisplayConfigGetSourceName(ref SourceDeviceName requestPacket);
+
+    [DllImport("user32.dll", EntryPoint = "DisplayConfigGetDeviceInfo", CharSet = CharSet.Unicode)]
+    private static extern int DisplayConfigGetTargetName(ref TargetDeviceName requestPacket);
 
     /// <summary>
     /// The attached adapter's friendly name and GDI name, primary display first. The two travel together
@@ -229,13 +251,14 @@ public static class DisplayManager
             .Trim() ?? "";
 
     /// <summary>
-    /// One display Windows is driving: its GDI adapter name, the mode it is in now, and the rates it
-    /// offers at that resolution. The name is what <c>ChangeDisplaySettingsExW</c> takes, so a rate
-    /// can be applied to this display alone.
+    /// One display Windows is driving: its GDI adapter name, the monitor's own EDID name, the mode it
+    /// is in now, and the rates it offers at that resolution. The GDI name is what
+    /// <c>ChangeDisplaySettingsExW</c> takes, so a rate can be applied to this display alone.
     /// </summary>
     public sealed record DisplayTarget(
         string GdiName,
         string Adapter,
+        string Monitor,
         bool IsPrimary,
         int Width,
         int Height,
@@ -248,6 +271,8 @@ public static class DisplayManager
         var displays = new List<DisplayTarget>();
         try
         {
+            var monitors = ActivePathMonitors();
+
             for (uint i = 0; ; i++)
             {
                 var device = new DISPLAY_DEVICEW { cb = Marshal.SizeOf<DISPLAY_DEVICEW>() };
@@ -257,14 +282,21 @@ public static class DisplayManager
                 var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
                 if (!EnumDisplaySettingsW(device.DeviceName, ENUM_CURRENT_SETTINGS, ref current)) continue;
 
+                monitors.TryGetValue(device.DeviceName, out var monitor);
+                var driverRates = SupportedRates(device.DeviceName, current.dmPelsWidth, current.dmPelsHeight);
+                var declared = monitor?.Edid is { } edid
+                    ? DeclaredTimings(edid)
+                    : null;
+
                 displays.Add(new DisplayTarget(
                     device.DeviceName,
                     CleanAdapterName(device.DeviceString),
+                    monitor?.Name ?? "",
                     (device.StateFlags & DisplayDevicePrimaryDevice) != 0,
                     current.dmPelsWidth,
                     current.dmPelsHeight,
                     current.dmDisplayFrequency,
-                    SupportedRates(device.DeviceName, current.dmPelsWidth, current.dmPelsHeight)));
+                    FilterRates(driverRates, declared, current.dmDisplayFrequency)));
             }
         }
         catch (Exception ex)
@@ -273,6 +305,269 @@ public static class DisplayManager
         }
 
         return displays.OrderByDescending(d => d.IsPrimary).ToList();
+    }
+
+    // --- the monitor behind each path: its EDID name and its declared timings ----------------------
+
+    private sealed record PathMonitor(string Name, byte[]? Edid);
+
+    private static readonly Dictionary<string, byte[]?> EdidCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object EdidGate = new();
+
+    /// <summary>
+    /// The monitor name and EDID for every active path, keyed by the GDI adapter name. Windows
+    /// reads both from the monitor's device path; the EDID is what decides which refresh rates the
+    /// monitor actually declares, so the list can match the OS instead of the driver's full set.
+    /// </summary>
+    private static Dictionary<string, PathMonitor> ActivePathMonitors()
+    {
+        var monitors = new Dictionary<string, PathMonitor>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                if (GetDisplayConfigBufferSizes(QdcOnlyActivePaths, out var pathCount, out var modeCount) != 0 ||
+                    pathCount == 0)
+                {
+                    return monitors;
+                }
+
+                var paths = new PathInfo[pathCount];
+                var modes = modeCount > 0 ? Marshal.AllocHGlobal((int)modeCount * ModeInfoSize) : IntPtr.Zero;
+                try
+                {
+                    var result = QueryDisplayConfig(
+                        QdcOnlyActivePaths, ref pathCount, paths, ref modeCount, modes, IntPtr.Zero);
+
+                    if (result == ErrorInsufficientBuffer) continue;
+                    if (result != 0) return monitors;
+
+                    for (var i = 0; i < pathCount && i < paths.Length; i++)
+                    {
+                        if (paths[i].TargetInfo.TargetAvailable == 0) continue;
+
+                        var gdi = ReadSourceName(paths[i].SourceInfo);
+                        if (string.IsNullOrEmpty(gdi)) continue;
+
+                        var (name, devicePath) = ReadTargetName(paths[i].TargetInfo);
+                        monitors[gdi] = new PathMonitor(name, ReadEdid(devicePath));
+                    }
+
+                    return monitors;
+                }
+                finally
+                {
+                    if (modes != IntPtr.Zero) Marshal.FreeHGlobal(modes);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not read the monitor names.", ex);
+        }
+
+        return monitors;
+    }
+
+    private static (string Name, string DevicePath) ReadTargetName(PathTargetInfo target)
+    {
+        var request = new TargetDeviceName
+        {
+            Header = new DeviceInfoHeader
+            {
+                Type = DeviceInfoGetTargetName,
+                Size = (uint)Marshal.SizeOf<TargetDeviceName>(),
+                AdapterId = target.AdapterId,
+                Id = target.Id
+            }
+        };
+
+        return DisplayConfigGetTargetName(ref request) == 0
+            ? (request.MonitorFriendlyDeviceName ?? "", request.MonitorDevicePath ?? "")
+            : ("", "");
+    }
+
+    /// <summary>
+    /// A monitor's EDID, from its device interface path
+    /// (<c>\\?\DISPLAY#BOE0CED#5&amp;...&amp;UID512#{interface}</c>). The bytes never change for a
+    /// given path, so they are cached.
+    /// </summary>
+    private static byte[]? ReadEdid(string devicePath)
+    {
+        if (string.IsNullOrWhiteSpace(devicePath)) return null;
+
+        lock (EdidGate)
+        {
+            if (EdidCache.TryGetValue(devicePath, out var cached)) return cached;
+        }
+
+        byte[]? edid = null;
+        try
+        {
+            var path = devicePath;
+            var lastHash = path.LastIndexOf('#');
+            if (lastHash > 0) path = path[..lastHash];
+
+            path = path.Replace('#', '\\');
+            if (path.StartsWith(@"\\?\", StringComparison.Ordinal)) path = path[4..];
+
+            using var key = Registry.LocalMachine.OpenSubKey(
+                @"SYSTEM\CurrentControlSet\Enum\" + path + @"\Device Parameters");
+            edid = key?.GetValue("EDID") as byte[];
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not read the monitor EDID.", ex);
+        }
+
+        lock (EdidGate)
+        {
+            EdidCache[devicePath] = edid;
+        }
+
+        return edid;
+    }
+
+    /// <summary>
+    /// The refresh rates a monitor declares in its EDID: base-block detailed timings, CTA detailed
+    /// timings and the DisplayID Type I/Type VII timings laptop panels use for their fast modes.
+    /// </summary>
+    private static IReadOnlyList<(int Width, int Height, double Hz)> DeclaredTimings(byte[] edid)
+    {
+        var timings = new List<(int Width, int Height, double Hz)>();
+
+        try
+        {
+            if (edid.Length < 128 || edid[0] != 0x00 || edid[1] != 0xFF || edid[6] != 0xFF || edid[7] != 0x00)
+                return timings;
+
+            for (var i = 0; i < 4; i++)
+                AddDetailedTiming(edid, 54 + (i * 18), timings);
+
+            for (var block = 1; block * 128 < edid.Length; block++)
+            {
+                var offset = block * 128;
+                if (offset + 128 > edid.Length) break;
+
+                if (edid[offset] == 0x02)
+                {
+                    // CTA-861: byte 2 is the offset to the detailed timings.
+                    var start = offset + edid[offset + 2];
+                    for (var p = start; p + 18 <= offset + 127; p += 18)
+                        if (!AddDetailedTiming(edid, p, timings)) break;
+                }
+                else if (edid[offset] == 0x70)
+                {
+                    AddDisplayIdTimings(edid, offset, timings);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Display: could not parse the monitor EDID.", ex);
+        }
+
+        return timings;
+    }
+
+    /// <summary>Reads one 18-byte EDID detailed timing; false when the descriptor is not a timing.</summary>
+    private static bool AddDetailedTiming(byte[] edid, int p, List<(int Width, int Height, double Hz)> timings)
+    {
+        if (p + 18 > edid.Length) return false;
+
+        var clock = edid[p] | (edid[p + 1] << 8);
+        if (clock == 0) return false;
+
+        var width = edid[p + 2] | ((edid[p + 4] & 0xF0) << 4);
+        var height = edid[p + 5] | ((edid[p + 7] & 0xF0) << 4);
+        var hTotal = width + (edid[p + 3] | ((edid[p + 4] & 0x0F) << 8));
+        var vTotal = height + (edid[p + 6] | ((edid[p + 7] & 0x0F) << 8));
+
+        if (hTotal <= 0 || vTotal <= 0) return false;
+
+        var interlaced = (edid[p + 17] & 0x80) != 0;
+        var hz = clock * 10000.0 / (hTotal * (double)vTotal) * (interlaced ? 2 : 1);
+        timings.Add((width, height, hz));
+        return true;
+    }
+
+    /// <summary>
+    /// DisplayID data blocks (EDID extension tag 0x70). Version 1.x declares Type I timings under
+    /// tag 0x03 in 10 kHz units; version 2.0 declares Type VII timings under tag 0x22 in 1 kHz.
+    /// </summary>
+    private static void AddDisplayIdTimings(byte[] edid, int offset, List<(int Width, int Height, double Hz)> timings)
+    {
+        var version = edid[offset + 1];
+        var length = Math.Min((int)edid[offset + 2], 121);
+        var end = offset + 5 + length;
+
+        for (var p = offset + 5; p + 3 <= end;)
+        {
+            var tag = edid[p];
+            var size = edid[p + 2];
+            if (tag == 0 && size == 0) break;
+            if (p + 3 + size > end) break;
+
+            var type1 = version < 0x20 && tag == 0x03;
+            var type7 = version >= 0x20 && tag == 0x22;
+
+            if (type1 || type7)
+            {
+                for (var t = 0; t + 20 <= size; t += 20)
+                    AddDisplayIdTiming(edid, p + 3 + t, type7, timings);
+            }
+
+            p += 3 + size;
+        }
+    }
+
+    private static void AddDisplayIdTiming(byte[] edid, int p, bool type7,
+        List<(int Width, int Height, double Hz)> timings)
+    {
+        if (p + 20 > edid.Length) return;
+
+        var clockKhz = (type7 ? 1 : 10) * (1 + (edid[p] + (edid[p + 1] << 8) + (edid[p + 2] << 16)));
+        var width = 1 + (edid[p + 4] | (edid[p + 5] << 8));
+        var hTotal = width + 1 + (edid[p + 6] | (edid[p + 7] << 8));
+        var height = 1 + (edid[p + 12] | (edid[p + 13] << 8));
+        var vTotal = height + 1 + (edid[p + 14] | (edid[p + 15] << 8));
+
+        if (hTotal <= 0 || vTotal <= 0 || clockKhz <= 0) return;
+
+        var interlaced = (edid[p + 3] & 0x10) != 0;
+        var hz = clockKhz * 1000.0 / (hTotal * (double)vTotal) * (interlaced ? 2 : 1);
+        timings.Add((width, height, hz));
+    }
+
+    /// <summary>
+    /// Keeps the driver rates the monitor's EDID declares at this resolution, plus the rate it is
+    /// running now, so the list matches Windows Settings instead of offering every mode the driver
+    /// can synthesize. A resolution the EDID does not describe keeps the full driver list, because
+    /// there is nothing to filter against and the scaled modes are legitimate there.
+    /// </summary>
+    private static IReadOnlyList<int> FilterRates(
+        IReadOnlyList<int> driverRates,
+        IReadOnlyList<(int Width, int Height, double Hz)>? declared,
+        int currentHz)
+    {
+        if (declared is null || declared.Count == 0 || driverRates.Count < 2)
+            return driverRates;
+
+        var matches = new List<int>();
+        foreach (var hz in driverRates)
+        {
+            if (declared.Any(t => Math.Abs(t.Hz - hz) <= 0.75))
+                matches.Add(hz);
+        }
+
+        // One declared rate is a scaled/non-native resolution, not the monitor's discrete mode set.
+        if (matches.Count < 2) return driverRates;
+
+        if (currentHz > 0 && !matches.Contains(currentHz))
+            matches.Add(currentHz);
+
+        return matches.OrderBy(hz => hz).ToArray();
     }
 
     /// <summary>
@@ -366,7 +661,10 @@ public static class DisplayManager
     }
 
     /// <summary>Whether a display path's source is the adapter with this GDI name.</summary>
-    private static bool SourceMatches(PathSourceInfo source, string gdiName)
+    private static bool SourceMatches(PathSourceInfo source, string gdiName) =>
+        string.Equals(ReadSourceName(source), gdiName, StringComparison.OrdinalIgnoreCase);
+
+    private static string? ReadSourceName(PathSourceInfo source)
     {
         try
         {
@@ -381,12 +679,11 @@ public static class DisplayManager
                 }
             };
 
-            return DisplayConfigGetSourceName(ref request) == 0 &&
-                   string.Equals(request.ViewGdiDeviceName, gdiName, StringComparison.OrdinalIgnoreCase);
+            return DisplayConfigGetSourceName(ref request) == 0 ? request.ViewGdiDeviceName : null;
         }
         catch
         {
-            return false;
+            return null;
         }
     }
 
@@ -436,22 +733,15 @@ public static class DisplayManager
         }
     }
 
-    /// <summary>Distinct refresh rates a display advertises at its current resolution.</summary>
+    /// <summary>Distinct refresh rates a display offers at its current resolution.</summary>
     public static IReadOnlyList<int> GetSupportedRefreshRates(string? gdiDeviceName = null)
     {
-        try
-        {
-            var current = new DEVMODEW { dmSize = (short)Marshal.SizeOf<DEVMODEW>() };
-            if (!EnumDisplaySettingsW(gdiDeviceName, ENUM_CURRENT_SETTINGS, ref current))
-                return Array.Empty<int>();
+        var displays = GetDisplays();
+        var display = displays.FirstOrDefault(d =>
+                          string.Equals(d.GdiName, gdiDeviceName, StringComparison.OrdinalIgnoreCase))
+                      ?? displays.FirstOrDefault();
 
-            return SupportedRates(gdiDeviceName, current.dmPelsWidth, current.dmPelsHeight);
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn("Display: could not enumerate refresh rates.", ex);
-            return Array.Empty<int>();
-        }
+        return display?.Rates ?? Array.Empty<int>();
     }
 
     private static IReadOnlyList<int> SupportedRates(string? gdiDeviceName, int width, int height)
@@ -558,8 +848,8 @@ public static class DisplayManager
     {
         if (!string.IsNullOrWhiteSpace(gdiDeviceName)) return gdiDeviceName;
 
-        var displays = GetDisplays();
-        return (displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault())?.GdiName ?? "";
+        var (_, gdi) = PrimaryAdapter();
+        return gdi ?? "";
     }
 
     /// <summary>
@@ -655,6 +945,10 @@ public static class DisplayManager
                 }
             }
 
+            var displays = GetDisplays();
+            var primary = displays.FirstOrDefault(d => d.IsPrimary) ?? displays.FirstOrDefault();
+            var offered = primary?.Rates ?? supported.ToArray();
+
             result["current"] = new Dictionary<string, object?>
             {
                 ["width"] = current.dmPelsWidth,
@@ -663,13 +957,16 @@ public static class DisplayManager
                 ["bitsPerPixel"] = current.dmBitsPerPel
             };
             result["adapter"] = GetAdapterName();
+            result["monitor"] = primary?.Monitor;
             result["bitsPerColorChannel"] = GetBitsPerColorChannel();
-            result["supportedRefreshHz"] = supported.ToArray();
-            result["maxRefreshHz"] = supported.Count > 0 ? supported.Max : current.dmDisplayFrequency;
-            result["displays"] = GetDisplays().Select(d => new Dictionary<string, object?>
+            result["supportedRefreshHz"] = offered;
+            result["driverRefreshHz"] = supported.ToArray();
+            result["maxRefreshHz"] = offered.Count > 0 ? offered.Max() : current.dmDisplayFrequency;
+            result["displays"] = displays.Select(d => new Dictionary<string, object?>
             {
                 ["gdiName"] = d.GdiName,
                 ["adapter"] = d.Adapter,
+                ["monitor"] = d.Monitor,
                 ["primary"] = d.IsPrimary,
                 ["width"] = d.Width,
                 ["height"] = d.Height,

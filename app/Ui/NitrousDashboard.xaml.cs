@@ -4680,14 +4680,17 @@ public partial class NitrousDashboard : Window
 
     private sealed record RefreshChoice(string Label, int? Hz);
 
-    private sealed record DisplayChoice(string Label, string GdiName);
+    private sealed record DisplayChoice(string Label, DisplayManager.DisplayTarget Target)
+    {
+        public string GdiName => Target.GdiName;
+    }
 
     private bool _refreshControlsLoading;
     private bool _keepAwakeLoading;
 
     /// <summary>
     /// Fills the monitor list - shown only when more than one display is attached - then the rate
-    /// dropdown with Auto and the rates that monitor advertises. The current rate is shown
+    /// dropdown with Auto and the rates that monitor declares. The current rate is shown
     /// separately, so the dropdown says what was chosen and the label says what is running.
     /// </summary>
     private void SyncRefreshControls()
@@ -4700,9 +4703,9 @@ public partial class NitrousDashboard : Window
         for (var i = 0; i < displays.Count; i++)
         {
             var display = displays[i];
-            var label = $"{i + 1} · {display.Width}×{display.Height}";
-            if (display.IsPrimary) label += " · Primary";
-            choices.Add(new DisplayChoice(label, display.GdiName));
+            var name = string.IsNullOrWhiteSpace(display.Monitor) ? $"Display {i + 1}" : display.Monitor;
+            var label = display.IsPrimary ? $"{name} · Primary" : name;
+            choices.Add(new DisplayChoice(label, display));
         }
 
         // Keep the monitor the user is looking at across a re-sync; fall back to the primary,
@@ -4720,24 +4723,25 @@ public partial class NitrousDashboard : Window
         DisplaySelectRow.Visibility = choices.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         DisplaySelectBox.SelectedItem = selected;
 
-        PopulateRefreshChoices(selected?.GdiName);
+        PopulateRefreshChoices(selected);
         RefreshDisplaySummary();
 
         _refreshControlsLoading = false;
     }
 
-    /// <summary>Auto and the rates one monitor advertises at its current resolution.</summary>
-    private void PopulateRefreshChoices(string? gdiDeviceName)
+    /// <summary>Auto and the rates one monitor declares at its current resolution.</summary>
+    private void PopulateRefreshChoices(DisplayChoice? display)
     {
         var choices = new List<RefreshChoice> { new("Auto", null) };
-        foreach (var hz in DisplayManager.GetSupportedRefreshRates(gdiDeviceName))
+        foreach (var hz in display?.Target.Rates ?? Array.Empty<int>())
             choices.Add(new RefreshChoice($"{hz} Hz", hz));
 
         RefreshModeBox.ItemsSource = choices;
         RefreshModeBox.DisplayMemberPath = nameof(RefreshChoice.Label);
 
-        var mode = DisplayManager.GetMode(gdiDeviceName);
-        var chosen = DisplayManager.GetChosenRefreshRate(gdiDeviceName);
+        var gdi = display?.GdiName;
+        var mode = DisplayManager.GetMode(gdi);
+        var chosen = DisplayManager.GetChosenRefreshRate(gdi);
 
         var selected = choices[0];
         if (mode != RefreshMode.Auto)
@@ -4762,7 +4766,7 @@ public partial class NitrousDashboard : Window
         SettingsManager.Save("RefreshDisplay", choice.GdiName);
 
         _refreshControlsLoading = true;
-        PopulateRefreshChoices(choice.GdiName);
+        PopulateRefreshChoices(choice);
         _refreshControlsLoading = false;
 
         RefreshDisplaySummary();
@@ -4784,9 +4788,9 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// The selected monitor's own label: adapter, the rate it is running at, and - for the built-in
-    /// panel, the only path whose depth is read - the signal depth Windows reports:
-    /// "AMD Radeon 860M @ 144 Hz · 10-bit". Parts the machine does not answer are left out.
+    /// The selected monitor's own label: the name from its EDID, the rate it is running at, and -
+    /// for the built-in panel, the only path whose depth is read - the signal depth Windows reports:
+    /// "27G64 @ 144 Hz · 10-bit". Parts the machine does not answer are left out.
     /// </summary>
     private void RefreshDisplaySummary()
     {
@@ -4805,8 +4809,9 @@ public partial class NitrousDashboard : Window
         }
 
         var bits = display.IsPrimary ? DisplayManager.GetBitsPerColorChannel() : 0;
+        var name = string.IsNullOrWhiteSpace(display.Monitor) ? display.Adapter : display.Monitor;
 
-        var text = display.Adapter;
+        var text = name;
         if (display.CurrentHz > 0)
             text = text.Length == 0 ? $"{display.CurrentHz} Hz" : $"{text} @ {display.CurrentHz} Hz";
         if (bits > 0)
