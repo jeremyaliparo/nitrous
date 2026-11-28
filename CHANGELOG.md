@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.6 - 2026-11-28
+
+### Appearance
+
+- **The tray icon is rebuilt only when what it draws changes.** A steady CPU temperature no longer
+  re-encodes the 32 px icon every ten seconds, and the mode style skips the work unless the mode or
+  its colour changes. The temperature style still reads the EC once per refresh; the logo style does
+  no recurring appearance work at all.
+
 ## 0.17.0-test.5 - 2026-11-28
 
 ### Appearance
