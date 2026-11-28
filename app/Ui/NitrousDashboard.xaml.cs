@@ -3,6 +3,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -705,13 +706,24 @@ public partial class NitrousDashboard : Window
     /// Named combinations of the three palette choices. "Custom" is derived: the list shows it
     /// whenever the current accent, background and card match none of these.
     /// </summary>
-    private static readonly (string Name, string Accent, ThemePalette.ThemeSurface Surface, ThemePalette.ThemeCard Card)[] ThemePresets =
+    private static readonly (string Name, string Accent, ThemePalette.ThemeSurface Surface, ThemePalette.ThemeCard Card)[] DarkThemePresets =
     [
         ("Nitrous", "#B388FF", ThemePalette.ThemeSurface.Midnight, ThemePalette.ThemeCard.Default),
         ("Ice", "#2FD4E6", ThemePalette.ThemeSurface.Slate, ThemePalette.ThemeCard.Default),
         ("Ember", "#FF8A3D", ThemePalette.ThemeSurface.Graphite, ThemePalette.ThemeCard.Default),
         ("Mono", "#C8C8D0", ThemePalette.ThemeSurface.Black, ThemePalette.ThemeCard.Default)
     ];
+
+    private static readonly (string Name, string Accent, ThemePalette.ThemeSurface Surface, ThemePalette.ThemeCard Card)[] LightThemePresets =
+    [
+        ("Daylight", "#B388FF", ThemePalette.ThemeSurface.Paper, ThemePalette.ThemeCard.Default),
+        ("Frost", "#5B9DFF", ThemePalette.ThemeSurface.Cool, ThemePalette.ThemeCard.White),
+        ("Sand", "#FFB020", ThemePalette.ThemeSurface.Warm, ThemePalette.ThemeCard.Default),
+        ("Mono", "#C8C8D0", ThemePalette.ThemeSurface.White, ThemePalette.ThemeCard.White)
+    ];
+
+    private static (string Name, string Accent, ThemePalette.ThemeSurface Surface, ThemePalette.ThemeCard Card)[] ActivePresets =>
+        ThemeManager.IsLight ? LightThemePresets : DarkThemePresets;
 
     /// <summary>
     /// Builds the accent row from the palette instead of hand-written XAML: the selected ring has
@@ -807,7 +819,9 @@ public partial class NitrousDashboard : Window
         {
             Width = 22,
             Height = 22,
-            Background = colour is { } c ? new SolidColorBrush(c) : null
+            Background = colour is null
+                ? null
+                : new SolidColorBrush(ThemeManager.DisplayAccent(choice))
         };
 
         if (colour is null)
@@ -908,6 +922,23 @@ public partial class NitrousDashboard : Window
         _appearanceLoading = true;
         try
         {
+            BuildAppearanceChoices();
+
+            ThemeModeBox.SelectedIndex = ThemeManager.Mode switch
+            {
+                AppTheme.System => 0,
+                AppTheme.Light => 1,
+                _ => 2
+            };
+
+            var resolved = ThemeManager.IsLight ? "light" : "dark";
+            ThemeModeHint.Text = ThemeManager.Mode switch
+            {
+                AppTheme.System => $"Following Windows: {resolved}. Editing the {resolved} theme.",
+                AppTheme.Light => "Editing the light theme.",
+                _ => "Editing the dark theme."
+            };
+
             ThemePresetBox.SelectedIndex = IndexOfPreset();
             BackgroundBox.SelectedIndex = IndexOfSurface(ThemeManager.Surface);
             SectionsBox.SelectedIndex = IndexOfCard(ThemeManager.Card);
@@ -919,23 +950,57 @@ public partial class NitrousDashboard : Window
         }
     }
 
+    /// <summary>Rebuilds the mode-specific preset, background and section lists.</summary>
+    private void BuildAppearanceChoices()
+    {
+        ThemePresetBox.Items.Clear();
+        foreach (var preset in ActivePresets)
+            ThemePresetBox.Items.Add(new ComboBoxItem { Content = preset.Name });
+        ThemePresetBox.Items.Add(new ComboBoxItem { Content = "Custom", IsEnabled = false });
+
+        BackgroundBox.Items.Clear();
+        foreach (var (name, _) in ThemeManager.Surfaces)
+            BackgroundBox.Items.Add(new ComboBoxItem { Content = name });
+
+        SectionsBox.Items.Clear();
+        foreach (var (name, _) in ThemeManager.Cards)
+            SectionsBox.Items.Add(new ComboBoxItem { Content = name });
+    }
+
     /// <summary>The matching preset, or the trailing "Custom" entry.</summary>
     private static int IndexOfPreset()
     {
-        var index = Array.FindIndex(ThemePresets, p =>
+        var presets = ActivePresets;
+        var index = Array.FindIndex(presets, p =>
             string.Equals(p.Accent, ThemeManager.Choice, StringComparison.OrdinalIgnoreCase) &&
             p.Surface == ThemeManager.Surface &&
             p.Card == ThemeManager.Card);
 
-        return index >= 0 ? index : ThemePresets.Length;
+        return index >= 0 ? index : presets.Length;
+    }
+
+    private void ThemeMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appearanceLoading || ThemeModeBox.SelectedIndex < 0) return;
+
+        var mode = ThemeModeBox.SelectedIndex switch
+        {
+            0 => AppTheme.System,
+            1 => AppTheme.Light,
+            _ => AppTheme.Dark
+        };
+
+        ThemeManager.SetMode(System.Windows.Application.Current, mode);
     }
 
     private void ThemePreset_Changed(object sender, SelectionChangedEventArgs e)
     {
         if (_appearanceLoading || ThemePresetBox.SelectedIndex < 0) return;
-        if (ThemePresetBox.SelectedIndex >= ThemePresets.Length) return;
 
-        var preset = ThemePresets[ThemePresetBox.SelectedIndex];
+        var presets = ActivePresets;
+        if (ThemePresetBox.SelectedIndex >= presets.Length) return;
+
+        var preset = presets[ThemePresetBox.SelectedIndex];
         ThemeManager.SetPreset(
             System.Windows.Application.Current, preset.Accent, preset.Surface, preset.Card);
     }
@@ -1131,7 +1196,8 @@ public partial class NitrousDashboard : Window
     {
         if (_dashboardOptionsLoading || OsdDesignBox.SelectedIndex < 0) return;
 
-        var design = (UiPreferences.ToastDesign)Math.Clamp(OsdDesignBox.SelectedIndex, 0, 2);
+        var design = (UiPreferences.ToastDesign)Math.Clamp(
+            OsdDesignBox.SelectedIndex, 0, UiPreferences.OsdDesigns.Length - 1);
         SettingsManager.Save("OsdDesign", design.ToString());
     }
 
@@ -1621,8 +1687,9 @@ public partial class NitrousDashboard : Window
         try
         {
             var work = SystemParameters.WorkArea;
-            UiScale110Item.IsEnabled = 660 * 1.10 <= work.Height - 24;
-            UiScale125Item.IsEnabled = 660 * 1.25 <= work.Height - 24;
+            var baseHeight = ReadWindowBaseHeight();
+            UiScale110Item.IsEnabled = baseHeight * 1.10 <= work.Height - 24;
+            UiScale125Item.IsEnabled = baseHeight * 1.25 <= work.Height - 24;
 
             var allowed = new List<int> { 90, 100 };
             if (UiScale110Item.IsEnabled) allowed.Add(110);
@@ -1670,7 +1737,8 @@ public partial class NitrousDashboard : Window
     private void ApplyUiScale(int percent)
     {
         var work = CurrentWorkArea();
-        var maxScale = Math.Min((work.Height - 24) / 660.0, (work.Width - 24) / 375.0);
+        var baseHeight = ReadWindowBaseHeight();
+        var maxScale = Math.Min((work.Height - 24) / (double)baseHeight, (work.Width - 24) / 375.0);
         var scale = percent / 100.0;
 
         if (scale > maxScale)
@@ -1699,14 +1767,51 @@ public partial class NitrousDashboard : Window
             SettingsManager.Save("UiScale", percent);
         }
 
+        MinWidth = Math.Round(375 * scale);
+        MaxWidth = MinWidth;
         Width = Math.Round(375 * scale);
-        Height = Math.Round(660 * scale);
+        MinHeight = Math.Round(MinBaseHeight * scale);
+        MaxHeight = Math.Max(MinHeight, work.Height - 16);
+        Height = Math.Min(Math.Round(baseHeight * scale), MaxHeight);
 
         if (Content is FrameworkElement root)
             root.LayoutTransform = new ScaleTransform(scale, scale);
 
         Resources["UiScaleTransform"] = new ScaleTransform(scale, scale);
         ClampWindowToWorkArea();
+    }
+
+    private const int MinBaseHeight = 520;
+    private const int MaxBaseHeight = 2000;
+
+    private static int ReadWindowBaseHeight() =>
+        Math.Clamp(SettingsManager.Get("WindowHeight", 660), MinBaseHeight, MaxBaseHeight);
+
+    private void WindowResizeThumb_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        if (Content is not FrameworkElement root ||
+            root.LayoutTransform is not ScaleTransform transform)
+        {
+            return;
+        }
+
+        var scale = Math.Max(0.1, transform.ScaleY);
+        var work = CurrentWorkArea();
+        Height = Math.Clamp(Height + e.VerticalChange,
+            MinBaseHeight * scale,
+            Math.Max(MinBaseHeight * scale, work.Height - 16));
+    }
+
+    private void WindowResizeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        if (Content is not FrameworkElement root ||
+            root.LayoutTransform is not ScaleTransform transform)
+        {
+            return;
+        }
+
+        var baseHeight = (int)Math.Round(Height / Math.Max(0.1, transform.ScaleY));
+        SettingsManager.Save("WindowHeight", Math.Clamp(baseHeight, MinBaseHeight, MaxBaseHeight));
     }
 
     /// <summary>The work area of the screen the window is on, in WPF device-independent units.</summary>
@@ -1743,7 +1848,9 @@ public partial class NitrousDashboard : Window
     private void OnThemeChanged()
     {
         ApplyNavColours();
-        RefreshAppearanceSelection();
+
+        // The accent row shows the clamped accent, so it is rebuilt when the mode or accent moves.
+        BuildAppearanceSwatches();
         AppearanceChangeSignal.Notify();
 
         // The GPU APPLY button's colour is a captured string, not a resource, so it has to be

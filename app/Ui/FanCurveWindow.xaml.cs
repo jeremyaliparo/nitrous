@@ -51,6 +51,7 @@ public partial class FanCurveWindow : Window
         {
             ApplyCornerStyle();
             ApplyTemperatureUnit();
+            ApplyThemeGlow();
         };
 
         ApplyThemeGlow();

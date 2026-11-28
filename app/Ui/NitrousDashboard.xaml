@@ -3,6 +3,7 @@
 	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Nitrous Dashboard" Height="660" Width="375"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize"
         Topmost="True"
         IsVisibleChanged="Window_IsVisibleChanged"
         UseLayoutRounding="True"
@@ -661,6 +662,7 @@
 				<RowDefinition Height="50"/>
 				<RowDefinition Height="*"/>
 				<RowDefinition x:Name="NavRow" Height="54"/>
+				<RowDefinition Height="8"/>
 			</Grid.RowDefinitions>
 			<!-- Title Bar -->
 			<Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseDown" Background="Transparent">
@@ -1188,7 +1190,7 @@
 											<TextBlock x:Name="CpuPowerCapStatus" Grid.Column="0" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,0,8,0" VerticalAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"/>
 											<StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
 												<Button x:Name="CpuPowerCapResetButton" Content="RESET" Click="CpuPowerCapReset_Click" Style="{StaticResource SetupActionButtonStyle}" ToolTip="Return both limits to this mode's own values."/>
-												<Button x:Name="CpuPowerCapApplyButton" Content="APPLY" Click="CpuPowerCapApply_Click" Background="{DynamicResource AccentDeepBrush}" Foreground="{DynamicResource TextPrimaryBrush}" Style="{StaticResource AccentBtn}" FontSize="9" FontWeight="Bold" Height="28" MinWidth="72" Padding="12,0" Margin="8,0,0,0" ToolTip="Write both limits to this mode and remember them for it."/>
+												<Button x:Name="CpuPowerCapApplyButton" Content="APPLY" Click="CpuPowerCapApply_Click" Background="{DynamicResource AccentDeepBrush}" Foreground="{DynamicResource OnAccentBrush}" Style="{StaticResource AccentBtn}" FontSize="9" FontWeight="Bold" Height="28" MinWidth="72" Padding="12,0" Margin="8,0,0,0" ToolTip="Write both limits to this mode and remember them for it."/>
 											</StackPanel>
 										</Grid>
 									</StackPanel>
@@ -1617,20 +1619,27 @@
 											<Path Data="M17.5,12A1.5,1.5 0 0,1 16,10.5A1.5,1.5 0 0,1 17.5,9A1.5,1.5 0 0,1 19,10.5A1.5,1.5 0 0,1 17.5,12M14.5,8A1.5,1.5 0 0,1 13,6.5A1.5,1.5 0 0,1 14.5,5A1.5,1.5 0 0,1 16,6.5A1.5,1.5 0 0,1 14.5,8M9.5,8A1.5,1.5 0 0,1 8,6.5A1.5,1.5 0 0,1 9.5,5A1.5,1.5 0 0,1 11,6.5A1.5,1.5 0 0,1 9.5,8M6.5,12A1.5,1.5 0 0,1 5,10.5A1.5,1.5 0 0,1 6.5,9A1.5,1.5 0 0,1 8,10.5A1.5,1.5 0 0,1 6.5,12M12,3A9,9 0 0,0 3,12A9,9 0 0,0 12,21A1.5,1.5 0 0,0 13.5,19.5C13.5,19.11 13.35,18.76 13.11,18.5C12.88,18.23 12.73,17.88 12.73,17.5A1.5,1.5 0 0,1 14.23,16H16A5,5 0 0,0 21,11C21,6.58 16.97,3 12,3Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="13" Height="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
 											<TextBlock Text="Accent Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 										</StackPanel>
-										<TextBlock Text="Nitrous violet by default. Pick a preset, choose your own colour, or follow Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<TextBlock Text="Nitrous violet by default. Light and dark keep separate choices; System follows Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Mode" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Light and dark each remember their own accent, background and sections."/>
+											<ComboBox Grid.Column="1" x:Name="ThemeModeBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="ThemeMode_Changed">
+												<ComboBoxItem Content="System"/>
+												<ComboBoxItem Content="Light"/>
+												<ComboBoxItem Content="Dark"/>
+											</ComboBox>
+										</Grid>
+										<TextBlock x:Name="ThemeModeHint" Text="Editing the dark theme." Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap"/>
 										<Grid Margin="0,10,0,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*"/>
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
 											<TextBlock Text="Preset" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Sets the accent, background and sections together. Editing any of them switches to Custom."/>
-											<ComboBox Grid.Column="1" x:Name="ThemePresetBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="ThemePreset_Changed">
-												<ComboBoxItem Content="Nitrous"/>
-												<ComboBoxItem Content="Ice"/>
-												<ComboBoxItem Content="Ember"/>
-												<ComboBoxItem Content="Mono"/>
-												<ComboBoxItem Content="Custom" IsEnabled="False"/>
-											</ComboBox>
+											<ComboBox Grid.Column="1" x:Name="ThemePresetBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="ThemePreset_Changed"/>
 										</Grid>
 										<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
 										<Grid Margin="0,12,0,0">
@@ -1639,13 +1648,7 @@
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
 											<TextBlock Text="Background" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-											<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed">
-												<ComboBoxItem Content="Midnight"/>
-												<ComboBoxItem Content="Black"/>
-												<ComboBoxItem Content="Graphite"/>
-												<ComboBoxItem Content="Slate"/>
-												<ComboBoxItem Content="Navy"/>
-											</ComboBox>
+											<ComboBox Grid.Column="1" x:Name="BackgroundBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Background_Changed"/>
 										</Grid>
 										<Grid Margin="0,8,0,0">
 											<Grid.ColumnDefinitions>
@@ -1653,12 +1656,7 @@
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
 											<TextBlock Text="Sections" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
-											<ComboBox Grid.Column="1" x:Name="SectionsBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Sections_Changed">
-												<ComboBoxItem Content="Default"/>
-												<ComboBoxItem Content="Black"/>
-												<ComboBoxItem Content="Graphite"/>
-												<ComboBoxItem Content="Slate"/>
-											</ComboBox>
+											<ComboBox Grid.Column="1" x:Name="SectionsBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="Sections_Changed"/>
 										</Grid>
 										<Grid Margin="0,8,0,0">
 											<Grid.ColumnDefinitions>
@@ -1793,6 +1791,7 @@
 												<ComboBoxItem Content="Card"/>
 												<ComboBoxItem Content="Compact"/>
 												<ComboBoxItem Content="Minimal"/>
+												<ComboBoxItem Content="Nitro"/>
 											</ComboBox>
 										</Grid>
 										<Grid Margin="0,8,0,0">
@@ -2113,7 +2112,7 @@
 								<TextBlock Text="{Binding ActivePowerProfile, StringFormat=Profile: {0}}" Foreground="{DynamicResource TextDimBrush}" FontSize="9.5" VerticalAlignment="Center"/>
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
 									<Button Content="RESET" Command="{Binding ResetGpuClocksCommand}" Style="{StaticResource GhostBtn}" FontSize="10" FontWeight="Bold" Height="30" Padding="14,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Return all four to neutral: stock offsets, the driver&apos;s own temperature and no clock cap."/>
-									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="{DynamicResource TextPrimaryBrush}" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Write these four values to the active profile: both offsets, the temperature limit and the clock cap."/>
+									<Button Content="{Binding ApplyBtnText}" Command="{Binding ApplyGpuClocksCommand}" Background="{Binding ApplyBtnColor}" Foreground="{DynamicResource OnAccentBrush}" Style="{StaticResource AccentBtn}" FontSize="10" FontWeight="Bold" Height="30" MinWidth="88" Padding="18,0" Margin="8,0,0,0" IsEnabled="{Binding ManageGpuClocks}" ToolTip="Write these four values to the active profile: both offsets, the temperature limit and the clock cap."/>
 								</StackPanel>
 							</Grid>
 						</StackPanel>
@@ -2428,6 +2427,20 @@
 					</Button>
 				</Grid>
 			</Border>
+			<!-- Height grip: the width is fixed; dragging the bottom edge changes only the height. -->
+			<Grid Grid.Row="3" Background="Transparent">
+				<Border Width="32" Height="3" Background="{DynamicResource TextMutedBrush}" CornerRadius="{DynamicResource MicroCornerRadius}"
+				        HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" Margin="0,0,0,1" IsHitTestVisible="False"/>
+				<Thumb x:Name="WindowResizeThumb" Background="Transparent" Cursor="SizeNS"
+				       DragDelta="WindowResizeThumb_DragDelta" DragCompleted="WindowResizeThumb_DragCompleted"
+				       ToolTip="Drag to change the window height.">
+					<Thumb.Template>
+						<ControlTemplate TargetType="Thumb">
+							<Border Background="Transparent"/>
+						</ControlTemplate>
+					</Thumb.Template>
+				</Thumb>
+			</Grid>
 		</Grid>
 	</Border>
 </Window>

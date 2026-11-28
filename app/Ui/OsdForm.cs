@@ -47,6 +47,7 @@ public sealed class OsdForm : Form
     private readonly Dictionary<string, CardSurface> _statusCards = new();
 
     private Bitmap? _logo;
+    private Bitmap? _nitroMark;
     private CardSurface? _surface;
     private Size _surfaceSize;
     private Point _baseLocation;
@@ -444,6 +445,27 @@ public sealed class OsdForm : Form
         }
     }
 
+    private Bitmap? EnsureNitroMark()
+    {
+        if (_nitroMark != null) return _nitroMark;
+
+        try
+        {
+            using var stream = Assembly.GetExecutingAssembly()
+                .GetManifestResourceStream("Nitrous.assets.osd-nitro-n.png");
+            if (stream == null) return null;
+
+            using var source = Image.FromStream(stream);
+            _nitroMark = new Bitmap(source);
+            return _nitroMark;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("OSD: could not load the Nitro mark.", ex);
+            return null;
+        }
+    }
+
     private CardSurface GetSurface(PowerProfile profile, Color accent, OsdLayout layout)
     {
         var key = new CardKey(profile, layout.Size.Width, layout.Size.Height, accent.ToArgb());
@@ -549,11 +571,24 @@ public sealed class OsdForm : Form
                 graphics.DrawString("N", fallbackFont, fallbackBrush, logoBounds, centered);
             }
         }
+        else if (design == UiPreferences.ToastDesign.Nitro)
+        {
+            var mark = EnsureNitroMark();
+            if (mark != null)
+            {
+                var markHeight = 56f * scale;
+                var markWidth = markHeight * (mark.Width / (float)mark.Height);
+                graphics.DrawImage(mark,
+                    new RectangleF(30f * scale, (height - markHeight) / 2f, markWidth, markHeight),
+                    new RectangleF(0, 0, mark.Width, mark.Height), GraphicsUnit.Pixel);
+            }
+        }
 
         var textX = design switch
         {
             UiPreferences.ToastDesign.Minimal => 34f,
             UiPreferences.ToastDesign.Compact => 26f,
+            UiPreferences.ToastDesign.Nitro => 64f,
             _ => 100f
         } * scale;
 
@@ -568,6 +603,7 @@ public sealed class OsdForm : Form
         {
             UiPreferences.ToastDesign.Minimal => 16f,
             UiPreferences.ToastDesign.Compact => 19f,
+            UiPreferences.ToastDesign.Nitro => 21f,
             _ => 22f
         };
 

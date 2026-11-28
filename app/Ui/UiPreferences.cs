@@ -14,13 +14,14 @@ internal static class UiPreferences
     public static readonly int[] OsdDurations = [1, 2, 3, 4];
     public static readonly int[] OsdSizes = [80, 90, 100, 110, 120];
 
-    public static readonly string[] OsdDesigns = ["Card", "Compact", "Minimal"];
+    public static readonly string[] OsdDesigns = ["Card", "Compact", "Minimal", "Nitro"];
 
     public enum ToastDesign
     {
         Card,
         Compact,
-        Minimal
+        Minimal,
+        Nitro
     }
 
     public static ToastDesign OsdDesign

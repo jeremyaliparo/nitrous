@@ -13,8 +13,8 @@ namespace Nitrous.Ui.Theme;
 ///
 /// This is appearance only. Nothing here decides what a control does, which controls are
 /// available, or what gets written to hardware - it only decides what the user sees. Status
-/// colours (danger, warn, success) are deliberately fixed: a temperature crossing a threshold
-/// must look the same whatever accent the user picked.
+/// colours (danger, warn, success) are deliberately fixed per mode: a temperature crossing a
+/// threshold must look the same whatever accent the user picked.
 ///
 /// Brushes are rebuilt rather than mutated so that <c>DynamicResource</c> consumers always get a
 /// fresh, unfrozen object. A frozen <see cref="Freezable"/> in a resource dictionary cannot be
@@ -26,9 +26,9 @@ internal static class ThemePalette
     public static readonly Color DefaultAccent = Parse("#B388FF");
 
     /// <summary>
-    /// Curated accents. Every entry clears 4.5:1 against <see cref="WindowBg"/> at its normal
-    /// size, so a pick can never produce unreadable labels. Red is deliberately absent: it would
-    /// be indistinguishable from the danger colour on a temperature warning.
+    /// Curated accents. Every entry clears 4.5:1 against the dark chrome at its normal size, and
+    /// the light palette darkens them until they clear the same bar on white. Red is deliberately
+    /// absent: it would be indistinguishable from the danger colour on a temperature warning.
     /// </summary>
     public static readonly (string Name, string Hex)[] Choices =
     [
@@ -41,17 +41,11 @@ internal static class ThemePalette
         ("Pink", "#FF6FB5"),
     ];
 
-    // Fixed chrome. These are the dark surfaces the accent is read against.
+    // Fixed chrome for the shipped dark theme. The light palette builds its own.
     public static readonly Color WindowBg = Parse("#121214");
     public static readonly Color PanelDeep = Parse("#141416");
     public static readonly Color TextMuted = Parse("#888890");
     public static readonly Color TextPrimary = Parse("#FFFFFF");
-
-    /// <summary>Minimum relative luminance an accent needs to stay readable on the dark chrome.</summary>
-    private const double MinAccentLuminance = 0.22;
-
-    /// <summary>Cap so an almost-white accent does not wash out the surfaces it sits on.</summary>
-    private const double MaxAccentLuminance = 0.70;
 
     /// <summary>
     /// The window background. Presets rather than a colour picker: the text, border and hover
@@ -73,13 +67,25 @@ internal static class ThemePalette
         Slate,
 
         /// <summary>Deep blue.</summary>
-        Navy
+        Navy,
+
+        /// <summary>The default light paper surface.</summary>
+        Paper,
+
+        /// <summary>A clean white window.</summary>
+        White,
+
+        /// <summary>Warm off-white.</summary>
+        Warm,
+
+        /// <summary>Cool pale blue-grey.</summary>
+        Cool
     }
 
     /// <summary>
     /// The card surface - the "sections" - chosen separately from the window. <see cref="Default"/>
-    /// keeps each window preset's tuned card; anything else lifts the hover, border and toggle
-    /// shades off the chosen card so the controls stay visible against it.
+    /// keeps each window preset's tuned card; anything else lifts (dark) or shades (light) the
+    /// hover, border and toggle shades off the chosen card so the controls stay visible.
     /// </summary>
     public enum ThemeCard
     {
@@ -88,8 +94,32 @@ internal static class ThemePalette
 
         Black,
         Graphite,
-        Slate
+        Slate,
+
+        /// <summary>White light-mode card.</summary>
+        White,
+
+        /// <summary>Warm light-mode card.</summary>
+        Warm,
+
+        /// <summary>Cool light-mode card.</summary>
+        Cool
     }
+
+    public readonly record struct DisplayColors(
+        Color TextPrimary,
+        Color TextStrong,
+        Color TextBody,
+        Color TextSecondary,
+        Color TextMuted,
+        Color TextDim,
+        Color Danger,
+        Color Warn,
+        Color Success,
+        Color Hot,
+        Color Scrim,
+        double AccentMin,
+        double AccentMax);
 
     private readonly record struct ChromeColors(
         Color Window,
@@ -103,6 +133,17 @@ internal static class ThemePalette
         Color Grid,
         Color Toggle,
         Color Divider);
+
+    /// <summary>The text and status colours for a mode. Accent limits are in WCAG luminance.</summary>
+    public static DisplayColors Display(bool light) => light
+        ? new DisplayColors(
+            Parse("#16161A"), Parse("#2C2C33"), Parse("#3C3C45"), Parse("#5A5A64"),
+            Parse("#6E6E78"), Parse("#8A8A94"), Parse("#B42318"), Parse("#9A5B00"),
+            Parse("#1B7F3A"), Parse("#C2182E"), Parse("#66000000"), 0.08, 0.18)
+        : new DisplayColors(
+            TextPrimary, Parse("#E0E0E0"), Parse("#C8C8D0"), Parse("#A0A0A8"),
+            TextMuted, Parse("#6E6E76"), Parse("#FF453A"), Parse("#FF9F0A"),
+            Parse("#34C759"), Parse("#FF5C7A"), Parse("#99000000"), 0.22, 0.70);
 
     private static ChromeColors Chrome(ThemeSurface surface) => surface switch
     {
@@ -128,19 +169,57 @@ internal static class ThemePalette
             Parse("#232328"), Parse("#35353A"), Parse("#45454D"))
     };
 
+    private static ChromeColors ChromeLight(ThemeSurface surface) => surface switch
+    {
+        ThemeSurface.White => new ChromeColors(
+            Parse("#FCFCFD"), Parse("#FFFFFF"), Parse("#F4F4F7"), Parse("#FFFFFF"),
+            Parse("#F3F3F7"), Parse("#EEEEF3"), Parse("#E6E6EC"), Parse("#D9D9E1"),
+            Parse("#E7E7EE"), Parse("#C9C9D2"), Parse("#B8B8C4")),
+        ThemeSurface.Warm => new ChromeColors(
+            Parse("#F7F2EA"), Parse("#FFFDF8"), Parse("#F1EADF"), Parse("#FFFDF8"),
+            Parse("#F5EFE5"), Parse("#EFE7DA"), Parse("#E6DDD0"), Parse("#DCCFC0"),
+            Parse("#E8E0D5"), Parse("#CDBFAC"), Parse("#BCAB96")),
+        ThemeSurface.Cool => new ChromeColors(
+            Parse("#EEF3F8"), Parse("#F8FBFF"), Parse("#E5EDF5"), Parse("#F8FBFF"),
+            Parse("#EFF5FA"), Parse("#E8F0F7"), Parse("#DFE8F1"), Parse("#D3DEE9"),
+            Parse("#E2EAF3"), Parse("#C3D1E0"), Parse("#B3C3D4")),
+        _ => new ChromeColors(
+            Parse("#F2F2F5"), Parse("#FAFAFC"), Parse("#ECECF0"), Parse("#FFFFFF"),
+            Parse("#F2F2F6"), Parse("#F7F7FA"), Parse("#EAEAF0"), Parse("#D8D8E0"),
+            Parse("#E6E6EC"), Parse("#C9C9D2"), Parse("#B8B8C4"))
+    };
+
     /// <summary>Replaces the card surface and re-derives the shades that sit on it.</summary>
-    private static ChromeColors WithCard(ChromeColors chrome, ThemeCard card)
+    private static ChromeColors WithCard(ChromeColors chrome, ThemeCard card, bool light)
     {
         var colour = card switch
         {
             ThemeCard.Black => Parse("#0B0B0D"),
             ThemeCard.Graphite => Parse("#242428"),
             ThemeCard.Slate => Parse("#23272E"),
+            ThemeCard.White => Parse("#FFFFFF"),
+            ThemeCard.Warm => Parse("#FFF9F1"),
+            ThemeCard.Cool => Parse("#F7FAFD"),
             _ => chrome.Card
         };
 
         if (card == ThemeCard.Default)
             return chrome;
+
+        if (light)
+        {
+            return chrome with
+            {
+                Card = colour,
+                SurfaceHover = Shade(colour, 6),
+                SurfaceRaised = Shade(colour, 10),
+                SurfaceActive = Shade(colour, 16),
+                Border = Shade(colour, 24),
+                Grid = Shade(colour, 10),
+                Toggle = Shade(colour, 32),
+                Divider = Shade(colour, 46)
+            };
+        }
 
         return chrome with
         {
@@ -160,26 +239,38 @@ internal static class ThemePalette
         (byte)Math.Min(255, colour.G + amount),
         (byte)Math.Min(255, colour.B + amount));
 
+    private static Color Shade(Color colour, int amount) => Color.FromRgb(
+        (byte)Math.Max(0, colour.R - amount),
+        (byte)Math.Max(0, colour.G - amount),
+        (byte)Math.Max(0, colour.B - amount));
+
     public static ResourceDictionary Build(
         Color requestedAccent,
-        ThemeSurface surface = ThemeSurface.Midnight,
-        ThemeCard card = ThemeCard.Default)
+        ThemeSurface surface,
+        ThemeCard card,
+        bool light)
     {
-        var accent = ClampLuminance(requestedAccent, MinAccentLuminance, MaxAccentLuminance);
-        var chrome = WithCard(Chrome(surface), card);
+        var display = Display(light);
+        var accent = ClampLuminance(requestedAccent, display.AccentMin, display.AccentMax);
+        var chrome = WithCard(light ? ChromeLight(surface) : Chrome(surface), card, light);
 
         // The deeper accent is used as text (hotkey box) and as a fill, so it has to stay legible
         // on the card surface as well.
-        var accentDeep = ClampLuminance(Blend(accent, Colors.Black, 0.12), 0.20, MaxAccentLuminance);
-        var accentHover = Blend(accent, Colors.White, 0.22);
-        var accentWash = Tint(accent, saturation: 0.45, lightness: 0.09);
+        var accentDeep = ClampLuminance(
+            Blend(accent, Colors.Black, 0.12), display.AccentMin, display.AccentMax);
+        var accentHover = light
+            ? Blend(accent, Colors.Black, 0.18)
+            : Blend(accent, Colors.White, 0.22);
+        var accentWash = light
+            ? Tint(accent, saturation: 0.30, lightness: 0.93)
+            : Tint(accent, saturation: 0.45, lightness: 0.09);
 
         // The fan-curve ramp reads cool -> hot. Three stops follow the accent; the hot end stays
         // red because it means heat, not brand.
         var ramp0 = accent;
-        var ramp1 = Blend(accent, Colors.White, 0.20);
-        var ramp2 = Blend(accent, Colors.White, 0.45);
-        var hot = Parse("#FF5C7A");
+        var ramp1 = light ? Blend(accent, Colors.Black, 0.18) : Blend(accent, Colors.White, 0.20);
+        var ramp2 = light ? Blend(accent, Colors.Black, 0.32) : Blend(accent, Colors.White, 0.45);
+        var hot = display.Hot;
 
         var d = new ResourceDictionary();
 
@@ -197,25 +288,26 @@ internal static class ThemePalette
         Add(d, "DividerBrush", chrome.Divider);
 
         // --- text ---------------------------------------------------------------------------
-        Add(d, "TextPrimaryBrush", TextPrimary);
-        Add(d, "TextStrongBrush", Parse("#E0E0E0"));
-        Add(d, "TextBodyBrush", Parse("#C8C8D0"));
-        Add(d, "TextSecondaryBrush", Parse("#A0A0A8"));
-        Add(d, "TextMutedBrush", TextMuted);
-        Add(d, "TextDimBrush", Parse("#6E6E76"));
+        Add(d, "TextPrimaryBrush", display.TextPrimary);
+        Add(d, "TextStrongBrush", display.TextStrong);
+        Add(d, "TextBodyBrush", display.TextBody);
+        Add(d, "TextSecondaryBrush", display.TextSecondary);
+        Add(d, "TextMutedBrush", display.TextMuted);
+        Add(d, "TextDimBrush", display.TextDim);
 
         // --- accent -------------------------------------------------------------------------
         Add(d, "AccentBrush", accent);
         Add(d, "AccentHoverBrush", accentHover);
         Add(d, "AccentDeepBrush", accentDeep);
         Add(d, "AccentWashBrush", accentWash);
+        Add(d, "OnAccentBrush", Colors.White);
 
         // --- fixed status -------------------------------------------------------------------
-        Add(d, "DangerBrush", Parse("#FF453A"));
-        Add(d, "WarnBrush", Parse("#FF9F0A"));
-        Add(d, "SuccessBrush", Parse("#34C759"));
+        Add(d, "DangerBrush", display.Danger);
+        Add(d, "WarnBrush", display.Warn);
+        Add(d, "SuccessBrush", display.Success);
         Add(d, "HotBrush", hot);
-        Add(d, "ScrimBrush", Parse("#99000000"));
+        Add(d, "ScrimBrush", display.Scrim);
 
         // --- fan curve ramp -----------------------------------------------------------------
         var ramp = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };

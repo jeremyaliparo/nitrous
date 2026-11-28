@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -12,12 +15,21 @@ using Brush = System.Windows.Media.Brush;
 
 namespace Nitrous.Ui.Theme;
 
+/// <summary>Light, dark, or follow the Windows app theme.</summary>
+public enum AppTheme
+{
+    Dark,
+    Light,
+    System
+}
+
 /// <summary>
 /// Installs and swaps the appearance palette. Called once before the dashboard window exists,
-/// then again whenever the user changes the accent.
+/// then again whenever the user changes a theme choice or Windows flips its app theme.
 ///
-/// The choice is stored as either "auto" (follow Windows) or the hex of one of
-/// <see cref="ThemePalette.Choices"/>. Appearance only - this never touches a hardware setting.
+/// Dark and light keep separate accent, background and card choices. The stored choice is either
+/// "auto" (follow the Windows accent) or the hex of one of <see cref="ThemePalette.Choices"/>.
+/// Appearance only - this never touches a hardware setting.
 /// </summary>
 internal static class ThemeManager
 {
@@ -25,6 +37,9 @@ internal static class ThemeManager
     private const string SurfaceKey = "BackgroundChoice";
     private const string CardKey = "SectionsChoice";
     private const string FontKey = "FontChoice";
+    private const string ModeKey = "AppTheme";
+    private const string LightPrefix = "Light";
+    private const string LightDefaultChoice = "#B388FF";
     public const string Auto = "auto";
 
     /// <summary>Stored when the font should be whatever Windows uses for its own UI text.</summary>
@@ -37,14 +52,25 @@ internal static class ThemeManager
     public static readonly string DefaultChoice = ThemePalette.Hex(ThemePalette.DefaultAccent);
 
     private static ResourceDictionary? _installed;
-    private static string _choice = DefaultChoice;
+    private static AppTheme _mode = AppTheme.Dark;
+    private static bool _light;
+    private static ModeState _dark = new();
+    private static ModeState _lightState = new();
     private static Color _accent = ThemePalette.DefaultAccent;
-    private static ThemePalette.ThemeSurface _surface = ThemePalette.ThemeSurface.Midnight;
-    private static ThemePalette.ThemeCard _card = ThemePalette.ThemeCard.Default;
+    private static ThemePalette.DisplayColors _display = ThemePalette.Display(false);
     private static string _font = AutoFont;
 
-    /// <summary>The window background presets, in the order the SETUP list shows them.</summary>
-    public static readonly (string Name, ThemePalette.ThemeSurface Surface)[] Surfaces =
+    /// <summary>One mode's saved choices. Surface and card belong to the same light/dark family.</summary>
+    private sealed class ModeState
+    {
+        public string Choice = DefaultChoice;
+        public ThemePalette.ThemeSurface Surface = ThemePalette.ThemeSurface.Midnight;
+        public ThemePalette.ThemeCard Card = ThemePalette.ThemeCard.Default;
+    }
+
+    private static ModeState Active => _light ? _lightState : _dark;
+
+    private static readonly (string Name, ThemePalette.ThemeSurface Surface)[] DarkSurfaces =
     [
         ("Midnight", ThemePalette.ThemeSurface.Midnight),
         ("Black", ThemePalette.ThemeSurface.Black),
@@ -53,8 +79,15 @@ internal static class ThemeManager
         ("Navy", ThemePalette.ThemeSurface.Navy)
     ];
 
-    /// <summary>The card ("sections") presets, in the order the SETUP list shows them.</summary>
-    public static readonly (string Name, ThemePalette.ThemeCard Card)[] Cards =
+    private static readonly (string Name, ThemePalette.ThemeSurface Surface)[] LightSurfaces =
+    [
+        ("Paper", ThemePalette.ThemeSurface.Paper),
+        ("White", ThemePalette.ThemeSurface.White),
+        ("Warm", ThemePalette.ThemeSurface.Warm),
+        ("Cool", ThemePalette.ThemeSurface.Cool)
+    ];
+
+    private static readonly (string Name, ThemePalette.ThemeCard Card)[] DarkCards =
     [
         ("Default", ThemePalette.ThemeCard.Default),
         ("Black", ThemePalette.ThemeCard.Black),
@@ -62,13 +95,26 @@ internal static class ThemeManager
         ("Slate", ThemePalette.ThemeCard.Slate)
     ];
 
+    private static readonly (string Name, ThemePalette.ThemeCard Card)[] LightCards =
+    [
+        ("Default", ThemePalette.ThemeCard.Default),
+        ("White", ThemePalette.ThemeCard.White),
+        ("Warm", ThemePalette.ThemeCard.Warm),
+        ("Cool", ThemePalette.ThemeCard.Cool)
+    ];
+
+    /// <summary>The window background presets for the active mode, in SETUP list order.</summary>
+    public static (string Name, ThemePalette.ThemeSurface Surface)[] Surfaces =>
+        _light ? LightSurfaces : DarkSurfaces;
+
+    /// <summary>The card ("sections") presets for the active mode, in SETUP list order.</summary>
+    public static (string Name, ThemePalette.ThemeCard Card)[] Cards =>
+        _light ? LightCards : DarkCards;
+
     /// <summary>
     /// Font candidates, in display order, split into UI faces and code faces. Only the ones this
     /// machine actually has are offered - see <see cref="FontFamilies"/> - so the list can never
     /// show a choice that would quietly fall back to the Windows font.
-    ///
-    /// Icons are vector paths, so no family can break the glyphs; the reason to curate rather than
-    /// list every installed family is that a decorative or symbol font would still be offered.
     /// </summary>
     private static readonly (string Name, string Family)[] FontCandidates =
     [
@@ -97,13 +143,19 @@ internal static class ThemeManager
     /// <summary>Raised after the palette has been replaced, so code that caches a brush can refresh.</summary>
     public static event Action? Changed;
 
-    public static string Choice => _choice;
+    public static AppTheme Mode => _mode;
+
+    public static bool IsLight => _light;
+
+    public static bool IsSystem => _mode == AppTheme.System;
+
+    public static string Choice => Active.Choice;
 
     public static Color Accent => _accent;
 
-    public static ThemePalette.ThemeSurface Surface => _surface;
+    public static ThemePalette.ThemeSurface Surface => Active.Surface;
 
-    public static ThemePalette.ThemeCard Card => _card;
+    public static ThemePalette.ThemeCard Card => Active.Card;
 
     public static string FontChoice => _font;
 
@@ -113,31 +165,39 @@ internal static class ThemeManager
     /// <summary>Hex strings for the view-model properties that bind directly to a brush.</summary>
     public static string AccentHex => ThemePalette.Hex(_accent);
 
-    public static string AccentDeepHex => ThemePalette.Hex(ThemePalette.Blend(_accent, Colors.Black, 0.12));
+    public static string AccentDeepHex =>
+        ThemePalette.Hex(ThemePalette.Blend(_accent, Colors.Black, 0.12));
 
-    public static string TextPrimaryHex => ThemePalette.Hex(ThemePalette.TextPrimary);
+    public static string TextPrimaryHex => ThemePalette.Hex(_display.TextPrimary);
 
-    public static string TextMutedHex => ThemePalette.Hex(ThemePalette.TextMuted);
+    public static string TextMutedHex => ThemePalette.Hex(_display.TextMuted);
 
-    public static string DangerHex => ThemePalette.Hex(ThemePalette.Parse("#FF453A"));
+    public static string DangerHex => ThemePalette.Hex(_display.Danger);
 
-    public static string WarnHex => ThemePalette.Hex(ThemePalette.Parse("#FF9F0A"));
+    public static string WarnHex => ThemePalette.Hex(_display.Warn);
 
-    public static string SuccessHex => ThemePalette.Hex(ThemePalette.Parse("#34C759"));
+    public static string SuccessHex => ThemePalette.Hex(_display.Success);
 
-    /// <summary>Loads the saved choice and installs the palette. Safe to call twice.</summary>
+    /// <summary>The accent as it is actually drawn in this mode, after the readability clamp.</summary>
+    public static Color DisplayAccent(string choice) =>
+        ThemePalette.ClampLuminance(Resolve(choice), _display.AccentMin, _display.AccentMax);
+
+    /// <summary>Loads the saved choices and installs the palette. Safe to call twice.</summary>
     public static void Initialise(Application app)
     {
-        var saved = SettingsManager.Get(ChoiceKey, DefaultChoice);
-        _surface = ReadSurface(SettingsManager.Get(SurfaceKey, nameof(ThemePalette.ThemeSurface.Midnight)));
-        _card = ReadCard(SettingsManager.Get(CardKey, nameof(ThemePalette.ThemeCard.Default)));
+        _mode = ReadMode(SettingsManager.Get(ModeKey, nameof(AppTheme.Dark)));
+        _dark = LoadState(light: false);
+        _lightState = LoadState(light: true);
         _font = ReadFont(SettingsManager.Get(FontKey, AutoFont));
-        Install(app, string.IsNullOrWhiteSpace(saved) ? DefaultChoice : saved);
+        _light = ResolveLight(_mode);
+        Install(app);
 
         // Diagnostics answer "why don't I see Inter?" without a round trip: it lists what this
         // machine offered and what the saved choice resolved to.
         Logger.Info($"Font: saved '{_font}' resolved to '{FontFamily.Source}'; " +
                     $"{FontFamilies.Length - 1} of {FontCandidates.Length} candidate families installed.");
+        Logger.Info($"Theme: mode {_mode} resolved to {(_light ? "light" : "dark")}; " +
+                    $"accent {ThemePalette.Hex(_accent)}.");
 
         // The user can change the Windows accent while Nitrous is open.
         SystemParameters.StaticPropertyChanged += (_, e) =>
@@ -145,20 +205,44 @@ internal static class ThemeManager
             if (e.PropertyName is nameof(SystemParameters.WindowGlassColor) or "")
                 app.Dispatcher.BeginInvoke(() =>
                 {
-                    if (_choice == Auto)
-                        Install(app, Auto);
+                    if (Active.Choice == Auto)
+                        Install(app);
                 });
+        };
+
+        // Windows' light/dark app theme can flip while Nitrous is open. The event arrives on
+        // SystemEvents' own thread, so marshal it to the application.
+        Microsoft.Win32.SystemEvents.UserPreferenceChanged += (_, e) =>
+        {
+            if (e.Category is not (Microsoft.Win32.UserPreferenceCategory.General
+                or Microsoft.Win32.UserPreferenceCategory.VisualStyle
+                or Microsoft.Win32.UserPreferenceCategory.Color))
+            {
+                return;
+            }
+
+            app.Dispatcher.BeginInvoke(() =>
+            {
+                if (_mode != AppTheme.System) return;
+                var wasLight = _light;
+                _light = ResolveLight(_mode);
+                if (_light == wasLight) return;
+
+                Install(app);
+                Changed?.Invoke();
+            });
         };
     }
 
-    /// <summary>Applies a new choice, persists it, and reports the change.</summary>
+    /// <summary>Applies a new accent choice to the active mode, persists it, and reports the change.</summary>
     public static void Set(Application? app, string choice)
     {
         if (app is null)
             return;
 
-        Install(app, choice);
-        SettingsManager.Save(ChoiceKey, _choice);
+        Active.Choice = choice;
+        Install(app);
+        SaveActive(ChoiceKey, Active.Choice);
         Changed?.Invoke();
     }
 
@@ -168,9 +252,9 @@ internal static class ThemeManager
         if (app is null)
             return;
 
-        _surface = surface;
-        Install(app, _choice);
-        SettingsManager.Save(SurfaceKey, surface.ToString());
+        Active.Surface = surface;
+        Install(app);
+        SaveActive(SurfaceKey, surface.ToString());
         Changed?.Invoke();
     }
 
@@ -180,9 +264,9 @@ internal static class ThemeManager
         if (app is null)
             return;
 
-        _card = card;
-        Install(app, _choice);
-        SettingsManager.Save(CardKey, card.ToString());
+        Active.Card = card;
+        Install(app);
+        SaveActive(CardKey, card.ToString());
         Changed?.Invoke();
     }
 
@@ -193,8 +277,21 @@ internal static class ThemeManager
             return;
 
         _font = ReadFont(family);
-        Install(app, _choice);
+        Install(app);
         SettingsManager.Save(FontKey, _font);
+        Changed?.Invoke();
+    }
+
+    /// <summary>Switches light, dark or system and installs the matching saved choices.</summary>
+    public static void SetMode(Application? app, AppTheme mode)
+    {
+        if (app is null)
+            return;
+
+        _mode = mode;
+        _light = ResolveLight(mode);
+        Install(app);
+        SettingsManager.Save(ModeKey, mode.ToString());
         Changed?.Invoke();
     }
 
@@ -211,13 +308,59 @@ internal static class ThemeManager
         if (app is null)
             return;
 
-        _surface = surface;
-        _card = card;
-        Install(app, choice);
-        SettingsManager.Save(ChoiceKey, _choice);
-        SettingsManager.Save(SurfaceKey, surface.ToString());
-        SettingsManager.Save(CardKey, card.ToString());
+        Active.Surface = surface;
+        Active.Card = card;
+        Active.Choice = choice;
+        Install(app);
+        SaveActive(ChoiceKey, Active.Choice);
+        SaveActive(SurfaceKey, surface.ToString());
+        SaveActive(CardKey, card.ToString());
         Changed?.Invoke();
+    }
+
+    private static ModeState LoadState(bool light)
+    {
+        var prefix = light ? LightPrefix : "";
+        var defaultSurface = light
+            ? ThemePalette.ThemeSurface.Paper
+            : ThemePalette.ThemeSurface.Midnight;
+
+        return new ModeState
+        {
+            Choice = SettingsManager.Get(prefix + ChoiceKey, light ? LightDefaultChoice : DefaultChoice),
+            Surface = ReadSurface(
+                SettingsManager.Get(prefix + SurfaceKey, defaultSurface.ToString()), light),
+            Card = ReadCard(SettingsManager.Get(prefix + CardKey, nameof(ThemePalette.ThemeCard.Default)), light)
+        };
+    }
+
+    /// <summary>Writes to the keys of the resolved mode, so System edits the theme you can see.</summary>
+    private static void SaveActive(string key, string value) =>
+        SettingsManager.Save((_light ? LightPrefix : "") + key, value);
+
+    private static AppTheme ReadMode(string? saved) =>
+        Enum.TryParse<AppTheme>(saved, ignoreCase: true, out var mode) ? mode : AppTheme.Dark;
+
+    private static bool ResolveLight(AppTheme mode) => mode switch
+    {
+        AppTheme.Light => true,
+        AppTheme.Dark => false,
+        _ => WindowsUsesLightTheme()
+    };
+
+    private static bool WindowsUsesLightTheme()
+    {
+        try
+        {
+            var value = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+                "AppsUseLightTheme", 0);
+            return value is int i && i != 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string ReadFont(string? saved)
@@ -271,15 +414,39 @@ internal static class ThemeManager
 
     private static bool IsInstalled(string family) => InstalledFamilies.Contains(family);
 
-    private static ThemePalette.ThemeSurface ReadSurface(string? saved) =>
-        Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface)
-            ? surface
-            : ThemePalette.ThemeSurface.Midnight;
+    private static bool IsLightSurface(ThemePalette.ThemeSurface surface) =>
+        surface is ThemePalette.ThemeSurface.Paper or ThemePalette.ThemeSurface.White
+            or ThemePalette.ThemeSurface.Warm or ThemePalette.ThemeSurface.Cool;
 
-    private static ThemePalette.ThemeCard ReadCard(string? saved) =>
-        Enum.TryParse<ThemePalette.ThemeCard>(saved, ignoreCase: true, out var card)
-            ? card
-            : ThemePalette.ThemeCard.Default;
+    private static bool IsLightCard(ThemePalette.ThemeCard card) =>
+        card is ThemePalette.ThemeCard.White or ThemePalette.ThemeCard.Warm
+            or ThemePalette.ThemeCard.Cool;
+
+    private static ThemePalette.ThemeSurface ReadSurface(string? saved, bool light)
+    {
+        if (!Enum.TryParse<ThemePalette.ThemeSurface>(saved, ignoreCase: true, out var surface))
+            return light ? ThemePalette.ThemeSurface.Paper : ThemePalette.ThemeSurface.Midnight;
+
+        // A stale value from the other family is not shown in this mode's list; fall back.
+        if (IsLightSurface(surface) != light)
+            return light ? ThemePalette.ThemeSurface.Paper : ThemePalette.ThemeSurface.Midnight;
+
+        return surface;
+    }
+
+    private static ThemePalette.ThemeCard ReadCard(string? saved, bool light)
+    {
+        if (!Enum.TryParse<ThemePalette.ThemeCard>(saved, ignoreCase: true, out var card))
+            return ThemePalette.ThemeCard.Default;
+
+        if (card == ThemePalette.ThemeCard.Default)
+            return card;
+
+        if (IsLightCard(card) != light)
+            return ThemePalette.ThemeCard.Default;
+
+        return card;
+    }
 
     /// <summary>The accent a choice resolves to right now.</summary>
     public static Color Resolve(string choice)
@@ -323,16 +490,18 @@ internal static class ThemeManager
         return true;
     }
 
-    private static void Install(Application app, string choice)
+    private static void Install(Application app)
     {
-        var accent = Resolve(choice);
+        var state = Active;
+        var requested = Resolve(state.Choice);
 
         // Normalises anything unrecognised back to the shipped accent rather than persisting a bad
         // value. Kept in step with Resolve above so the stored choice and the applied accent agree.
-        _choice = MatchChoice(choice);
-        _accent = accent;
+        state.Choice = MatchChoice(state.Choice);
+        _display = ThemePalette.Display(_light);
+        _accent = ThemePalette.ClampLuminance(requested, _display.AccentMin, _display.AccentMax);
 
-        var next = ThemePalette.Build(accent, _surface, _card);
+        var next = ThemePalette.Build(_accent, state.Surface, state.Card, _light);
         var merged = app.Resources.MergedDictionaries;
 
         if (_installed is not null)

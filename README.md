@@ -112,16 +112,19 @@ Single-colour keyboards get one Colour chip instead of four dead zones, and mode
 ### Appearance
 
 **Theme presets**<br>
-Nitrous, Ice, Ember, and Mono set the accent, background, and sections together. Change any one and the picker shows `Custom`, so it never claims a look it isn't showing.
+Dark: Nitrous, Ice, Ember, and Mono. Light: Daylight, Frost, Sand, and Mono. A preset sets the accent, background, and sections together, and editing any one switches the picker to `Custom`.
 
 **Accent and surfaces**<br>
-Seven curated accents, `Auto` to follow Windows, or any custom colour—contrast-checked so a pick can never make a label unreadable. Five window presets and independent card surfaces rebuild the hover, border, and toggle shades around the colour.
+Seven curated accents, `Auto` to follow Windows, or any custom colour—contrast-checked so a pick can never make a label unreadable. Light and dark each remember their own accent, background, and section choices; five dark window presets and four light ones rebuild the hover, border, and toggle shades around the colour.
+
+**Light, dark, or system**<br>
+Choose a mode or follow the Windows app theme. The two palettes are independent, so a light daylight look and a dark midnight look can each keep their own accent and surfaces.
 
 **Fonts and scale**<br>
 A font list built strictly from families installed on your PC, plus a whole-dashboard UI scale (90–125 %) that grows the window and every card, not just the text.
 
-**Shape and light**<br>
-Rounded, Soft, or Square corners across the dashboard and the fan-curve editor, compact navigation that drops the bottom-bar labels, and 92–100 % window opacity.
+**Shape, light, and height**<br>
+Rounded, Soft, or Square corners across the dashboard and the fan-curve editor, compact navigation that drops the bottom-bar labels, 92–100 % window opacity, and a bottom grip that changes only the window height and remembers it.
 
 **Dashboard cards**<br>
 Show or hide the temperature graph, power modes, display controls, and fans individually. Hidden cards keep working; only their place on the page goes.
@@ -130,7 +133,7 @@ Show or hide the temperature graph, power modes, display controls, and fans indi
 Every reading follows the unit—chart axes and history ranges, thermal limits, the hover readout, and the curve editor—while the hardware is still read and written in Celsius.
 
 **Toast and tray**<br>
-The power-profile toast can sit at either screen edge, last 1–4 seconds, and scale 80–120 %. It comes in three designs—**Card** with the logo tile, **Compact**, or **Minimal** with just the mode name—and its colour follows the firmware's keyboard flash by default (Quiet white, Balanced orange, Performance crimson, Turbo violet), with each mode recolourable. The tray icon can show the logo, the active mode, or live CPU temperature.
+The power-profile toast can sit at either screen edge, last 1–4 seconds, and scale 80–120 %. It comes in four designs—**Card** with the logo tile, **Compact**, **Minimal**, or **Nitro** with the angular N mark—and its colour follows the firmware's keyboard flash by default (Quiet white, Balanced orange, Performance crimson, Turbo violet), with each mode recolourable. The tray icon can show the logo, the active mode, or live CPU temperature.
 
 **Keep awake**<br>
 A coffee toggle in the title bar holds a Windows execution-state request so the machine and screen stay awake—no timer and no service, and the tray keeps it after the dashboard is closed.
