@@ -3,6 +3,27 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.18.0 - 2026-11-28
+
+### Power
+
+**0.18.0 adds app profiles: rules that switch the power mode and fans while a chosen app runs.**
+
+- **Per-app power modes.** Add an executable by browsing or picking a running windowed app, then
+  choose Quiet, Balanced, Performance or Turbo. The tray checks one process snapshot every three
+  seconds, and only when a rule is enabled; an empty list costs one registry read and no process scan.
+- **Per-app fans.** Each rule can leave the fans alone (the default) or ask for Auto, Max or Custom.
+  Custom uses the saved custom speeds, or the fan curve when curve mode is on.
+- **Restore and overrides.** The pre-rule mode and fan are restored when the last match exits. The
+  AC/DC slots are never overwritten; a manual power or fan change during a rule becomes the restore
+  target instead of being fought; a different matching app clears both overrides. Turbo clamps to
+  Performance where the firmware does not expose it.
+- **Visible state.** Setup > Power shows the rules and the active one, including its fan choice; the
+  toast announces the app and the applied mode on entry. The first matching rule wins.
+
+Rules are stored as one JSON value. They reuse the same power, CPU and GPU writes as a manual switch;
+there is no new hardware access. The feature does nothing until a rule is added.
+
 ## 0.18.0-test.2 - 2026-11-28
 
 ### Power
