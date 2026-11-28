@@ -3,6 +3,33 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0 - 2026-11-28
+
+### Appearance
+
+**0.17.0 is the appearance line: the dashboard now fits the way you want to use it, without touching
+how it reads or writes the hardware.**
+
+- **Theme presets.** Nitrous, Ice, Ember and Mono set the accent, background and sections together;
+  editing any one switches the picker to Custom.
+- **Whole-dashboard UI scale.** 90 / 100 / 110 / 125 %. The window, cards, text and controls grow
+  together through a layout transform, and 125 % is offered only where the screen fits it.
+- **Corners.** Rounded (default), Soft or Square across the dashboard, cards, controls, accent
+  swatches and the whole fan-curve editor, including its own window.
+- **Dashboard cards on or off.** The temperature graph, Power modes, Display and Fans can each be
+  hidden from Theme; a hidden card keeps working, only its place on the page goes.
+- **Celsius or Fahrenheit.** The telemetry cards, chart axes, history ranges, hover readout, thermal
+  limits and the fan-curve axis and readout follow the choice; stored and written values stay Celsius.
+- **Compact navigation and window opacity.** Hide the bottom-bar labels and shorten it, and set the
+  frame to 92-100 %.
+- **Toast and tray.** Card, Compact or Minimal toast designs, either screen edge, 1-4 seconds and
+  80-120 %. Mode colours follow the firmware's keyboard flash by default (Quiet white, Balanced
+  orange, Performance crimson, Turbo violet) and each mode can be recoloured. The tray icon can show
+  the logo, the active mode, or live CPU temperature, and changes reach it immediately.
+
+Everything above is presentation only: no hardware writes, no new polling, and the default logo tray
+style does no recurring work. The fan-curve editor keeps its fixed window because it is a plot.
+
 ## 0.17.0-test.7 - 2026-11-28
 
 ### Appearance
