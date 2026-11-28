@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.3 - 2026-11-29
+
+### Display
+
+- **The refresh list matches Windows.** Nitrous now keeps the rates the monitor declares in its
+  EDID - base-block and CTA detailed timings, plus the DisplayID timings laptop panels use for
+  their fast modes - together with the rate the display is running now, instead of every mode the
+  driver can synthesize. The built-in panel now lists 60/120/180 Hz instead of
+  48/60/75/100/120/180. A resolution the EDID does not describe keeps the full driver list, so
+  scaled and non-native modes still work.
+- **Monitors have names.** The DISPLAY card and the Monitor selector show the monitor's own EDID
+  name - "27G64", "NE160QDM-NYL" - which Windows reads from the same place, instead of only the
+  adapter.
+
 ## 0.20.0-test.2 - 2026-11-28
 
 ### Diagnostics
