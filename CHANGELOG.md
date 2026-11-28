@@ -3,6 +3,14 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.3 - 2026-11-28
+
+### Appearance
+
+- **The accent swatches now follow Square corners while the window is open.** They were created with a
+  captured corner radius, so turning the toggle off left them square until the dashboard was reopened;
+  they now use resource references like the rest of the surface, including the selection ring.
+
 ## 0.17.0-test.2 - 2026-11-28
 
 ### Appearance
