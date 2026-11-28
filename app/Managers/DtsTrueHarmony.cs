@@ -85,6 +85,30 @@ internal static class DtsTrueHarmony
         return baseName.Replace("APO4-", "");
     }
 
+    /// <summary>What the controller reports, for a diagnostics bundle - no state is changed.</summary>
+    public static Dictionary<string, object?> GetDiagnosticsSnapshot()
+    {
+        var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        var controller = FindController();
+
+        result["installed"] = controller is not null;
+        result["controllerDirectory"] = controller;
+
+        var state = Read();
+        if (state is null)
+        {
+            result["available"] = false;
+            return result;
+        }
+
+        result["available"] = true;
+        result["endpoint"] = state.FriendlyName;
+        result["currentPreset"] = state.CurrentBase;
+        result["output"] = state.OutputSuffix;
+        result["presets"] = state.Bases.ToArray();
+        return result;
+    }
+
     /// <summary>The output the active mode is on, in the words the control shows.</summary>
     public static string OutputLabel(string suffix)
     {

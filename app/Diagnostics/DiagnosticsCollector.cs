@@ -147,6 +147,20 @@ public static class DiagnosticsCollector
                 WriteJson(temporaryDirectory, "display.json", display);
             }
 
+            progress?.Report("Reading audio preset...");
+            var audio = await CollectSectionAsync(
+                "audio",
+                () => Task.Run(DtsTrueHarmony.GetDiagnosticsSnapshot, cancellationToken),
+                DisplayTimeout,
+                errors,
+                cancellationToken).ConfigureAwait(false);
+
+            if (audio != null)
+            {
+                report["audio"] = audio;
+                WriteJson(temporaryDirectory, "audio.json", audio);
+            }
+
             progress?.Report("Querying startup task...");
             var startup = await CollectSectionAsync(
                 "startup",
