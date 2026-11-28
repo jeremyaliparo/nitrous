@@ -3,6 +3,36 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0 - 2026-11-28
+
+### Appearance
+
+**0.19.0 is the light, shape and toast line.**
+
+- **Light, dark and System.** Choose a mode or follow the Windows app theme. Light and dark keep
+  their own accent, background and section choices; light adds Daylight, Frost, Sand and Mono
+  presets and a palette with its own text, status and accent contrast range so it stays readable on
+  white. System follows Windows live.
+- **Height-only resize.** A grip below the navigation changes the dashboard height and nothing else.
+  The height is saved as `WindowHeight`, scales with the UI scale, has a 520 px minimum and is
+  clamped to the screen.
+- **A fourth toast design.** Nitro uses the angular N mark, cropped to a transparent asset. The
+  coloured dot at the right edge is gone from every design; the accent bar and the Nitro mark still
+  carry the mode colour, and Minimal keeps its left-hand dot.
+
+### Power
+
+- **App profiles are event-driven.** The three-second process snapshot is gone. A WMI watcher
+  subscribes to `Win32_ProcessStartTrace` and `Win32_ProcessStopTrace`, takes one snapshot when it
+  starts and after resume or a WMI restart, and otherwise wakes only for a start/stop. Rule edits and
+  manual power/fan changes signal the tray through a named event. A ten-second poll exists only if
+  the WMI subscription is refused. A stop event takes one live snapshot so packaged apps cannot leave
+  a stale count and keep a rule active.
+- **Overrides and cross-process fixes.** The fan hotkey applies the chosen fan directly when a rule
+  owns the fans; AC/DC re-applies respect a manual power or fan override; the keyboard flash and
+  Whisper Mode share their state across the tray and dashboard, so cycling to Quiet then switching to
+  Performance flashes and releases Whisper correctly.
+
 ## 0.19.0-test.6 - 2026-11-28
 
 ### Power
