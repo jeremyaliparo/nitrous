@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.2 - 2026-11-28
+
+### Appearance
+
+- **Square corners now cover the rest of the surface.** The cards built on `SetupCardStyle` - including the
+  dashboard temperature graph and the Accent Colour section - follow the toggle, as do the accent swatches
+  and their selection ring. The whole fan-curve editor follows too: its window, CPU/GPU tabs, Ramp Down
+  choices, Enable Curve Override and Snap to Grid boxes, and Save & Apply button. The curve editor is a
+  separate window, so it reads the choice when it opens and when it is activated.
+
 ## 0.17.0-test.1 - 2026-11-28
 
 ### Appearance
