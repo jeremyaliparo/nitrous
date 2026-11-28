@@ -279,7 +279,7 @@
 
         <Style x:Key="SetupCardStyle" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBgBrush}"/>
-            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Margin" Value="0,0,0,8"/>

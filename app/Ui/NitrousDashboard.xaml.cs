@@ -65,9 +65,9 @@ public partial class NitrousDashboard : Window
 
         ThemeManager.Changed += OnThemeChanged;
         Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
+        InitializeAppearanceCustomizations();
         BuildAppearanceSwatches();
         BuildFontChoices();
-        InitializeAppearanceCustomizations();
 
         // Shown unless it has been turned off; read before the binding exists so the toggle cannot
         // write a default back over the saved choice.
@@ -711,13 +711,19 @@ public partial class NitrousDashboard : Window
     /// "Pick any colour". A fixed spectrum rather than the current choice, because the row is only
     /// rebuilt on theme change; the selection ring and the rest of the window show what is in use.
     /// </summary>
+    private CornerRadius SwatchCorner =>
+        Resources["ChipCornerRadius"] is CornerRadius radius ? radius : new CornerRadius(6);
+
+    private CornerRadius SwatchRingCorner =>
+        Resources["SurfaceCornerRadius"] is CornerRadius radius ? radius : new CornerRadius(8);
+
     private Button CreateCustomSwatch()
     {
         var inner = new Border
         {
             Width = 22,
             Height = 22,
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = SwatchCorner,
             Background = new LinearGradientBrush
             {
                 StartPoint = new System.Windows.Point(0, 0),
@@ -737,7 +743,7 @@ public partial class NitrousDashboard : Window
         {
             Width = 28,
             Height = 28,
-            CornerRadius = new CornerRadius(9),
+            CornerRadius = SwatchRingCorner,
             BorderThickness = new Thickness(2),
             BorderBrush = Brushes.Transparent,
             Child = inner
@@ -781,7 +787,7 @@ public partial class NitrousDashboard : Window
         {
             Width = 22,
             Height = 22,
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = SwatchCorner,
             Background = colour is { } c ? new SolidColorBrush(c) : null
         };
 
@@ -805,7 +811,7 @@ public partial class NitrousDashboard : Window
         {
             Width = 28,
             Height = 28,
-            CornerRadius = new CornerRadius(9),
+            CornerRadius = SwatchRingCorner,
             BorderThickness = new Thickness(2),
             BorderBrush = Brushes.Transparent,
             Child = inner

@@ -46,6 +46,24 @@ internal static class UiCapture
             window.Show();
             window.SelectPageForCapture(page);
 
+            // The fan-curve editor is a separate window; render it when asked, after the dashboard
+            // has supplied its view model.
+            Window target = window;
+            FanCurveWindow? curve = null;
+            if (page.StartsWith("curve", StringComparison.OrdinalIgnoreCase))
+            {
+                curve = new FanCurveWindow((DashboardViewModel)window.DataContext)
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = -32000,
+                    Top = -32000,
+                    ShowActivated = false,
+                    Topmost = false
+                };
+                curve.Show();
+                target = curve;
+            }
+
             var wait = settleMs > 0 ? settleMs : DefaultSettleFor(page);
             Logger.Info($"Capture: page '{page}' at scale {scale}, settling {wait} ms, writing '{outputPath}'.");
 
@@ -68,7 +86,7 @@ internal static class UiCapture
                     if (page.Contains("gpu-dds-preview", StringComparison.OrdinalIgnoreCase))
                         window.ShowGpuMuxPreviewForCapture(dds: true);
 
-                    Save(window, outputPath, scale);
+                    Save(target, outputPath, scale);
                 }
                 catch (Exception ex)
                 {
@@ -76,6 +94,7 @@ internal static class UiCapture
                     Environment.ExitCode = 2;
                 }
 
+                curve?.Close();
                 app.Shutdown();
             };
             timer.Start();

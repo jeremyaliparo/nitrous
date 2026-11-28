@@ -44,6 +44,9 @@ public partial class FanCurveWindow : Window
         _viewModel = viewModel;
         DataContext = _viewModel;
 
+        ApplyCornerStyle();
+        Activated += (_, _) => ApplyCornerStyle();
+
         ApplyThemeGlow();
 
         SyncRampSelection();
@@ -55,6 +58,20 @@ public partial class FanCurveWindow : Window
         LoadCurvesForProfile(_viewModel.ActivePowerProfile);
 
         this.Loaded += (s, e) => RedrawGraph();
+    }
+
+    /// <summary>
+    /// Square corners are a Theme choice; the curve editor is a separate window, so it reads the
+    /// setting on open and when activated rather than sharing the dashboard's resources.
+    /// </summary>
+    private void ApplyCornerStyle()
+    {
+        var square = SettingsManager.Get("SquareCorners", 0) == 1;
+        Resources["FrameCornerRadius"] = new CornerRadius(square ? 0 : 16);
+        Resources["HeroCornerRadius"] = new CornerRadius(square ? 0 : 12);
+        Resources["SurfaceCornerRadius"] = new CornerRadius(square ? 0 : 8);
+        Resources["ChipCornerRadius"] = new CornerRadius(square ? 0 : 6);
+        Resources["MicroCornerRadius"] = new CornerRadius(square ? 0 : 2);
     }
 
     /// <summary>
