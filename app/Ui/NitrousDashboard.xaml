@@ -660,7 +660,7 @@
 			<Grid.RowDefinitions>
 				<RowDefinition Height="50"/>
 				<RowDefinition Height="*"/>
-				<RowDefinition Height="54"/>
+				<RowDefinition x:Name="NavRow" Height="54"/>
 			</Grid.RowDefinitions>
 			<!-- Title Bar -->
 			<Grid Grid.Row="0" MouseLeftButtonDown="TitleBar_MouseDown" Background="Transparent">
@@ -831,7 +831,7 @@
 						</Border>
 					</Grid>
 					<!-- Temperature history: timestamped samples, 2/5/15 min, hover readout -->
-					<Border Style="{StaticResource SetupCardStyle}" Padding="12,10" Margin="0,0,0,8">
+					<Border x:Name="TemperatureCard" Style="{StaticResource SetupCardStyle}" Padding="12,10" Margin="0,0,0,8">
 						<StackPanel>
 							<Grid>
 								<TextBlock Text="TEMPERATURE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -905,6 +905,7 @@
 						</StackPanel>
 					</Border>
 
+					<StackPanel x:Name="PowerSection">
 					<!-- Power Modes -->
 					<Grid Margin="0,0,0,8">
 						<TextBlock Text="POWER" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -924,7 +925,9 @@
 							<RadioButton x:Name="BtnPowerTurbo" TabIndex="1" GroupName="Power" Uid="Turbo" Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Turbo" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Turbo" Visibility="{Binding IsTurboSupported, Converter={StaticResource BoolToVis}}"/>
 						</UniformGrid>
 					</Border>
+					</StackPanel>
 					<!-- Display: refresh rate and panel overdrive -->
+					<StackPanel x:Name="DisplaySection">
 					<Grid Margin="0,0,0,8">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto"/>
@@ -948,7 +951,9 @@
 							</Grid>
 						</StackPanel>
 					</Border>
+					</StackPanel>
 					<!-- Fans -->
+					<StackPanel x:Name="FanSection">
 					<TextBlock Text="FANS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
 					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,16">
 						<UniformGrid Rows="1" Height="34">
@@ -1039,6 +1044,7 @@
 								<Slider x:Name="GpuFanSlider" Style="{StaticResource ModernSliderStyle}" Minimum="1" Maximum="100" Value="{Binding GpuFanSpeed, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsManualSliderEnabled}" IsSnapToTickEnabled="True" TickFrequency="1"/>
 							</StackPanel>
 						</Border>
+					</StackPanel>
 					</StackPanel>
 					</StackPanel>
 				</ScrollViewer>
@@ -1564,6 +1570,20 @@
 											<TextBlock Text="Accent Colour" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 										</StackPanel>
 										<TextBlock Text="Nitrous violet by default. Pick a preset, choose your own colour, or follow Windows." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Preset" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Sets the accent, background and sections together. Editing any of them switches to Custom."/>
+											<ComboBox Grid.Column="1" x:Name="ThemePresetBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="ThemePreset_Changed">
+												<ComboBoxItem Content="Nitrous"/>
+												<ComboBoxItem Content="Ice"/>
+												<ComboBoxItem Content="Ember"/>
+												<ComboBoxItem Content="Mono"/>
+												<ComboBoxItem Content="Custom" IsEnabled="False"/>
+											</ComboBox>
+										</Grid>
 										<StackPanel x:Name="AccentSwatchRow" Orientation="Horizontal" Margin="0,10,0,0"/>
 										<Grid Margin="0,12,0,0">
 											<Grid.ColumnDefinitions>
@@ -1628,10 +1648,144 @@
 												<ColumnDefinition Width="*"/>
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
-											<TextBlock Text="Square corners" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Remove the rounded corners from the dashboard, cards and controls."/>
-											<CheckBox Grid.Column="1" x:Name="TogSquareCorners" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
-												Checked="SquareCorners_Toggled" Unchecked="SquareCorners_Toggled"
-												ToolTip="Remove the rounded corners from the dashboard, cards and controls."/>
+											<TextBlock Text="Corners" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Rounded is the shipped look. Soft halves every radius. Square removes them from the dashboard, cards and controls."/>
+											<ComboBox Grid.Column="1" x:Name="CornerStyleBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="CornerStyle_Changed" ToolTip="The dashboard and the curve editor follow this.">
+												<ComboBoxItem Content="Rounded"/>
+												<ComboBoxItem Content="Soft"/>
+												<ComboBoxItem Content="Square"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Temperature" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Changes every displayed temperature. Values are still read and stored in Celsius."/>
+											<ComboBox Grid.Column="1" x:Name="TemperatureUnitBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="TemperatureUnit_Changed" ToolTip="Readings and limits switch unit; the hardware is unchanged.">
+												<ComboBoxItem Content="Celsius"/>
+												<ComboBoxItem Content="Fahrenheit"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Compact navigation" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Hide the bottom bar labels and shorten it."/>
+											<CheckBox Grid.Column="1" x:Name="TogCompactNav" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
+												Checked="CompactNav_Toggled" Unchecked="CompactNav_Toggled"
+												ToolTip="Hide the bottom bar labels and shorten it."/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.RowDefinitions>
+												<RowDefinition Height="Auto"/>
+												<RowDefinition Height="Auto"/>
+											</Grid.RowDefinitions>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Window opacity" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="92-100% keeps every label readable over bright content."/>
+											<TextBlock Grid.Column="1" x:Name="WindowOpacityText" Text="100%" Foreground="{DynamicResource AccentBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+											<Slider Grid.Row="1" Grid.ColumnSpan="2" x:Name="WindowOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="92" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1" ValueChanged="WindowOpacity_Changed" Margin="0,4,0,0"/>
+										</Grid>
+									</StackPanel>
+								</Border>
+
+								<TextBlock Text="DASHBOARD CARDS" Style="{StaticResource SetupSectionLabelStyle}" Margin="0,14,0,6"/>
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+										<TextBlock Text="Choose what the dashboard shows. Hidden cards keep working; only their place on the page is removed." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,4"/>
+										<Grid Margin="0,6,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Temperature graph" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<CheckBox Grid.Column="1" x:Name="TogCardTemperature" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Checked="DashCardOption_Toggled" Unchecked="DashCardOption_Toggled"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Power modes" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<CheckBox Grid.Column="1" x:Name="TogCardPower" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Checked="DashCardOption_Toggled" Unchecked="DashCardOption_Toggled"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Display" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<CheckBox Grid.Column="1" x:Name="TogCardDisplay" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Checked="DashCardOption_Toggled" Unchecked="DashCardOption_Toggled"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Fans" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<CheckBox Grid.Column="1" x:Name="TogCardFans" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center" Checked="DashCardOption_Toggled" Unchecked="DashCardOption_Toggled"/>
+										</Grid>
+									</StackPanel>
+								</Border>
+
+								<TextBlock Text="OVERLAY AND TRAY" Style="{StaticResource SetupSectionLabelStyle}" Margin="0,14,0,6"/>
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10">
+									<StackPanel>
+										<TextBlock Text="The power-profile toast and the tray icon. The tray picks changes up within ten seconds." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,0,0,4"/>
+										<Grid Margin="0,6,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Toast position" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="OsdPositionBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="OsdPosition_Changed">
+												<ComboBoxItem Content="Bottom centre"/>
+												<ComboBoxItem Content="Top centre"/>
+												<ComboBoxItem Content="Bottom right"/>
+												<ComboBoxItem Content="Bottom left"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Toast duration" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="OsdDurationBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="OsdDuration_Changed">
+												<ComboBoxItem Content="1 second"/>
+												<ComboBoxItem Content="2 seconds"/>
+												<ComboBoxItem Content="3 seconds"/>
+												<ComboBoxItem Content="4 seconds"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Toast size" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="OsdSizeBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="OsdSize_Changed">
+												<ComboBoxItem Content="80%"/>
+												<ComboBoxItem Content="90%"/>
+												<ComboBoxItem Content="100%"/>
+												<ComboBoxItem Content="110%"/>
+												<ComboBoxItem Content="120%"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Tray icon" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="The CPU temperature style reads the sensor every ten seconds."/>
+											<ComboBox Grid.Column="1" x:Name="TrayIconBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="TrayIcon_Changed">
+												<ComboBoxItem Content="Logo"/>
+												<ComboBoxItem Content="Mode colour"/>
+												<ComboBoxItem Content="CPU temperature"/>
+											</ComboBox>
 										</Grid>
 									</StackPanel>
 								</Border>
@@ -1867,8 +2021,8 @@
 							</Grid>
 							<Slider x:Name="GpuThermalSlider" Style="{StaticResource ModernSliderStyle}" Minimum="{Binding GpuThermalMinimum}" Maximum="{Binding GpuThermalMaximum}" Value="{Binding GpuThermalLimit, UpdateSourceTrigger=PropertyChanged}" IsSnapToTickEnabled="True" TickFrequency="1" IsEnabled="{Binding GpuThermalEditable}"/>
 							<Grid Margin="0,2,0,4">
-								<TextBlock Text="{Binding GpuThermalMinimum, StringFormat={}{0} C}" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
-								<TextBlock Text="{Binding GpuThermalMaximum, StringFormat={}{0} C default}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
+								<TextBlock Text="{Binding GpuThermalMinimumText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9"/>
+								<TextBlock Text="{Binding GpuThermalMaximumText}" Foreground="{DynamicResource TextDimBrush}" FontSize="9" HorizontalAlignment="Right"/>
 							</Grid>
 							<TextBlock x:Name="GpuThermalHint" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" TextWrapping="Wrap" Margin="0,0,0,10"/>
 

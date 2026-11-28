@@ -198,6 +198,28 @@ internal static class ThemeManager
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// Applies a named preset: accent, window background and card surface at once, so the
+    /// dashboard is rebuilt once rather than three times.
+    /// </summary>
+    public static void SetPreset(
+        Application? app,
+        string choice,
+        ThemePalette.ThemeSurface surface,
+        ThemePalette.ThemeCard card)
+    {
+        if (app is null)
+            return;
+
+        _surface = surface;
+        _card = card;
+        Install(app, choice);
+        SettingsManager.Save(ChoiceKey, _choice);
+        SettingsManager.Save(SurfaceKey, surface.ToString());
+        SettingsManager.Save(CardKey, card.ToString());
+        Changed?.Invoke();
+    }
+
     private static string ReadFont(string? saved)
     {
         if (string.IsNullOrWhiteSpace(saved) ||

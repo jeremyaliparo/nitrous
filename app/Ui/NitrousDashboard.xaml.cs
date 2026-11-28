@@ -51,8 +51,8 @@ public partial class NitrousDashboard : Window
 
     private bool _gpuLimitsReading;
     private bool _gpuMuxReading;
-    private bool _cornerUpdating;
     private bool _uiScaleLoading;
+    private bool _dashboardOptionsLoading;
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
     /// <summary>The effect lists as offered on this machine: a five-effect controller hides the last two.</summary>
@@ -382,8 +382,8 @@ public partial class NitrousDashboard : Window
         var seconds = Math.Max(0, (int)Math.Round((DateTime.Now - sample.At).TotalSeconds));
         var when = seconds < 60 ? $"-{seconds} s" : $"-{seconds / 60}:{seconds % 60:00}";
 
-        var text = cpu ? $"{when} \u00b7 CPU {sample.Cpu} C" : when;
-        if (gpu) text += $" \u00b7 GPU {sample.Gpu} C";
+        var text = cpu ? $"{when} \u00b7 CPU {TemperatureDisplay.Short((int)sample.Cpu)}" : when;
+        if (gpu) text += $" \u00b7 GPU {TemperatureDisplay.Short((int)sample.Gpu)}";
 
         TemperatureHoverText.Text = text;
         TemperatureHoverText.Visibility = Visibility.Visible;
@@ -691,6 +691,18 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
+    /// Named combinations of the three palette choices. "Custom" is derived: the list shows it
+    /// whenever the current accent, background and card match none of these.
+    /// </summary>
+    private static readonly (string Name, string Accent, ThemePalette.ThemeSurface Surface, ThemePalette.ThemeCard Card)[] ThemePresets =
+    [
+        ("Nitrous", "#B388FF", ThemePalette.ThemeSurface.Midnight, ThemePalette.ThemeCard.Default),
+        ("Ice", "#2FD4E6", ThemePalette.ThemeSurface.Slate, ThemePalette.ThemeCard.Default),
+        ("Ember", "#FF8A3D", ThemePalette.ThemeSurface.Graphite, ThemePalette.ThemeCard.Default),
+        ("Mono", "#C8C8D0", ThemePalette.ThemeSurface.Black, ThemePalette.ThemeCard.Default)
+    ];
+
+    /// <summary>
     /// Builds the accent row from the palette instead of hand-written XAML: the selected ring has
     /// to track a runtime value, and eight near-identical blocks are easy to get wrong by hand.
     /// </summary>
@@ -885,6 +897,7 @@ public partial class NitrousDashboard : Window
         _appearanceLoading = true;
         try
         {
+            ThemePresetBox.SelectedIndex = IndexOfPreset();
             BackgroundBox.SelectedIndex = IndexOfSurface(ThemeManager.Surface);
             SectionsBox.SelectedIndex = IndexOfCard(ThemeManager.Card);
             FontBox.SelectedIndex = IndexOfFont(ThemeManager.FontChoice);
@@ -893,6 +906,27 @@ public partial class NitrousDashboard : Window
         {
             _appearanceLoading = false;
         }
+    }
+
+    /// <summary>The matching preset, or the trailing "Custom" entry.</summary>
+    private static int IndexOfPreset()
+    {
+        var index = Array.FindIndex(ThemePresets, p =>
+            string.Equals(p.Accent, ThemeManager.Choice, StringComparison.OrdinalIgnoreCase) &&
+            p.Surface == ThemeManager.Surface &&
+            p.Card == ThemeManager.Card);
+
+        return index >= 0 ? index : ThemePresets.Length;
+    }
+
+    private void ThemePreset_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appearanceLoading || ThemePresetBox.SelectedIndex < 0) return;
+        if (ThemePresetBox.SelectedIndex >= ThemePresets.Length) return;
+
+        var preset = ThemePresets[ThemePresetBox.SelectedIndex];
+        ThemeManager.SetPreset(
+            System.Windows.Application.Current, preset.Accent, preset.Surface, preset.Card);
     }
 
     private static int IndexOfSurface(ThemePalette.ThemeSurface surface) =>
@@ -930,51 +964,178 @@ public partial class NitrousDashboard : Window
     }
 
     /// <summary>
-    /// Loads the two appearance choices that are not part of the palette: the corner style and the
-    /// dashboard scale. Both are dashboard-only; the tray OSD keeps its own fixed size.
+    /// Loads the appearance choices that are not part of the palette. The corner style and scale
+    /// are shared with the curve editor; the remaining choices cover the dashboard and the tray.
     /// </summary>
     private void InitializeAppearanceCustomizations()
     {
-        var square = SettingsManager.Get("SquareCorners", 0) == 1;
-        _cornerUpdating = true;
-        try { TogSquareCorners.IsChecked = square; }
-        finally { _cornerUpdating = false; }
-        ApplyCornerStyle(square);
+        _dashboardOptionsLoading = true;
+        try
+        {
+            CornerStyleBox.SelectedIndex = (int)CornerStyles.Current;
+            TemperatureUnitBox.SelectedIndex = TemperatureDisplay.UseFahrenheit ? 1 : 0;
+            TogCompactNav.IsChecked = SettingsManager.Get("CompactNav", 0) == 1;
+            WindowOpacitySlider.Value = Math.Clamp(SettingsManager.Get("WindowOpacity", 100), 90, 100);
+            TogCardTemperature.IsChecked = SettingsManager.Get("ShowTemperatureCard", 1) == 1;
+            TogCardPower.IsChecked = SettingsManager.Get("ShowPowerCard", 1) == 1;
+            TogCardDisplay.IsChecked = SettingsManager.Get("ShowDisplayCard", 1) == 1;
+            TogCardFans.IsChecked = SettingsManager.Get("ShowFansCard", 1) == 1;
+
+            OsdPositionBox.SelectedIndex =
+                Math.Max(0, Array.IndexOf(UiPreferences.OsdPositions, UiPreferences.OsdPosition));
+            OsdDurationBox.SelectedIndex =
+                Math.Max(0, Array.IndexOf(UiPreferences.OsdDurations, UiPreferences.OsdDurationSeconds));
+            OsdSizeBox.SelectedIndex =
+                Math.Max(0, Array.IndexOf(UiPreferences.OsdSizes, UiPreferences.OsdSizePercent));
+            TrayIconBox.SelectedIndex =
+                Math.Max(0, Array.IndexOf(UiPreferences.TrayIconStyles, UiPreferences.TrayIconStyle));
+        }
+        finally
+        {
+            _dashboardOptionsLoading = false;
+        }
+
+        ApplyCornerStyle(CornerStyles.Current);
+        ApplyCompactNav(TogCompactNav.IsChecked == true);
+        ApplyWindowOpacity((int)WindowOpacitySlider.Value);
+        ApplyDashCardVisibility();
 
         LoadUiScaleOptions(SettingsManager.Get("UiScale", 100));
     }
 
-    private void SquareCorners_Toggled(object sender, RoutedEventArgs e)
+    private void CornerStyle_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (_cornerUpdating) return;
+        if (_dashboardOptionsLoading || CornerStyleBox.SelectedIndex < 0) return;
 
-        var square = TogSquareCorners.IsChecked == true;
-        SettingsManager.Save("SquareCorners", square ? 1 : 0);
-        ApplyCornerStyle(square);
+        var style = (CornerStyle)Math.Clamp(CornerStyleBox.SelectedIndex, 0, 2);
+        CornerStyles.Save(style);
+        ApplyCornerStyle(style);
     }
 
     /// <summary>
-    /// Zeroes the shared corner radii. Every corner in the dashboard resolves through one of these
-    /// resources, so the whole surface becomes square at once; the nav buttons carry their own
-    /// per-edge radii in Tag, which the style binds.
+    /// Applies the shared corner choice to every corner in the dashboard. Square zeroes them,
+    /// Soft halves them, Rounded is the shipped look; the nav buttons carry per-edge radii in
+    /// Tag, which the style binds.
     /// </summary>
-    private void ApplyCornerStyle(bool square)
+    private void ApplyCornerStyle(CornerStyle style)
     {
-        Resources["FrameCornerRadius"] = new CornerRadius(square ? 0 : 16);
-        Resources["HeroCornerRadius"] = new CornerRadius(square ? 0 : 12);
-        Resources["CardCornerRadius"] = new CornerRadius(square ? 0 : 10);
-        Resources["SurfaceCornerRadius"] = new CornerRadius(square ? 0 : 8);
-        Resources["ChipCornerRadius"] = new CornerRadius(square ? 0 : 6);
-        Resources["MicroCornerRadius"] = new CornerRadius(square ? 0 : 2);
-        Resources["SwatchRingCornerRadius"] = new CornerRadius(square ? 0 : 9);
-        Resources["NavBarCornerRadius"] = square
-            ? new CornerRadius(0)
-            : new CornerRadius(0, 0, 15, 15);
+        var radii = CornerStyles.Radii(style);
+        Resources["FrameCornerRadius"] = new CornerRadius(radii.Frame);
+        Resources["HeroCornerRadius"] = new CornerRadius(radii.Hero);
+        Resources["CardCornerRadius"] = new CornerRadius(radii.Card);
+        Resources["SurfaceCornerRadius"] = new CornerRadius(radii.Surface);
+        Resources["ChipCornerRadius"] = new CornerRadius(radii.Chip);
+        Resources["MicroCornerRadius"] = new CornerRadius(radii.Micro);
+        Resources["SwatchRingCornerRadius"] = new CornerRadius(radii.Ring);
+        Resources["NavBarCornerRadius"] = new CornerRadius(0, 0, radii.Nav, radii.Nav);
 
-        NavDashBtn.Tag = square ? "0,0,0,0" : "0,0,0,15";
+        NavDashBtn.Tag = $"0,0,0,{radii.Nav:0}";
         NavGpuBtn.Tag = "0,0,0,0";
         NavKeyboardBtn.Tag = "0,0,0,0";
-        NavSetBtn.Tag = square ? "0,0,0,0" : "0,0,15,0";
+        NavSetBtn.Tag = $"0,0,{radii.Nav:0},0";
+    }
+
+    private void ApplyCompactNav(bool compact)
+    {
+        var visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        NavDashText.Visibility = visibility;
+        NavGpuText.Visibility = visibility;
+        NavKeyboardText.Visibility = visibility;
+        NavSetText.Visibility = visibility;
+        NavRow.Height = new GridLength(compact ? 42 : 54);
+    }
+
+    private void ApplyWindowOpacity(int percent)
+    {
+        percent = Math.Clamp(percent, 90, 100);
+        Opacity = percent / 100.0;
+        WindowOpacityText.Text = $"{percent}%";
+    }
+
+    private void ApplyDashCardVisibility()
+    {
+        TemperatureCard.Visibility =
+            TogCardTemperature.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PowerSection.Visibility =
+            TogCardPower.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        DisplaySection.Visibility =
+            TogCardDisplay.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        FanSection.Visibility =
+            TogCardFans.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void CompactNav_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_dashboardOptionsLoading) return;
+
+        var compact = TogCompactNav.IsChecked == true;
+        SettingsManager.Save("CompactNav", compact ? 1 : 0);
+        ApplyCompactNav(compact);
+    }
+
+    private void WindowOpacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        // The slider raises ValueChanged once while the XAML is built; the saved choice is
+        // applied explicitly after InitializeAppearanceCustomizations has read it.
+        if (_dashboardOptionsLoading || !IsLoaded) return;
+
+        var percent = (int)Math.Round(e.NewValue);
+        SettingsManager.Save("WindowOpacity", percent);
+        ApplyWindowOpacity(percent);
+    }
+
+    private void DashCardOption_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_dashboardOptionsLoading) return;
+
+        SettingsManager.Save("ShowTemperatureCard", TogCardTemperature.IsChecked == true ? 1 : 0);
+        SettingsManager.Save("ShowPowerCard", TogCardPower.IsChecked == true ? 1 : 0);
+        SettingsManager.Save("ShowDisplayCard", TogCardDisplay.IsChecked == true ? 1 : 0);
+        SettingsManager.Save("ShowFansCard", TogCardFans.IsChecked == true ? 1 : 0);
+        ApplyDashCardVisibility();
+    }
+
+    private void TemperatureUnit_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || TemperatureUnitBox.SelectedIndex < 0) return;
+
+        var unit = TemperatureUnitBox.SelectedIndex == 1
+            ? TemperatureDisplay.Fahrenheit
+            : TemperatureDisplay.Celsius;
+        SettingsManager.Save("TemperatureUnit", unit);
+        (DataContext as DashboardViewModel)?.RefreshTemperatureLabels();
+    }
+
+    private void OsdPosition_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || OsdPositionBox.SelectedIndex < 0) return;
+
+        SettingsManager.Save("OsdPosition",
+            UiPreferences.OsdPositions[Math.Min(OsdPositionBox.SelectedIndex, UiPreferences.OsdPositions.Length - 1)]);
+    }
+
+    private void OsdDuration_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || OsdDurationBox.SelectedIndex < 0) return;
+
+        SettingsManager.Save("OsdDuration",
+            UiPreferences.OsdDurations[Math.Min(OsdDurationBox.SelectedIndex, UiPreferences.OsdDurations.Length - 1)]);
+    }
+
+    private void OsdSize_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || OsdSizeBox.SelectedIndex < 0) return;
+
+        SettingsManager.Save("OsdSize",
+            UiPreferences.OsdSizes[Math.Min(OsdSizeBox.SelectedIndex, UiPreferences.OsdSizes.Length - 1)]);
+    }
+
+    private void TrayIcon_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || TrayIconBox.SelectedIndex < 0) return;
+
+        SettingsManager.Save("TrayIconStyle",
+            UiPreferences.TrayIconStyles[Math.Min(TrayIconBox.SelectedIndex, UiPreferences.TrayIconStyles.Length - 1)]);
     }
 
     private void LoadUiScaleOptions(int saved)
@@ -2160,7 +2321,8 @@ public partial class NitrousDashboard : Window
         }
 
         GpuThermalHint.Text = state.Thermal is { } thermal
-            ? $"Allowed {thermal.Min}-{thermal.Default} C; {thermal.Default} C is the driver default. " +
+            ? $"Allowed {TemperatureDisplay.Short(thermal.Min)}\u2013{TemperatureDisplay.Short(thermal.Default)}; " +
+              $"{TemperatureDisplay.Short(thermal.Default)} is the driver default. " +
               "Lower runs cooler and quieter at the cost of boost."
             : "The GPU is asleep, so the target cannot be read or set.";
 

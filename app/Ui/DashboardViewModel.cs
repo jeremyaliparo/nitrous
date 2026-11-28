@@ -363,7 +363,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
         var parts = new List<string>(2);
 
         var thermal = GpuThermalTargetNow > 0 ? GpuThermalTargetNow : GpuThermalMaximum;
-        if (thermal > 0) parts.Add($"Thermal target {thermal} C");
+        if (thermal > 0) parts.Add($"Thermal target {TemperatureDisplay.Short(thermal)}");
 
         if (GpuClockMaximum > 0)
             parts.Add(GpuClockCapNow > 0 && GpuClockCapNow < GpuClockMaximum
@@ -589,7 +589,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _powerPillWattsText, value);
     }
 
-    private string _cpuTempText = "--°C";
+    private string _cpuTempText = $"-- {TemperatureDisplay.Unit}";
     public string CpuTempText { get => _cpuTempText; set => SetProperty(ref _cpuTempText, value); }
 
     private string _cpuTempColor = ThemeManager.TextPrimaryHex;
@@ -619,7 +619,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
         set => SetProperty(ref _gpuHistoryPoints, value);
     }
 
-    private string _gpuTempText = "--°C";
+    private string _gpuTempText = $"-- {TemperatureDisplay.Unit}";
     public string GpuTempText { get => _gpuTempText; set => SetProperty(ref _gpuTempText, value); }
 
     private string _gpuRpmText = "-- RPM";
@@ -675,7 +675,7 @@ public class DashboardViewModel : ObservableObject, IDisposable
                 if (result.Ok)
                 {
                     GpuThermalTarget.SaveFor(currentProfile, target);
-                    applied.Add(target == 0 ? "the driver's temperature" : $"{target} C");
+                    applied.Add(target == 0 ? "the driver's temperature" : TemperatureDisplay.Short(target));
                 }
                 else
                 {
@@ -789,8 +789,11 @@ public class DashboardViewModel : ObservableObject, IDisposable
         {
             if (!SetProperty(ref _gpuThermalMinimum, value)) return;
             OnPropertyChanged(nameof(GpuThermalEditable));
+            OnPropertyChanged(nameof(GpuThermalMinimumText));
         }
     }
+
+    public string GpuThermalMinimumText => TemperatureDisplay.Short(_gpuThermalMinimum);
 
     private int _gpuThermalMaximum;
     /// <summary>The policy's own default: the top of the slider, and the "follow the driver" choice.</summary>
@@ -802,8 +805,12 @@ public class DashboardViewModel : ObservableObject, IDisposable
             if (!SetProperty(ref _gpuThermalMaximum, value)) return;
             OnPropertyChanged(nameof(GpuThermalEditable));
             OnPropertyChanged(nameof(GpuThermalLimitText));
+            OnPropertyChanged(nameof(GpuThermalMaximumText));
         }
     }
+
+    public string GpuThermalMaximumText =>
+        _gpuThermalMaximum <= 0 ? "—" : $"{TemperatureDisplay.Short(_gpuThermalMaximum)} default";
 
     private int _gpuThermalLimit;
     public int GpuThermalLimit
@@ -819,8 +826,16 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
     public string GpuThermalLimitText =>
         GpuThermalMaximum <= 0 ? "—"
-        : GpuThermalLimit >= GpuThermalMaximum ? $"{GpuThermalLimit} C (default)"
-        : $"{GpuThermalLimit} C";
+        : GpuThermalLimit >= GpuThermalMaximum ? $"{TemperatureDisplay.Short(GpuThermalLimit)} (default)"
+        : TemperatureDisplay.Short(GpuThermalLimit);
+
+    /// <summary>Re-reads the unit choice for the limits that are shown as text, not polled.</summary>
+    public void RefreshTemperatureLabels()
+    {
+        OnPropertyChanged(nameof(GpuThermalLimitText));
+        OnPropertyChanged(nameof(GpuThermalMinimumText));
+        OnPropertyChanged(nameof(GpuThermalMaximumText));
+    }
 
     public bool GpuThermalEditable => ManageGpuClocks && GpuThermalMaximum > GpuThermalMinimum;
 
@@ -2194,9 +2209,9 @@ public class DashboardViewModel : ObservableObject, IDisposable
         GpuHistoryGeometry = gpuGeometry;
         ChartSamples = samples;
 
-        ChartAxisTop = $"{yMax}\u00b0";
-        ChartAxisMid = $"{Math.Round((yMin + yMax) / 2.0):0}\u00b0";
-        ChartAxisBottom = $"{yMin}\u00b0";
+        ChartAxisTop = TemperatureDisplay.Axis(yMax);
+        ChartAxisMid = TemperatureDisplay.Axis((int)Math.Round((yMin + yMax) / 2.0));
+        ChartAxisBottom = TemperatureDisplay.Axis(yMin);
 
         var half = _chartSpanMinutes / 2.0;
         ChartTimeLeft = $"-{_chartSpanMinutes}m";
@@ -2462,7 +2477,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
 
         return count == 0
             ? "--"
-            : $"{lo}\u2013{hi} \u00b7 avg {Math.Round((double)total / count):0} C";
+            : $"{TemperatureDisplay.Convert(lo)}\u2013{TemperatureDisplay.Convert(hi)} \u00b7 " +
+              $"avg {TemperatureDisplay.Convert((int)Math.Round((double)total / count))} {TemperatureDisplay.Unit}";
     }
 
     private void StartTelemetryPolling()
@@ -2575,13 +2591,13 @@ public class DashboardViewModel : ObservableObject, IDisposable
                         {
                             PowerPillWattsText = FormatBatteryPower(battery);
 
-                            CpuTempText = telemetry.CpuTemp > 0 ? $"{telemetry.CpuTemp} C" : "-- C";
+                            CpuTempText = TemperatureDisplay.Reading(telemetry.CpuTemp);
                             CpuRpmText = telemetry.CpuRpm > 0 ? $"{telemetry.CpuRpm} RPM" : "-- RPM";
                             CpuUsageText = cpuUsage is { } usage ? $"{usage}%" : "--%";
                             CpuTempColor = telemetry.CpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
 
                             var gpuTemp = chartGpuTemp;
-                            GpuTempText = gpuTemp > 0 ? $"{gpuTemp} C" : "-- C";
+                            GpuTempText = TemperatureDisplay.Reading(gpuTemp);
                             GpuRpmText = telemetry.GpuRpm > 0 ? $"{telemetry.GpuRpm} RPM" : "-- RPM";
                             GpuUsageText = smi is { HasData: true } ? $"{smi.GpuLoad}%" : "--%";
                             GpuTempColor = gpuTemp > 85 ? ThemeManager.DangerHex : ThemeManager.TextPrimaryHex;
@@ -2605,7 +2621,8 @@ public class DashboardViewModel : ObservableObject, IDisposable
                                 var target = GpuThermalTargetNow > 0
                                     ? GpuThermalTargetNow
                                     : GpuThermalMaximum > 0 ? GpuThermalMaximum : 87;
-                                GpuTempMeterText = $"{gpuData.CoreTemp} / {target} C";
+                                GpuTempMeterText = $"{TemperatureDisplay.Convert(gpuData.CoreTemp)} / " +
+                                                   $"{TemperatureDisplay.Convert(target)} {TemperatureDisplay.Unit}";
                                 GpuTempPercent = Math.Clamp(100.0 * gpuData.CoreTemp / target, 0, 100);
 
                                 GpuVramShortText = gpuData.VramTotalMb > 0

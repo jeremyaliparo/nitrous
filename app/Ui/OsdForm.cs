@@ -29,7 +29,7 @@ public sealed class OsdForm : Form
     private const int SlideDip = 12;
 
     private static readonly TimeSpan FadeIn = TimeSpan.FromMilliseconds(160);
-    private static readonly TimeSpan Hold = TimeSpan.FromMilliseconds(1400);
+    private static readonly TimeSpan DefaultHold = TimeSpan.FromMilliseconds(1400);
     private static readonly TimeSpan FadeOut = TimeSpan.FromMilliseconds(200);
 
     private const byte AC_SRC_OVER = 0x00;
@@ -59,6 +59,7 @@ public sealed class OsdForm : Form
     private int _slide;
     private float _scale = 1f;
     private Color _accent = Color.White;
+    private TimeSpan _hold = DefaultHold;
     private Phase _phase = Phase.Idle;
     private TimeSpan _phaseStart;
     private bool _animating;
@@ -212,6 +213,7 @@ public sealed class OsdForm : Form
         _baseLocation = layout.BaseLocation;
         _slide = layout.Slide;
         _scale = layout.Size.Width / (float)BaseWidthDip;
+        _hold = TimeSpan.FromSeconds(UiPreferences.OsdDurationSeconds);
 
         _ = Handle;
 
@@ -276,7 +278,7 @@ public sealed class OsdForm : Form
             case Phase.Hold:
             {
                 SetFrame(255, 0);
-                if (now - _phaseStart >= Hold)
+                if (now - _phaseStart >= _hold)
                 {
                     if (_reduceMotion)
                     {
@@ -349,20 +351,30 @@ public sealed class OsdForm : Form
         var dpiScale = dpi / 96f;
 
         // DIP-based sizing keeps the card physically consistent across DPI settings. The fit
-        // clamp keeps it under ~30% of the screen width on small laptop panels.
+        // clamp keeps it under ~30% of the screen width on small laptop panels; the user's size
+        // choice scales it from there.
         var fit = Math.Min(1f, screen.WorkingArea.Width * 0.30f / (BaseWidthDip * dpiScale));
-        var scale = dpiScale * fit;
+        var scale = dpiScale * fit * (UiPreferences.OsdSizePercent / 100f);
 
         var width = Math.Max(1, (int)Math.Round(BaseWidthDip * scale));
         var height = Math.Max(1, (int)Math.Round(BaseHeightDip * scale));
 
         var work = screen.WorkingArea;
-        var x = work.Left + (work.Width - width) / 2;
-        var bottomMargin = Math.Max((int)Math.Round(48 * scale), (int)Math.Round(work.Height * 0.08f));
-        var y = work.Bottom - height - bottomMargin;
+        var margin = Math.Max((int)Math.Round(48 * scale), (int)Math.Round(work.Height * 0.08f));
+        var centred = work.Left + (work.Width - width) / 2;
 
-        return new OsdLayout(screen, dpi, new Size(width, height), new Point(x, y),
-            Math.Max(1, (int)Math.Round(SlideDip * scale)));
+        var (x, y, fromTop) = UiPreferences.OsdPosition switch
+        {
+            "Top centre" => (centred, work.Top + margin, true),
+            "Bottom right" => (work.Right - width - margin, work.Bottom - height - margin, false),
+            "Bottom left" => (work.Left + margin, work.Bottom - height - margin, false),
+            _ => (centred, work.Bottom - height - margin, false)
+        };
+
+        // The card slides in from the nearest edge: up from the bottom, down from the top.
+        var slide = Math.Max(1, (int)Math.Round(SlideDip * scale)) * (fromTop ? -1 : 1);
+
+        return new OsdLayout(screen, dpi, new Size(width, height), new Point(x, y), slide);
     }
 
     private static Screen GetTargetScreen()

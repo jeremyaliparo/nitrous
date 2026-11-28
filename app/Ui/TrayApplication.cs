@@ -59,6 +59,9 @@ public class TrayApplication : ApplicationContext
     // press the profile hotkey.
     private OsdForm? _osd;
 
+    private readonly Icon _appIcon;
+    private Icon? _generatedIcon;
+
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
     private string _registeredCycleHotkey = "";
@@ -136,13 +139,14 @@ public class TrayApplication : ApplicationContext
         // Force creation of the marshaling handle on the tray/UI thread.
         _ = _uiInvoker.Handle;
 
-        Icon appIcon = SystemIcons.Shield;
-        try { appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Shield; } catch { }
+        _appIcon = SystemIcons.Shield;
+        try { _appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Shield; } catch { }
 
-        trayIcon = new NotifyIcon { Icon = appIcon, Visible = true, Text = "Nitrous" };
+        trayIcon = new NotifyIcon { Icon = _appIcon, Visible = true, Text = "Nitrous" };
         trayIcon.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowDashboard(); };
 
         BuildContextMenu();
+        RefreshTrayIcon();
 
         SystemEvents.PowerModeChanged += OnPowerStateChanged;
 
@@ -218,6 +222,66 @@ public class TrayApplication : ApplicationContext
         menu.Items.Add("Restart", null, Restart);
         menu.Items.Add("Exit", null, Exit);
         trayIcon.ContextMenuStrip = menu;
+    }
+
+    /// <summary>
+    /// Rebuilds the tray icon from the Theme choice: the app logo, the active mode's initial, or
+    /// the CPU temperature. The dashboard writes the preference; this reads it on a slow timer.
+    /// </summary>
+    private void RefreshTrayIcon()
+    {
+        if (_shuttingDown || trayIcon == null) return;
+
+        var style = UiPreferences.TrayIconStyle;
+        var profile = GetActivePowerProfile(
+            SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online);
+
+        var icon = _appIcon;
+        var tooltip = "Nitrous";
+        var ink = Color.FromArgb(18, 18, 20);
+
+        if (string.Equals(style, "mode", StringComparison.Ordinal))
+        {
+            icon = TrayIconRenderer.Create(profile.ToString()[..1], ProfileColor(profile), ink);
+            tooltip = $"Nitrous \u00b7 {profile}";
+        }
+        else if (string.Equals(style, "temperature", StringComparison.Ordinal))
+        {
+            var temperature = AcerWmiManager.GetSystemTelemetry().CpuTemp;
+            if (temperature > 0)
+            {
+                icon = TrayIconRenderer.Create(
+                    $"{TemperatureDisplay.Convert(temperature)}", AccentColor(), ink);
+                tooltip = $"Nitrous \u00b7 CPU {TemperatureDisplay.Short(temperature)}";
+            }
+        }
+
+        // Assign before disposing: the old icon is still on screen until the new one is set.
+        var previous = _generatedIcon;
+        _generatedIcon = ReferenceEquals(icon, _appIcon) ? null : icon;
+        trayIcon.Icon = icon;
+        previous?.Dispose();
+        trayIcon.Text = tooltip.Length > 63 ? tooltip[..63] : tooltip;
+    }
+
+    /// <summary>The OSD's mode colours, so the tray and the toast agree.</summary>
+    private static Color ProfileColor(PowerProfile profile) => profile switch
+    {
+        PowerProfile.Quiet => Color.FromArgb(52, 199, 89),
+        PowerProfile.Balanced => Color.FromArgb(10, 132, 255),
+        PowerProfile.Performance => Color.FromArgb(255, 159, 10),
+        _ => Color.FromArgb(255, 69, 58)
+    };
+
+    private static Color AccentColor()
+    {
+        var saved = SettingsManager.Get("AccentChoice", "");
+        if (saved.Length == 7 && saved[0] == '#')
+        {
+            try { return ColorTranslator.FromHtml(saved); } catch { }
+        }
+
+        return Color.FromArgb(179, 136, 255);
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -1067,6 +1131,29 @@ public class TrayApplication : ApplicationContext
             }
         });
 
+        // Tray icon and tooltip. The choice is written by the dashboard, so it is re-read on a
+        // slow timer; only the temperature style touches WMI, and only while it is selected.
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    await timer.WaitForNextTickAsync(_engineCts.Token);
+                    if (_shuttingDown) break;
+
+                    try { RunOnUi(RefreshTrayIcon); }
+                    catch (OperationCanceledException) { break; }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn("Tray icon: refresh failed.", ex);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+
         // GPU OC watchdog. This repairs the offsets after a driver reset, sleep/resume, or
         // another tool clearing P0 — the "randomly resets to 0" report.
         Task.Run(async () =>
@@ -1153,6 +1240,7 @@ public class TrayApplication : ApplicationContext
 
         trayIcon.Visible = false;
         SafeDispose(trayIcon, "tray icon");
+        SafeDispose(_generatedIcon, "generated tray icon");
 
         lock (_dashboardGate)
         {

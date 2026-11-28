@@ -45,7 +45,13 @@ public partial class FanCurveWindow : Window
         DataContext = _viewModel;
 
         ApplyCornerStyle();
-        Activated += (_, _) => ApplyCornerStyle();
+        ApplyTemperatureUnit();
+
+        Activated += (_, _) =>
+        {
+            ApplyCornerStyle();
+            ApplyTemperatureUnit();
+        };
 
         ApplyThemeGlow();
 
@@ -66,12 +72,28 @@ public partial class FanCurveWindow : Window
     /// </summary>
     private void ApplyCornerStyle()
     {
-        var square = SettingsManager.Get("SquareCorners", 0) == 1;
-        Resources["FrameCornerRadius"] = new CornerRadius(square ? 0 : 16);
-        Resources["HeroCornerRadius"] = new CornerRadius(square ? 0 : 12);
-        Resources["SurfaceCornerRadius"] = new CornerRadius(square ? 0 : 8);
-        Resources["ChipCornerRadius"] = new CornerRadius(square ? 0 : 6);
-        Resources["MicroCornerRadius"] = new CornerRadius(square ? 0 : 2);
+        var radii = CornerStyles.Radii(CornerStyles.Current);
+        Resources["FrameCornerRadius"] = new CornerRadius(radii.Frame);
+        Resources["HeroCornerRadius"] = new CornerRadius(radii.Hero);
+        Resources["SurfaceCornerRadius"] = new CornerRadius(radii.Surface);
+        Resources["ChipCornerRadius"] = new CornerRadius(radii.Chip);
+        Resources["MicroCornerRadius"] = new CornerRadius(radii.Micro);
+    }
+
+    /// <summary>
+    /// The curve itself is stored in Celsius. Only the axis and the readout follow the user's
+    /// unit choice, so switching units cannot move a waypoint.
+    /// </summary>
+    private void ApplyTemperatureUnit()
+    {
+        TempAxis30.Text = TemperatureDisplay.Short(30);
+        TempAxis45.Text = TemperatureDisplay.Short(45);
+        TempAxis60.Text = TemperatureDisplay.Short(60);
+        TempAxis75.Text = TemperatureDisplay.Short(75);
+        TempAxis90.Text = TemperatureDisplay.Short(90);
+        TempAxis100.Text = TemperatureDisplay.Short(100);
+        TogSnapToGrid.Content =
+            $"Snap to Grid (5% / {TemperatureDisplay.Delta(5)}{TemperatureDisplay.Unit})";
     }
 
     /// <summary>
@@ -335,7 +357,7 @@ public partial class FanCurveWindow : Window
         double px = TempToX(pt.X);
         double py = SpeedToY(pt.Y);
 
-        TooltipText.Text = $"{(int)pt.X}°C · {(int)pt.Y}%";
+        TooltipText.Text = $"{TemperatureDisplay.Short((int)pt.X)} \u00b7 {(int)pt.Y}%";
 
         // Center the tooltip horizontally above the node
         Canvas.SetLeft(NodeTooltip, px - (NodeTooltip.ActualWidth / 2));
