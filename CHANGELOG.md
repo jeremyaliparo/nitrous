@@ -3,6 +3,20 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.1 - 2026-11-28
+
+### Appearance
+
+- **Light, dark and system.** Pick a mode or follow the Windows app theme. Light and dark keep
+  separate accent, background and section choices, with four light presets and the existing dark
+  ones; the light palette uses its own text, status and accent contrast range so a pick stays
+  readable on white. The toast stays dark in both modes.
+- **Height-only resize.** A grip below the navigation changes the dashboard height only (the width
+  stays fixed). The height is saved as `WindowHeight`, scales with the UI scale, and is clamped to
+  the screen's work area; 520 px is the minimum.
+- **Nitro toast design.** A fourth toast design uses the angular Nitro N mark supplied by the user,
+  cropped to a transparent asset; the existing Card, Compact and Minimal designs are unchanged.
+
 ## 0.18.0 - 2026-11-28
 
 ### Power

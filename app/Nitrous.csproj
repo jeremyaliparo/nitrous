@@ -15,7 +15,7 @@
 		     that property is ignored when a custom manifest is supplied. -->
 		<NoWarn>$(NoWarn);WFO0003</NoWarn>
 		<ApplicationIcon>../assets/icon.ico</ApplicationIcon>
-		<Version>0.18.0</Version>
+		<Version>0.19.0-test.1</Version>
 		<Product>Nitrous</Product>
 		<Company>Jeremy Aliparo</Company>
 		<Authors>Jeremy Aliparo</Authors>
@@ -41,6 +41,9 @@
 		     PresentationFramework into the tray process. -->
 		<EmbeddedResource Include="..\assets\logo.png" Link="assets\logo.png"
 		                  LogicalName="Nitrous.assets.logo.png" />
+		<!-- The Nitro toast's angular N mark, derived from the supplied boot logo. -->
+		<EmbeddedResource Include="..\assets\osd-nitro-n.png" Link="assets\osd-nitro-n.png"
+		                  LogicalName="Nitrous.assets.osd-nitro-n.png" />
 		<!-- PawnIO module for MSR reads; LGPL-2.1, licence in assets/pawnio/COPYING. -->
 		<EmbeddedResource Include="..\assets\pawnio\IntelMSR.bin" Link="assets\pawnio\IntelMSR.bin"
 		                  LogicalName="Nitrous.assets.pawnio.IntelMSR.bin" />
@@ -48,6 +51,7 @@
 		                  LogicalName="Nitrous.assets.pawnio.IntelMCHBAR.bin" />
 	</ItemGroup>
 </Project>
+
 
 
 
