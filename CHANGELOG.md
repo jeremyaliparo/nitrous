@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.20.0-test.6 - 2026-11-29
+
+### Diagnostics
+
+- The audio section records the endpoint GUID, whether the APO reports itself enabled, whether auto
+  content mode is on, and whether Windows has audio enhancements disabled for that endpoint. That
+  last flag is the one that silently swallows a DTS mode change: the controller accepts it and
+  nothing processes it.
+
 ## 0.20.0-test.5 - 2026-11-29
 
 ### Sound
