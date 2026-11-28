@@ -1740,6 +1740,18 @@
 												<ColumnDefinition Width="*"/>
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
+											<TextBlock Text="Toast design" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Card keeps the logo tile; Compact drops it; Minimal keeps only the mode name and caption."/>
+											<ComboBox Grid.Column="1" x:Name="OsdDesignBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="OsdDesign_Changed">
+												<ComboBoxItem Content="Card"/>
+												<ComboBoxItem Content="Compact"/>
+												<ComboBoxItem Content="Minimal"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
 											<TextBlock Text="Toast position" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 											<ComboBox Grid.Column="1" x:Name="OsdPositionBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="OsdPosition_Changed">
 												<ComboBoxItem Content="Bottom centre"/>

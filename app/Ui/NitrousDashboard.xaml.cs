@@ -984,6 +984,7 @@ public partial class NitrousDashboard : Window
 
             OsdPositionBox.SelectedIndex =
                 Math.Max(0, Array.IndexOf(UiPreferences.OsdPositions, UiPreferences.OsdPosition));
+            OsdDesignBox.SelectedIndex = (int)UiPreferences.OsdDesign;
             OsdDurationBox.SelectedIndex =
                 Math.Max(0, Array.IndexOf(UiPreferences.OsdDurations, UiPreferences.OsdDurationSeconds));
             OsdSizeBox.SelectedIndex =
@@ -1114,6 +1115,14 @@ public partial class NitrousDashboard : Window
 
         SettingsManager.Save("OsdPosition",
             UiPreferences.OsdPositions[Math.Min(OsdPositionBox.SelectedIndex, UiPreferences.OsdPositions.Length - 1)]);
+    }
+
+    private void OsdDesign_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_dashboardOptionsLoading || OsdDesignBox.SelectedIndex < 0) return;
+
+        var design = (UiPreferences.ToastDesign)Math.Clamp(OsdDesignBox.SelectedIndex, 0, 2);
+        SettingsManager.Save("OsdDesign", design.ToString());
     }
 
     private void OsdDuration_Changed(object sender, SelectionChangedEventArgs e)

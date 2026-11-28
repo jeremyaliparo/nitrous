@@ -24,8 +24,6 @@ namespace Nitrous.Ui;
 /// </summary>
 public sealed class OsdForm : Form
 {
-    private const int BaseWidthDip = 360;
-    private const int BaseHeightDip = 96;
     private const int SlideDip = 12;
 
     private static readonly TimeSpan FadeIn = TimeSpan.FromMilliseconds(160);
@@ -71,7 +69,8 @@ public sealed class OsdForm : Form
 
     private readonly record struct CardKey(PowerProfile Profile, int Width, int Height, int Accent);
 
-    private readonly record struct OsdLayout(Screen Screen, int Dpi, Size Size, Point BaseLocation, int Slide);
+    private readonly record struct OsdLayout(
+        Screen Screen, int Dpi, Size Size, Point BaseLocation, int Slide, UiPreferences.ToastDesign Design);
 
     public OsdForm()
     {
@@ -179,7 +178,7 @@ public sealed class OsdForm : Form
             if (!_statusCards.TryGetValue(key, out var surface))
             {
                 surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
-                    graphics => RenderCardCore(graphics, layout.Size, color, caption, title));
+                    graphics => RenderCardCore(graphics, layout.Size, color, caption, title, layout.Design));
                 _statusCards[key] = surface;
             }
 
@@ -203,7 +202,7 @@ public sealed class OsdForm : Form
         _surfaceSize = layout.Size;
         _baseLocation = layout.BaseLocation;
         _slide = layout.Slide;
-        _scale = layout.Size.Width / (float)BaseWidthDip;
+        _scale = layout.Size.Width / (float)UiPreferences.SizeOf(layout.Design).Width;
         _hold = TimeSpan.FromSeconds(UiPreferences.OsdDurationSeconds);
 
         _ = Handle;
@@ -344,11 +343,13 @@ public sealed class OsdForm : Form
         // DIP-based sizing keeps the card physically consistent across DPI settings. The fit
         // clamp keeps it under ~30% of the screen width on small laptop panels; the user's size
         // choice scales it from there.
-        var fit = Math.Min(1f, screen.WorkingArea.Width * 0.30f / (BaseWidthDip * dpiScale));
+        var design = UiPreferences.OsdDesign;
+        var (baseWidth, baseHeight) = UiPreferences.SizeOf(design);
+        var fit = Math.Min(1f, screen.WorkingArea.Width * 0.30f / (baseWidth * dpiScale));
         var scale = dpiScale * fit * (UiPreferences.OsdSizePercent / 100f);
 
-        var width = Math.Max(1, (int)Math.Round(BaseWidthDip * scale));
-        var height = Math.Max(1, (int)Math.Round(BaseHeightDip * scale));
+        var width = Math.Max(1, (int)Math.Round(baseWidth * scale));
+        var height = Math.Max(1, (int)Math.Round(baseHeight * scale));
 
         var work = screen.WorkingArea;
         var margin = Math.Max((int)Math.Round(48 * scale), (int)Math.Round(work.Height * 0.08f));
@@ -365,7 +366,7 @@ public sealed class OsdForm : Form
         // The card slides in from the nearest edge: up from the bottom, down from the top.
         var slide = Math.Max(1, (int)Math.Round(SlideDip * scale)) * (fromTop ? -1 : 1);
 
-        return new OsdLayout(screen, dpi, new Size(width, height), new Point(x, y), slide);
+        return new OsdLayout(screen, dpi, new Size(width, height), new Point(x, y), slide, design);
     }
 
     private static Screen GetTargetScreen()
@@ -449,18 +450,20 @@ public sealed class OsdForm : Form
         if (_cards.TryGetValue(key, out var existing)) return existing;
 
         var surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
-            graphics => RenderCard(graphics, layout.Size, profile, accent));
+            graphics => RenderCard(graphics, layout.Size, profile, accent, layout.Design));
         _cards[key] = surface;
         return surface;
     }
 
-    private void RenderCard(Graphics graphics, Size size, PowerProfile profile, Color accent) =>
+    private void RenderCard(Graphics graphics, Size size, PowerProfile profile, Color accent,
+        UiPreferences.ToastDesign design) =>
         RenderCardCore(graphics, size, accent, "POWER PROFILE",
-            profile.ToString().ToUpperInvariant());
+            profile.ToString().ToUpperInvariant(), design);
 
-    private void RenderCardCore(Graphics graphics, Size size, Color accent, string caption, string title)
+    private void RenderCardCore(Graphics graphics, Size size, Color accent, string caption, string title,
+        UiPreferences.ToastDesign design)
     {
-        var scale = size.Width / (float)BaseWidthDip;
+        var scale = size.Width / (float)UiPreferences.SizeOf(design).Width;
         var width = (float)size.Width;
         var height = (float)size.Height;
 
@@ -471,7 +474,14 @@ public sealed class OsdForm : Form
         graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         graphics.Clear(Color.Transparent);
 
-        using (var card = RoundedRect(new RectangleF(0.5f, 0.5f, width - 1f, height - 1f), 22f * scale))
+        var radius = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 16f,
+            UiPreferences.ToastDesign.Compact => 18f,
+            _ => 22f
+        } * scale;
+
+        using (var card = RoundedRect(new RectangleF(0.5f, 0.5f, width - 1f, height - 1f), radius))
         using (var fill = new LinearGradientBrush(new RectangleF(0, 0, width, height),
                    Color.FromArgb(242, 24, 24, 28), Color.FromArgb(242, 14, 14, 18), 90f))
         {
@@ -480,53 +490,124 @@ public sealed class OsdForm : Form
             graphics.DrawPath(border, card);
         }
 
-        using (var bar = RoundedRect(new RectangleF(14f * scale, 18f * scale, 4f * scale,
-                   height - 36f * scale), 2f * scale))
-        using (var brush = new LinearGradientBrush(
-                   new RectangleF(14f * scale, 18f * scale, 4f * scale, height - 36f * scale),
-                   Color.FromArgb(255, accent), Color.FromArgb(96, accent), 90f))
+        if (design == UiPreferences.ToastDesign.Minimal)
         {
-            graphics.FillPath(brush, bar);
-        }
-
-        var tile = new RectangleF(32f * scale, (height - 52f * scale) / 2f, 52f * scale, 52f * scale);
-        using (var tilePath = RoundedRect(tile, 14f * scale))
-        using (var tileBrush = new SolidBrush(Color.FromArgb(255, 30, 30, 35)))
-        {
-            graphics.FillPath(tileBrush, tilePath);
-            using var tileBorder = new Pen(Color.FromArgb(26, 255, 255, 255), Math.Max(1f, scale));
-            graphics.DrawPath(tileBorder, tilePath);
-        }
-
-        var logoSize = 34f * scale;
-        var logoBounds = new RectangleF(
-            tile.X + (tile.Width - logoSize) / 2f,
-            tile.Y + (tile.Height - logoSize) / 2f,
-            logoSize,
-            logoSize);
-
-        var logo = EnsureLogo();
-        if (logo != null)
-        {
-            graphics.DrawImage(logo, logoBounds, new RectangleF(0, 0, logo.Width, logo.Height),
-                GraphicsUnit.Pixel);
+            // Minimal leads with the dot instead of the bar, and has no right-hand dot.
+            var dotX = 20f * scale;
+            var dotY = height / 2f;
+            using (var glow = new SolidBrush(Color.FromArgb(40, accent)))
+                graphics.FillEllipse(glow, dotX - 8f * scale, dotY - 8f * scale, 16f * scale, 16f * scale);
+            using (var dot = new SolidBrush(accent))
+                graphics.FillEllipse(dot, dotX - 4f * scale, dotY - 4f * scale, 8f * scale, 8f * scale);
         }
         else
         {
-            using var fallbackFont = new Font("Segoe UI", 24f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
-            using var fallbackBrush = new LinearGradientBrush(logoBounds,
-                Color.FromArgb(255, 255, 159, 10), Color.FromArgb(255, 10, 132, 255), 45f);
-            using var centered = new StringFormat
-            {
-                Alignment = StringAlignment.Center,
-                LineAlignment = StringAlignment.Center
-            };
-            graphics.DrawString("N", fallbackFont, fallbackBrush, logoBounds, centered);
+            var barX = (design == UiPreferences.ToastDesign.Compact ? 12f : 14f) * scale;
+            var barTop = (design == UiPreferences.ToastDesign.Compact ? 14f : 18f) * scale;
+            using var bar = RoundedRect(new RectangleF(barX, barTop, 4f * scale,
+                height - (2f * barTop)), 2f * scale);
+            using var brush = new LinearGradientBrush(
+                new RectangleF(barX, barTop, 4f * scale, height - (2f * barTop)),
+                Color.FromArgb(255, accent), Color.FromArgb(96, accent), 90f);
+            graphics.FillPath(brush, bar);
         }
 
-        var textX = 100f * scale;
-        using var captionFont = new Font("Segoe UI", 11.5f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
-        using var titleFont = new Font("Segoe UI Semibold", 22f * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        if (design == UiPreferences.ToastDesign.Card)
+        {
+            var tile = new RectangleF(32f * scale, (height - 52f * scale) / 2f, 52f * scale, 52f * scale);
+            using (var tilePath = RoundedRect(tile, 14f * scale))
+            using (var tileBrush = new SolidBrush(Color.FromArgb(255, 30, 30, 35)))
+            {
+                graphics.FillPath(tileBrush, tilePath);
+                using var tileBorder = new Pen(Color.FromArgb(26, 255, 255, 255), Math.Max(1f, scale));
+                graphics.DrawPath(tileBorder, tilePath);
+            }
+
+            var logoSize = 34f * scale;
+            var logoBounds = new RectangleF(
+                tile.X + (tile.Width - logoSize) / 2f,
+                tile.Y + (tile.Height - logoSize) / 2f,
+                logoSize,
+                logoSize);
+
+            var logo = EnsureLogo();
+            if (logo != null)
+            {
+                graphics.DrawImage(logo, logoBounds, new RectangleF(0, 0, logo.Width, logo.Height),
+                    GraphicsUnit.Pixel);
+            }
+            else
+            {
+                using var fallbackFont = new Font("Segoe UI", 24f * scale, FontStyle.Bold, GraphicsUnit.Pixel);
+                using var fallbackBrush = new LinearGradientBrush(logoBounds,
+                    Color.FromArgb(255, 255, 159, 10), Color.FromArgb(255, 10, 132, 255), 45f);
+                using var centered = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                graphics.DrawString("N", fallbackFont, fallbackBrush, logoBounds, centered);
+            }
+        }
+
+        var textX = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 34f,
+            UiPreferences.ToastDesign.Compact => 26f,
+            _ => 100f
+        } * scale;
+
+        var captionSize = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 9f,
+            UiPreferences.ToastDesign.Compact => 10.5f,
+            _ => 11.5f
+        };
+
+        var titleSize = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 16f,
+            UiPreferences.ToastDesign.Compact => 19f,
+            _ => 22f
+        };
+
+        var captionY = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 13f,
+            UiPreferences.ToastDesign.Compact => 18f,
+            _ => 24f
+        } * scale;
+
+        var captionHeight = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 12f,
+            UiPreferences.ToastDesign.Compact => 14f,
+            _ => 18f
+        } * scale;
+
+        var titleY = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 26f,
+            UiPreferences.ToastDesign.Compact => 33f,
+            _ => 41f
+        } * scale;
+
+        var titleHeight = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 22f,
+            UiPreferences.ToastDesign.Compact => 28f,
+            _ => 36f
+        } * scale;
+
+        var rightPad = design switch
+        {
+            UiPreferences.ToastDesign.Minimal => 14f,
+            UiPreferences.ToastDesign.Compact => 34f,
+            _ => 24f
+        } * scale;
+
+        using var captionFont = new Font("Segoe UI", captionSize * scale, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var titleFont = new Font("Segoe UI Semibold", titleSize * scale, FontStyle.Regular, GraphicsUnit.Pixel);
         using var captionBrush = new SolidBrush(Color.FromArgb(255, 154, 154, 166));
         using var titleBrush = new SolidBrush(Color.White);
         using var textFormat = new StringFormat
@@ -538,16 +619,19 @@ public sealed class OsdForm : Form
         };
 
         graphics.DrawString(caption, captionFont, captionBrush,
-            new RectangleF(textX, 24f * scale, width - textX - 24f * scale, 18f * scale), textFormat);
+            new RectangleF(textX, captionY, width - textX - rightPad, captionHeight), textFormat);
         graphics.DrawString(title, titleFont, titleBrush,
-            new RectangleF(textX, 41f * scale, width - textX - 24f * scale, 36f * scale), textFormat);
+            new RectangleF(textX, titleY, width - textX - rightPad, titleHeight), textFormat);
 
-        var dotX = width - 28f * scale;
-        var dotY = height / 2f;
-        using (var glow = new SolidBrush(Color.FromArgb(40, accent)))
+        if (design != UiPreferences.ToastDesign.Minimal)
+        {
+            var dotX = width - (design == UiPreferences.ToastDesign.Compact ? 22f : 28f) * scale;
+            var dotY = height / 2f;
+            using var glow = new SolidBrush(Color.FromArgb(40, accent));
             graphics.FillEllipse(glow, dotX - 8f * scale, dotY - 8f * scale, 16f * scale, 16f * scale);
-        using (var dot = new SolidBrush(accent))
+            using var dot = new SolidBrush(accent);
             graphics.FillEllipse(dot, dotX - 4f * scale, dotY - 4f * scale, 8f * scale, 8f * scale);
+        }
     }
 
     private static GraphicsPath RoundedRect(RectangleF bounds, float radius)

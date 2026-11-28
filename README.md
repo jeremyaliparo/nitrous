@@ -127,7 +127,7 @@ Show or hide the temperature graph, power modes, display controls, and fans indi
 Every reading follows the unit—chart axes and history ranges, thermal limits, the hover readout, and the curve editor—while the hardware is still read and written in Celsius.
 
 **Toast and tray**<br>
-The power-profile toast can sit at either screen edge, last 1–4 seconds, and scale 80–120 %. Its colour follows the firmware's keyboard flash by default—Quiet white, Balanced orange, Performance crimson, Turbo violet—and each mode can be recoloured; the tray icon can show the logo, the active mode, or live CPU temperature.
+The power-profile toast can sit at either screen edge, last 1–4 seconds, and scale 80–120 %. It comes in three designs—**Card** with the logo tile, **Compact**, or **Minimal** with just the mode name—and its colour follows the firmware's keyboard flash by default (Quiet white, Balanced orange, Performance crimson, Turbo violet), with each mode recolourable. The tray icon can show the logo, the active mode, or live CPU temperature.
 
 **Keep awake**<br>
 A coffee toggle in the title bar holds a Windows execution-state request so the machine and screen stay awake—no timer and no service, and the tray keeps it after the dashboard is closed.

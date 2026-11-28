@@ -14,6 +14,34 @@ internal static class UiPreferences
     public static readonly int[] OsdDurations = [1, 2, 3, 4];
     public static readonly int[] OsdSizes = [80, 90, 100, 110, 120];
 
+    public static readonly string[] OsdDesigns = ["Card", "Compact", "Minimal"];
+
+    public enum ToastDesign
+    {
+        Card,
+        Compact,
+        Minimal
+    }
+
+    public static ToastDesign OsdDesign
+    {
+        get
+        {
+            var saved = SettingsManager.Get("OsdDesign", nameof(ToastDesign.Card));
+            return Enum.TryParse<ToastDesign>(saved, ignoreCase: true, out var design)
+                ? design
+                : ToastDesign.Card;
+        }
+    }
+
+    /// <summary>The design's authored size; the toast scale and the user's size choice work from it.</summary>
+    public static (int Width, int Height) SizeOf(ToastDesign design) => design switch
+    {
+        ToastDesign.Compact => (300, 76),
+        ToastDesign.Minimal => (240, 60),
+        _ => (360, 96)
+    };
+
     public static readonly string[] TrayIconStyles = ["logo", "mode", "temperature"];
     public static readonly string[] TrayIconLabels = ["Logo", "Mode colour", "CPU temperature"];
 
