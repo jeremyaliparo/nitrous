@@ -1249,6 +1249,46 @@
 									</Grid>
 								</Border>
 
+								<Border Style="{StaticResource SetupCardStyle}" Padding="12,10" Margin="0,12,0,0">
+									<StackPanel>
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+												<Path Data="M4,4H10V10H4V4M14,4H20V10H14V4M4,14H10V20H4V14M14,14H20V20H14V14Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
+												<TextBlock Text="App Profiles" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
+											</StackPanel>
+											<CheckBox Grid.Column="1" x:Name="TogAppProfiles" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
+												Checked="AppProfiles_Toggled" Unchecked="AppProfiles_Toggled"
+												ToolTip="Pause every rule without deleting them."/>
+										</Grid>
+										<TextBlock Text="Switch the power mode while a chosen app runs. The first matching rule wins; the previous mode returns when the app closes." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+										<Grid Margin="0,10,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="New rule uses" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="NewAppProfileBox" Width="110" Style="{StaticResource CompactComboBoxStyle}"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<ComboBox x:Name="AppRunningBox" Grid.Column="0" Style="{StaticResource CompactComboBoxStyle}"
+												DropDownOpened="AppRunningBox_DropDownOpened" ToolTip="Apps with a window. The list refreshes when it opens."/>
+											<Button Grid.Column="1" x:Name="AppRunningAddButton" Content="ADD" Click="AppRunningAdd_Click" Style="{StaticResource GhostBtn}" FontSize="9" FontWeight="Bold" Padding="8,2" Margin="8,0,0,0" ToolTip="Add the selected running app."/>
+										</Grid>
+										<Button x:Name="AppBrowseButton" Content="BROWSE FOR .EXE" Click="AppBrowse_Click" Style="{StaticResource SetupActionButtonStyle}" HorizontalAlignment="Left" Margin="0,6,0,0"/>
+										<TextBlock x:Name="AppProfileStatus" Foreground="{DynamicResource WarnBrush}" FontSize="9" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+										<StackPanel x:Name="AppProfileList" Margin="0,6,0,0"/>
+										<TextBlock x:Name="AppProfileActiveText" Text="No app rule active" Foreground="{DynamicResource TextDimBrush}" FontSize="9" Margin="0,8,0,0" TextWrapping="Wrap"/>
+									</StackPanel>
+								</Border>
+
 							</StackPanel>
 
 							<StackPanel x:Name="SetupSystemPanel" Visibility="Collapsed">

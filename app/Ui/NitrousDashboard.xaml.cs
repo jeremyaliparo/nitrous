@@ -21,6 +21,8 @@ using FontFamily = System.Windows.Media.FontFamily;
 using Brush = System.Windows.Media.Brush;
 using Brushes = System.Windows.Media.Brushes;
 using Button = System.Windows.Controls.Button;
+using CheckBox = System.Windows.Controls.CheckBox;
+using ComboBox = System.Windows.Controls.ComboBox;
 using MessageBox = System.Windows.MessageBox;
 using TextBox = System.Windows.Controls.TextBox;
 
@@ -53,6 +55,9 @@ public partial class NitrousDashboard : Window
     private bool _gpuMuxReading;
     private bool _uiScaleLoading;
     private bool _dashboardOptionsLoading;
+    private bool _appProfilesLoading;
+    private List<AppProfileRule> _appRules = new();
+    private sealed record RunningApp(string Executable, string Title);
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
     /// <summary>The effect lists as offered on this machine: a five-effect controller hides the last two.</summary>
@@ -80,6 +85,7 @@ public partial class NitrousDashboard : Window
         if (DataContext is DashboardViewModel gpuVm) gpuVm.GpuTuningApplied += RefreshGpuThermalTarget;
         ApplyScrollbarMode(showScrollbars);
         Loaded += (_, _) => ApplyScrollbarMode(SettingsManager.Get("ShowScrollbars", 1) == 1);
+        InitializeAppProfiles();
 
         _setupTabLoading = true;
         SelectSetupTab(SettingsManager.Get("SetupTab", "Power"));
@@ -193,6 +199,8 @@ public partial class NitrousDashboard : Window
         var whisperActive = SettingsManager.Get("WhisperActive", 0) == 1;
         if (DataContext is DashboardViewModel whisperVm && whisperVm.WhisperModeActive != whisperActive)
             whisperVm.WhisperModeActive = whisperActive;
+
+        UpdateAppProfileActiveText();
 
         var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile fan)
@@ -1226,6 +1234,342 @@ public partial class NitrousDashboard : Window
         ModeColors.Reset();
         BuildOsdColourSwatches();
         AppearanceChangeSignal.Notify();
+    }
+
+    private void InitializeAppProfiles()
+    {
+        _appProfilesLoading = true;
+        try
+        {
+            TogAppProfiles.IsChecked = AppProfileStore.Enabled;
+            BuildNewAppProfileChoices();
+            AppRunningBox.Items.Clear();
+            AppRunningBox.Items.Add(new ComboBoxItem
+            {
+                Content = "Choose a running app",
+                IsEnabled = false
+            });
+            AppRunningBox.SelectedIndex = 0;
+        }
+        finally
+        {
+            _appProfilesLoading = false;
+        }
+
+        _appRules = AppProfileStore.Load();
+        BuildAppProfileList();
+        UpdateAppProfileActiveText();
+    }
+
+    /// <summary>Turbo is omitted where the firmware does not expose it, matching the mode buttons.</summary>
+    private PowerProfile[] AppProfileChoices()
+    {
+        var turbo = (DataContext as DashboardViewModel)?.IsTurboSupported != false;
+        return turbo
+            ? [PowerProfile.Quiet, PowerProfile.Balanced, PowerProfile.Performance, PowerProfile.Turbo]
+            : [PowerProfile.Quiet, PowerProfile.Balanced, PowerProfile.Performance];
+    }
+
+    private PowerProfile SelectedNewProfile() =>
+        NewAppProfileBox.SelectedItem is ComboBoxItem { Tag: PowerProfile profile }
+            ? profile
+            : PowerProfile.Performance;
+
+    private void BuildNewAppProfileChoices()
+    {
+        NewAppProfileBox.Items.Clear();
+        foreach (var profile in AppProfileChoices())
+            NewAppProfileBox.Items.Add(new ComboBoxItem { Content = profile.ToString(), Tag = profile });
+
+        NewAppProfileBox.SelectedIndex = Math.Min(2, NewAppProfileBox.Items.Count - 1);
+    }
+
+    private void BuildAppProfileList()
+    {
+        _appProfilesLoading = true;
+        try
+        {
+            AppProfileList.Children.Clear();
+
+            if (_appRules.Count == 0)
+            {
+                var empty = new TextBlock
+                {
+                    Text = "No rules yet. Add an app above.",
+                    FontSize = 9.5,
+                    Margin = new Thickness(0, 2, 0, 0)
+                };
+                empty.SetResourceReference(TextBlock.ForegroundProperty, "TextDimBrush");
+                AppProfileList.Children.Add(empty);
+                return;
+            }
+
+            for (var i = 0; i < _appRules.Count; i++)
+                AppProfileList.Children.Add(CreateAppProfileRow(_appRules[i], i));
+        }
+        finally
+        {
+            _appProfilesLoading = false;
+        }
+    }
+
+    private Border CreateAppProfileRow(AppProfileRule rule, int index)
+    {
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var labels = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+
+        var name = new TextBlock
+        {
+            Text = rule.DisplayName,
+            FontSize = 10.5,
+            FontWeight = FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+
+        var executable = new TextBlock
+        {
+            Text = rule.Executable,
+            FontSize = 8.5,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        executable.SetResourceReference(TextBlock.ForegroundProperty, "TextMutedBrush");
+
+        labels.Children.Add(name);
+        labels.Children.Add(executable);
+
+        var choices = AppProfileChoices();
+        var profile = new ComboBox
+        {
+            Width = 100,
+            Style = (Style)FindResource("CompactComboBoxStyle"),
+            Tag = index,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0),
+            ToolTip = "The power mode this app switches to."
+        };
+        foreach (var choice in choices)
+            profile.Items.Add(new ComboBoxItem { Content = choice.ToString(), Tag = choice });
+
+        profile.SelectedIndex = Math.Max(0,
+            Array.IndexOf(choices, AppProfileStore.ClampForThisMachine(rule.Profile)));
+        profile.SelectionChanged += AppRuleProfile_Changed;
+
+        var toggle = new CheckBox
+        {
+            Style = (Style)FindResource("ModernToggleStyle"),
+            IsChecked = rule.Enabled,
+            Tag = index,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+            ToolTip = "Pause this rule without deleting it."
+        };
+        toggle.Checked += AppRuleEnabled_Toggled;
+        toggle.Unchecked += AppRuleEnabled_Toggled;
+
+        var remove = new Button
+        {
+            Content = "\u00d7",
+            Style = (Style)FindResource("GhostBtn"),
+            FontSize = 13,
+            Padding = new Thickness(4, 0, 4, 0),
+            Tag = index,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = "Remove this rule."
+        };
+        remove.Click += AppRuleRemove_Click;
+
+        Grid.SetColumn(labels, 0);
+        Grid.SetColumn(profile, 1);
+        Grid.SetColumn(toggle, 2);
+        Grid.SetColumn(remove, 3);
+        row.Children.Add(labels);
+        row.Children.Add(profile);
+        row.Children.Add(toggle);
+        row.Children.Add(remove);
+
+        var border = new Border
+        {
+            Padding = new Thickness(8, 6, 6, 6),
+            Margin = new Thickness(0, 4, 0, 0),
+            Child = row
+        };
+        border.SetResourceReference(Border.BackgroundProperty, "SurfaceHoverBrush");
+        border.SetResourceReference(Border.CornerRadiusProperty, "SurfaceCornerRadius");
+        return border;
+    }
+
+    private void AppProfiles_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_appProfilesLoading) return;
+        AppProfileStore.SetEnabled(TogAppProfiles.IsChecked == true);
+    }
+
+    private void AppRuleProfile_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appProfilesLoading || sender is not ComboBox { Tag: int index } combo) return;
+        if (index < 0 || index >= _appRules.Count) return;
+        if (combo.SelectedItem is not ComboBoxItem { Tag: PowerProfile profile }) return;
+
+        _appRules[index].Profile = profile;
+        AppProfileStore.Save(_appRules);
+    }
+
+    private void AppRuleEnabled_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_appProfilesLoading || sender is not CheckBox { Tag: int index } toggle) return;
+        if (index < 0 || index >= _appRules.Count) return;
+
+        _appRules[index].Enabled = toggle.IsChecked == true;
+        AppProfileStore.Save(_appRules);
+    }
+
+    private void AppRuleRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: int index }) return;
+        if (index < 0 || index >= _appRules.Count) return;
+
+        _appRules.RemoveAt(index);
+        AppProfileStore.Save(_appRules);
+        BuildAppProfileList();
+        UpdateAppProfileStatus("Rule removed.");
+    }
+
+    private void AppBrowse_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Choose an app",
+            Filter = "Applications (*.exe)|*.exe",
+            CheckFileExists = true
+        };
+
+        if (dialog.ShowDialog(this) != true) return;
+
+        var executable = System.IO.Path.GetFileName(dialog.FileName);
+        string? display = null;
+        try { display = System.Diagnostics.FileVersionInfo.GetVersionInfo(dialog.FileName).ProductName; }
+        catch { }
+
+        AddAppRule(executable, display, SelectedNewProfile());
+    }
+
+    private void AppRunningBox_DropDownOpened(object? sender, EventArgs e)
+    {
+        var previous = (AppRunningBox.SelectedItem as ComboBoxItem)?.Tag as RunningApp;
+        AppRunningBox.Items.Clear();
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var apps = new List<RunningApp>();
+
+        foreach (var process in System.Diagnostics.Process.GetProcesses())
+        {
+            try
+            {
+                var title = process.MainWindowTitle;
+                if (string.IsNullOrWhiteSpace(title)) continue;
+
+                var executable = process.ProcessName + ".exe";
+                if (string.Equals(process.ProcessName, "Nitrous", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!seen.Add(executable)) continue;
+
+                apps.Add(new RunningApp(executable, title.Trim()));
+            }
+            catch (InvalidOperationException) { }
+            catch (System.ComponentModel.Win32Exception) { }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        foreach (var app in apps.OrderBy(a => a.Title, StringComparer.OrdinalIgnoreCase))
+        {
+            var item = new ComboBoxItem
+            {
+                Content = $"{app.Title} \u00b7 {app.Executable}",
+                Tag = app
+            };
+            AppRunningBox.Items.Add(item);
+
+            if (previous is not null &&
+                string.Equals(previous.Executable, app.Executable, StringComparison.OrdinalIgnoreCase))
+            {
+                AppRunningBox.SelectedItem = item;
+            }
+        }
+
+        if (AppRunningBox.Items.Count == 0)
+            AppRunningBox.Items.Add(new ComboBoxItem { Content = "No windowed apps found", IsEnabled = false });
+    }
+
+    private void AppRunningAdd_Click(object sender, RoutedEventArgs e)
+    {
+        if (AppRunningBox.SelectedItem is not ComboBoxItem { Tag: RunningApp app })
+        {
+            UpdateAppProfileStatus("Pick a running app first.", warn: true);
+            return;
+        }
+
+        AddAppRule(app.Executable, app.Title, SelectedNewProfile());
+    }
+
+    private void AddAppRule(string executable, string? displayName, PowerProfile profile)
+    {
+        executable = System.IO.Path.GetFileName(executable);
+        if (string.IsNullOrWhiteSpace(executable)) return;
+
+        if (_appRules.Exists(r => string.Equals(r.Executable, executable, StringComparison.OrdinalIgnoreCase)))
+        {
+            UpdateAppProfileStatus($"{executable} is already in the list.", warn: true);
+            return;
+        }
+
+        _appRules.Add(new AppProfileRule
+        {
+            Executable = executable,
+            DisplayName = string.IsNullOrWhiteSpace(displayName)
+                ? System.IO.Path.GetFileNameWithoutExtension(executable)
+                : displayName.Trim(),
+            Profile = AppProfileStore.ClampForThisMachine(profile),
+            Enabled = true
+        });
+
+        AppProfileStore.Save(_appRules);
+        BuildAppProfileList();
+        UpdateAppProfileStatus($"{executable} added. It takes effect within a few seconds.");
+    }
+
+    private void UpdateAppProfileStatus(string message, bool warn = false)
+    {
+        AppProfileStatus.Text = message;
+        AppProfileStatus.Visibility = string.IsNullOrWhiteSpace(message)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        AppProfileStatus.Foreground = (Brush)FindResource(warn ? "WarnBrush" : "SuccessBrush");
+    }
+
+    /// <summary>Shows which rule is holding the mode; the tray writes the value.</summary>
+    private void UpdateAppProfileActiveText()
+    {
+        var active = SettingsManager.Get(AppProfileStore.ActiveKey, "");
+        var text = string.IsNullOrWhiteSpace(active) ? "No app rule active" : $"Active: {active}";
+
+        if (AppProfileActiveText.Text != text)
+            AppProfileActiveText.Text = text;
+
+        AppProfileActiveText.Foreground = (Brush)FindResource(
+            string.IsNullOrWhiteSpace(active) ? "TextDimBrush" : "AccentBrush");
     }
 
     private void LoadUiScaleOptions(int saved)

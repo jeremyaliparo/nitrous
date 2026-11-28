@@ -64,6 +64,17 @@ public class TrayApplication : ApplicationContext
     private Icon? _generatedIcon;
     private string _trayIconKey = "";
 
+    // App profiles: the rule currently owning the mode, and the mode to restore when it ends.
+    private volatile int _appRuleProfileValue = -1;
+    private volatile bool _appRuleOwned;
+    private bool _appManualOverride;
+    private bool _appProfileApplying;
+    private bool _appStartupSweepDone;
+    private PowerProfile _appRestoreProfile = PowerProfile.Performance;
+    private PowerProfile _appAppliedProfile = PowerProfile.Performance;
+    private int _appRuleIndex = -1;
+    private string _appActiveName = "";
+
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
     private string _registeredCycleHotkey = "";
@@ -473,7 +484,7 @@ public class TrayApplication : ApplicationContext
         }
     }
 
-    private static PowerProfile GetActivePowerProfile(bool isOnline)
+    private static PowerProfile GetBasePowerProfile(bool isOnline)
     {
         PowerProfile profile;
         if (SettingsManager.Get("AutoSwitch", 0) == 1)
@@ -493,6 +504,16 @@ public class TrayApplication : ApplicationContext
             profile = PowerProfile.Performance;
 
         return profile;
+    }
+
+    /// <summary>
+    /// The profile the hardware should hold now: an app rule's target when one owns the mode,
+    /// otherwise the user's AC/DC or last manual choice.
+    /// </summary>
+    private PowerProfile GetActivePowerProfile(bool isOnline)
+    {
+        var rule = _appRuleProfileValue;
+        return rule >= 0 ? (PowerProfile)rule : GetBasePowerProfile(isOnline);
     }
 
     private static FanProfile GetActiveFan(bool isOnline)
@@ -526,6 +547,9 @@ public class TrayApplication : ApplicationContext
             var fan = GetActiveFan(isOnline);
 
             SettingsManager.Save("LastPowerMode", (int)profile);
+            // A rule must not overwrite the AC/DC base; that is what it restores to on exit.
+            if (!_appRuleOwned)
+                SettingsManager.Save(isOnline ? "LastAcPowerMode" : "LastDcPowerMode", (int)profile);
             SettingsManager.Save("LastFanMode", fan.ToString());
 
             Logger.Info($"Power: applying {profile} / fan {fan} on {(isOnline ? "AC" : "DC")} " +
@@ -591,6 +615,233 @@ public class TrayApplication : ApplicationContext
         {
             _powerGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Matches the enabled rules against the running processes. One snapshot per tick; the first
+    /// rule in the list wins. Applying a rule snapshots the mode to restore and stops overwriting
+    /// the AC/DC slots, so reverting cannot restore the game profile by accident.
+    /// </summary>
+    private async Task EvaluateAppProfilesAsync()
+    {
+        if (!AppProfileStore.Enabled)
+        {
+            if (_appRuleOwned) await RestoreAppRuleAsync("app profiles disabled");
+            else ClearStaleRestore();
+            return;
+        }
+
+        var rules = AppProfileStore.Load();
+        if (!rules.Exists(r => r.Enabled))
+        {
+            if (_appRuleOwned) await RestoreAppRuleAsync("no enabled rules");
+            else ClearStaleRestore();
+            return;
+        }
+
+        var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+
+        // A manual mode change while a rule owns the mode becomes the restore target, so the
+        // engine does not fight the user. A new winning app clears the override.
+        if (_appRuleOwned && !_appProfileApplying)
+        {
+            var current = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+            if (Enum.IsDefined(current) && current != _appAppliedProfile)
+            {
+                _appManualOverride = true;
+                _appRestoreProfile = current;
+                _appAppliedProfile = current;
+                if (!string.IsNullOrWhiteSpace(_appActiveName))
+                {
+                    SettingsManager.Save(AppProfileStore.ActiveKey,
+                        $"{_appActiveName} \u2192 {current} (manual)");
+                }
+
+                Logger.Info($"App profiles: manual {current} wins until the active app changes.");
+            }
+        }
+
+        HashSet<string> running;
+        try
+        {
+            running = RunningProcessNames();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("App profiles: could not enumerate processes.", ex);
+            return;
+        }
+
+        var index = rules.FindIndex(rule => rule.Enabled && running.Contains(rule.MatchName));
+        if (index < 0)
+        {
+            if (_appRuleOwned) await RestoreAppRuleAsync("app closed");
+            else ClearStaleRestore();
+            return;
+        }
+
+        var rule = rules[index];
+        var target = AppProfileStore.ClampForThisMachine(rule.Profile);
+        var sameRule = _appRuleOwned && index == _appRuleIndex;
+
+        if (sameRule && (_appManualOverride || target == _appAppliedProfile))
+        {
+            if (!string.Equals(_appActiveName, rule.DisplayName, StringComparison.Ordinal))
+            {
+                _appActiveName = rule.DisplayName;
+                SettingsManager.Save(AppProfileStore.ActiveKey, _appManualOverride
+                    ? $"{rule.DisplayName} \u2192 {_appAppliedProfile} (manual)"
+                    : ActiveRuleText(rule, target));
+            }
+
+            return;
+        }
+
+        if (!_appRuleOwned)
+        {
+            // A tray restart during a game loses the live base; the saved value survives it.
+            var saved = SettingsManager.Get(AppProfileStore.RestoreKey, -1);
+            _appRestoreProfile = saved >= 0 && Enum.IsDefined((PowerProfile)saved)
+                ? (PowerProfile)saved
+                : GetBasePowerProfile(isOnline);
+            SettingsManager.Save(AppProfileStore.RestoreKey, (int)_appRestoreProfile);
+            _appStartupSweepDone = true;
+        }
+
+        _appRuleIndex = index;
+        _appManualOverride = false;
+        _appRuleOwned = true;
+        _appRuleProfileValue = (int)target;
+        _appAppliedProfile = target;
+        _appActiveName = rule.DisplayName;
+        SettingsManager.Save(AppProfileStore.ActiveKey, ActiveRuleText(rule, target));
+
+        Logger.Info($"App profiles: {rule.Executable} -> {target}.");
+        _appProfileApplying = true;
+        try
+        {
+            await ApplyAppRuleProfileAsync(target, "app-rule");
+            ShowRuleOsd(rule.DisplayName, target);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("App profiles: the mode switch failed.", ex);
+        }
+        finally
+        {
+            _appProfileApplying = false;
+        }
+    }
+
+    private async Task RestoreAppRuleAsync(string reason)
+    {
+        var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+
+        // With AutoSwitch on the AC/DC slots were never touched, so they are the truthful base;
+        // with it off LastPowerMode holds the rule and the saved snapshot is the base.
+        var target = _appManualOverride
+            ? _appRestoreProfile
+            : SettingsManager.Get("AutoSwitch", 0) == 1
+                ? GetBasePowerProfile(isOnline)
+                : _appRestoreProfile;
+        target = AppProfileStore.ClampForThisMachine(target);
+
+        var previous = _appAppliedProfile;
+        _appRuleOwned = false;
+        _appRuleProfileValue = -1;
+        _appRuleIndex = -1;
+        _appManualOverride = false;
+        _appActiveName = "";
+        _appStartupSweepDone = true;
+        SettingsManager.Save(AppProfileStore.ActiveKey, "");
+        SettingsManager.Delete(AppProfileStore.RestoreKey);
+
+        Logger.Info($"App profiles: {reason}; restoring {target} (was {previous}).");
+        try
+        {
+            await ApplyAppRuleProfileAsync(target, "app-rule-restore");
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("App profiles: the restore failed.", ex);
+        }
+
+        _appAppliedProfile = target;
+    }
+
+    /// <summary>Applies just the parts a profile owns; fans, charge and display are not per-app.</summary>
+    private async Task ApplyAppRuleProfileAsync(PowerProfile profile, string source)
+    {
+        await _powerGate.WaitAsync();
+        try
+        {
+            if (_shuttingDown) return;
+
+            var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+            await AcerWmiManager.SetPowerModeAsync(profile);
+            SettingsManager.Save("LastPowerMode", (int)profile);
+
+            CpuPowerCap.Reassert(profile, modeChanged: true);
+            GpuThermalTarget.Reassert(profile);
+            GpuClockLimit.Reassert(profile);
+
+            if (SettingsManager.Get("ManageCpuPower", 0) == 1)
+                await CpuPowerManager.ApplyProfileLimitsAsync(profile, isOnline);
+
+            await _gpuManager.ApplyPowerProfileOcAsync(profile, allowStockReset: true, source: source);
+            ResetFanRamp();
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1500);
+                if (_shuttingDown) return;
+                CpuPowerCap.Reassert(profile, modeChanged: true);
+                GpuThermalTarget.Reassert(profile);
+                GpuClockLimit.Reassert(profile);
+            });
+        }
+        finally
+        {
+            _powerGate.Release();
+        }
+    }
+
+    private static HashSet<string> RunningProcessNames()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var process in Process.GetProcesses())
+        {
+            try
+            {
+                names.Add(process.ProcessName);
+            }
+            catch (InvalidOperationException) { }
+            catch (System.ComponentModel.Win32Exception) { }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return names;
+    }
+
+    private void ShowRuleOsd(string app, PowerProfile profile)
+    {
+        var title = string.IsNullOrWhiteSpace(app) ? profile.ToString().ToUpperInvariant() : app.ToUpperInvariant();
+        ShowStatusOsd(ModeColors.For(profile),
+            $"APP PROFILE \u00b7 {profile.ToString().ToUpperInvariant()}", title);
+    }
+
+    private static string ActiveRuleText(AppProfileRule rule, PowerProfile profile) =>
+        $"{rule.DisplayName} \u2192 {profile}";
+
+    /// <summary>No app is running at tray start: a saved restore mode is stale.</summary>
+    private void ClearStaleRestore()
+    {
+        if (_appStartupSweepDone) return;
+        _appStartupSweepDone = true;
+        SettingsManager.Delete(AppProfileStore.RestoreKey);
     }
 
     private void ReloadHotkeys()
@@ -1219,6 +1470,34 @@ public class TrayApplication : ApplicationContext
                             Logger.Warn("GPU OC: watchdog failed.", ex);
                             _lastOcWatchdogLog = DateTime.UtcNow;
                         }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+
+        // App profiles. One process snapshot every three seconds, and only when a rule exists;
+        // an empty rule list costs a registry read and no process scan.
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    await timer.WaitForNextTickAsync(_engineCts.Token);
+
+                    try
+                    {
+                        await EvaluateAppProfilesAsync();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn("App profiles: evaluation failed.", ex);
                     }
                 }
             }
