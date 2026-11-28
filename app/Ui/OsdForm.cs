@@ -68,7 +68,8 @@ public sealed class OsdForm : Form
         Out
     }
 
-    private readonly record struct CardKey(PowerProfile Profile, int Width, int Height, int Accent);
+    private readonly record struct CardKey(
+        PowerProfile Profile, int Width, int Height, int Accent, UiPreferences.ToastDesign Design);
 
     private readonly record struct OsdLayout(
         Screen Screen, int Dpi, Size Size, Point BaseLocation, int Slide, UiPreferences.ToastDesign Design);
@@ -175,7 +176,7 @@ public sealed class OsdForm : Form
         try
         {
             var layout = ComputeLayout();
-            var key = $"{caption}|{title}|{color.ToArgb()}|{layout.Size.Width}x{layout.Size.Height}";
+            var key = $"{caption}|{title}|{color.ToArgb()}|{layout.Size.Width}x{layout.Size.Height}|{layout.Design}";
             if (!_statusCards.TryGetValue(key, out var surface))
             {
                 surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
@@ -468,7 +469,7 @@ public sealed class OsdForm : Form
 
     private CardSurface GetSurface(PowerProfile profile, Color accent, OsdLayout layout)
     {
-        var key = new CardKey(profile, layout.Size.Width, layout.Size.Height, accent.ToArgb());
+        var key = new CardKey(profile, layout.Size.Width, layout.Size.Height, accent.ToArgb(), layout.Design);
         if (_cards.TryGetValue(key, out var existing)) return existing;
 
         var surface = CardSurface.Create(layout.Size.Width, layout.Size.Height,
