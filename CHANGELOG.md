@@ -3,6 +3,17 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.1 - 2026-11-28
+
+### Appearance
+
+- **UI scale (Theme): 90 / 100 / 110 / 125 %, default 100.** The whole dashboard grows together - frame,
+  cards, text, plot and controls - through a layout transform, so nothing is left at the old size and text
+  stays crisp. The window resizes with it, is clamped to the screen's work area, and 125 % is offered only
+  where it fits; ComboBox popups carry the same transform.
+- **Square corners (Theme):** a toggle that zeroes the frame, cards, buttons, pills and toggles, including
+  the bottom navigation and its hover shapes. The rounded look remains the default.
+
 ## 0.16.0 - 2026-11-28
 
 ### Dashboard
