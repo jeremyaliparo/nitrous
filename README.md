@@ -54,7 +54,7 @@ Charge limit, USB charging while the lid is off, and a health figure read direct
 Optional separate power and fan modes for charger and battery, applied automatically when the plug state changes.
 
 **App profiles**<br>
-Send the power mode to Performance or Turbo while a chosen game or app is running, then hand the saved mode back when it closes. Rules match by executable, the first match wins, and a manual mode change during a game is respected rather than fought.
+Send the power mode to Performance or Turbo while a chosen game or app is running, and optionally switch the fans to Auto, Max, or Custom, then hand the saved settings back when it closes. Rules match by executable, the first match wins, and a manual change during a game is respected rather than fought.
 
 ---
 

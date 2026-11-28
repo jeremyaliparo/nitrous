@@ -1264,7 +1264,7 @@
 												Checked="AppProfiles_Toggled" Unchecked="AppProfiles_Toggled"
 												ToolTip="Pause every rule without deleting them."/>
 										</Grid>
-										<TextBlock Text="Switch the power mode while a chosen app runs. The first matching rule wins; the previous mode returns when the app closes." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
+										<TextBlock Text="Switch the power mode and optionally the fans while a chosen app runs. The first matching rule wins; the previous settings return when the app closes." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap" Margin="0,2,0,0"/>
 										<Grid Margin="0,10,0,0">
 											<Grid.ColumnDefinitions>
 												<ColumnDefinition Width="*"/>
@@ -1272,6 +1272,14 @@
 											</Grid.ColumnDefinitions>
 											<TextBlock Text="New rule uses" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 											<ComboBox Grid.Column="1" x:Name="NewAppProfileBox" Width="110" Style="{StaticResource CompactComboBoxStyle}"/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="New rule fans" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
+											<ComboBox Grid.Column="1" x:Name="NewAppFanBox" Width="110" Style="{StaticResource CompactComboBoxStyle}"/>
 										</Grid>
 										<Grid Margin="0,8,0,0">
 											<Grid.ColumnDefinitions>

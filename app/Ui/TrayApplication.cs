@@ -64,7 +64,7 @@ public class TrayApplication : ApplicationContext
     private Icon? _generatedIcon;
     private string _trayIconKey = "";
 
-    // App profiles: the rule currently owning the mode, and the mode to restore when it ends.
+    // App profiles: the rule currently owning the mode and fans, and what to restore afterwards.
     private volatile int _appRuleProfileValue = -1;
     private volatile bool _appRuleOwned;
     private bool _appManualOverride;
@@ -74,6 +74,13 @@ public class TrayApplication : ApplicationContext
     private PowerProfile _appAppliedProfile = PowerProfile.Performance;
     private int _appRuleIndex = -1;
     private string _appActiveName = "";
+
+    private volatile int _appFanModeValue = -1; // (int)FanProfile, or no fan ownership
+    private volatile bool _appFanOwned;
+    private bool _appManualFanOverride;
+    private bool _appFanApplying;
+    private FanProfile _appRestoreFan = FanProfile.Auto;
+    private FanProfile _appAppliedFan = FanProfile.Auto;
 
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
@@ -516,7 +523,7 @@ public class TrayApplication : ApplicationContext
         return rule >= 0 ? (PowerProfile)rule : GetBasePowerProfile(isOnline);
     }
 
-    private static FanProfile GetActiveFan(bool isOnline)
+    private static FanProfile GetBaseFan(bool isOnline)
     {
         if (SettingsManager.Get("AutoSwitch", 0) == 1)
         {
@@ -525,6 +532,13 @@ public class TrayApplication : ApplicationContext
         }
 
         return Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f2) ? f2 : FanProfile.Auto;
+    }
+
+    /// <summary>The fan mode the hardware should hold: the rule's when it owns the fans, else the base.</summary>
+    private FanProfile GetActiveFan(bool isOnline)
+    {
+        var fan = _appFanModeValue;
+        return fan >= 0 ? (FanProfile)fan : GetBaseFan(isOnline);
     }
 
     private async Task ApplyPowerSettingsAsync(bool isStartup, bool force)
@@ -619,14 +633,15 @@ public class TrayApplication : ApplicationContext
 
     /// <summary>
     /// Matches the enabled rules against the running processes. One snapshot per tick; the first
-    /// rule in the list wins. Applying a rule snapshots the mode to restore and stops overwriting
-    /// the AC/DC slots, so reverting cannot restore the game profile by accident.
+    /// rule in the list wins. Applying a rule snapshots the mode and fans to restore and stops
+    /// overwriting the AC/DC slots, so reverting cannot restore the game profile by accident.
+    /// Power and fans are owned independently: a rule may change one or both.
     /// </summary>
     private async Task EvaluateAppProfilesAsync()
     {
         if (!AppProfileStore.Enabled)
         {
-            if (_appRuleOwned) await RestoreAppRuleAsync("app profiles disabled");
+            if (_appRuleOwned || _appFanOwned) await RestoreAppRuleAsync("app profiles disabled");
             else ClearStaleRestore();
             return;
         }
@@ -634,15 +649,15 @@ public class TrayApplication : ApplicationContext
         var rules = AppProfileStore.Load();
         if (!rules.Exists(r => r.Enabled))
         {
-            if (_appRuleOwned) await RestoreAppRuleAsync("no enabled rules");
+            if (_appRuleOwned || _appFanOwned) await RestoreAppRuleAsync("no enabled rules");
             else ClearStaleRestore();
             return;
         }
 
         var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
 
-        // A manual mode change while a rule owns the mode becomes the restore target, so the
-        // engine does not fight the user. A new winning app clears the override.
+        // A manual change while a rule owns the setting becomes the restore target, so the engine
+        // does not fight the user. A new winning app clears both overrides.
         if (_appRuleOwned && !_appProfileApplying)
         {
             var current = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
@@ -651,13 +666,21 @@ public class TrayApplication : ApplicationContext
                 _appManualOverride = true;
                 _appRestoreProfile = current;
                 _appAppliedProfile = current;
-                if (!string.IsNullOrWhiteSpace(_appActiveName))
-                {
-                    SettingsManager.Save(AppProfileStore.ActiveKey,
-                        $"{_appActiveName} \u2192 {current} (manual)");
-                }
-
                 Logger.Info($"App profiles: manual {current} wins until the active app changes.");
+            }
+        }
+
+        if (_appFanOwned && !_appFanApplying)
+        {
+            var currentFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile f)
+                ? f
+                : FanProfile.Auto;
+            if (currentFan != _appAppliedFan)
+            {
+                _appManualFanOverride = true;
+                _appRestoreFan = currentFan;
+                _appAppliedFan = currentFan;
+                Logger.Info($"App profiles: manual fan {currentFan} wins until the active app changes.");
             }
         }
 
@@ -675,99 +698,254 @@ public class TrayApplication : ApplicationContext
         var index = rules.FindIndex(rule => rule.Enabled && running.Contains(rule.MatchName));
         if (index < 0)
         {
-            if (_appRuleOwned) await RestoreAppRuleAsync("app closed");
+            if (_appRuleOwned || _appFanOwned) await RestoreAppRuleAsync("app closed");
             else ClearStaleRestore();
             return;
         }
 
         var rule = rules[index];
         var target = AppProfileStore.ClampForThisMachine(rule.Profile);
-        var sameRule = _appRuleOwned && index == _appRuleIndex;
+        var targetFan = FanFor(rule.Fan);
+        var newSession = !_appRuleOwned && !_appFanOwned;
+        var winnerChanged = !newSession && _appRuleIndex != index;
 
-        if (sameRule && (_appManualOverride || target == _appAppliedProfile))
+        if (winnerChanged)
         {
-            if (!string.Equals(_appActiveName, rule.DisplayName, StringComparison.Ordinal))
-            {
-                _appActiveName = rule.DisplayName;
-                SettingsManager.Save(AppProfileStore.ActiveKey, _appManualOverride
-                    ? $"{rule.DisplayName} \u2192 {_appAppliedProfile} (manual)"
-                    : ActiveRuleText(rule, target));
-            }
-
-            return;
+            // A new app takes over: its rule wins over any manual setting for the previous one.
+            _appManualOverride = false;
+            _appManualFanOverride = false;
         }
 
-        if (!_appRuleOwned)
+        if (newSession)
         {
-            // A tray restart during a game loses the live base; the saved value survives it.
-            var saved = SettingsManager.Get(AppProfileStore.RestoreKey, -1);
-            _appRestoreProfile = saved >= 0 && Enum.IsDefined((PowerProfile)saved)
-                ? (PowerProfile)saved
+            // A tray restart during a game loses the live bases; the saved values survive it.
+            var savedPower = SettingsManager.Get(AppProfileStore.RestoreKey, -1);
+            _appRestoreProfile = savedPower >= 0 && Enum.IsDefined((PowerProfile)savedPower)
+                ? (PowerProfile)savedPower
                 : GetBasePowerProfile(isOnline);
             SettingsManager.Save(AppProfileStore.RestoreKey, (int)_appRestoreProfile);
+
+            var savedFan = SettingsManager.Get(AppProfileStore.FanRestoreKey, "");
+            _appRestoreFan = Enum.TryParse<FanProfile>(savedFan, out var restoredFan)
+                ? restoredFan
+                : GetBaseFan(isOnline);
+            SettingsManager.Save(AppProfileStore.FanRestoreKey, _appRestoreFan.ToString());
             _appStartupSweepDone = true;
         }
 
         _appRuleIndex = index;
-        _appManualOverride = false;
-        _appRuleOwned = true;
-        _appRuleProfileValue = (int)target;
-        _appAppliedProfile = target;
         _appActiveName = rule.DisplayName;
-        SettingsManager.Save(AppProfileStore.ActiveKey, ActiveRuleText(rule, target));
 
-        Logger.Info($"App profiles: {rule.Executable} -> {target}.");
-        _appProfileApplying = true;
-        try
+        // --- power --------------------------------------------------------------------------
+        if (!_appManualOverride && (!_appRuleOwned || target != _appAppliedProfile))
         {
-            await ApplyAppRuleProfileAsync(target, "app-rule");
-            ShowRuleOsd(rule.DisplayName, target);
+            _appRuleOwned = true;
+            _appRuleProfileValue = (int)target;
+            _appAppliedProfile = target;
+
+            Logger.Info($"App profiles: {rule.Executable} -> {target}.");
+            _appProfileApplying = true;
+            try
+            {
+                await ApplyAppRuleProfileAsync(target, "app-rule");
+                if (newSession) ShowRuleOsd(rule.DisplayName, target);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("App profiles: the mode switch failed.", ex);
+            }
+            finally
+            {
+                _appProfileApplying = false;
+            }
         }
-        catch (Exception ex)
+
+        // --- fans ---------------------------------------------------------------------------
+        if (targetFan is null)
         {
-            Logger.Error("App profiles: the mode switch failed.", ex);
+            if (_appFanOwned)
+            {
+                var restoreFan = ChooseFanRestore(isOnline);
+                var manual = _appManualFanOverride;
+                _appFanOwned = false;
+                _appFanModeValue = -1;
+                _appManualFanOverride = false;
+                SettingsManager.Delete(AppProfileStore.FanRestoreKey);
+
+                if (!manual)
+                {
+                    Logger.Info($"App profiles: fans restored to {restoreFan}.");
+                    _appFanApplying = true;
+                    try
+                    {
+                        await ApplyAppRuleFanAsync(restoreFan);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("App profiles: the fan restore failed.", ex);
+                    }
+                    finally
+                    {
+                        _appFanApplying = false;
+                    }
+                }
+            }
         }
-        finally
+        else
         {
-            _appProfileApplying = false;
+            var fan = targetFan.Value;
+            if (!_appFanOwned)
+            {
+                if (!newSession)
+                {
+                    _appRestoreFan = GetBaseFan(isOnline);
+                    SettingsManager.Save(AppProfileStore.FanRestoreKey, _appRestoreFan.ToString());
+                }
+
+                _appFanOwned = true;
+                _appManualFanOverride = false;
+            }
+
+            if (!_appManualFanOverride && (!_appAppliedFan.Equals(fan) || _appFanModeValue < 0))
+            {
+                _appFanModeValue = (int)fan;
+                _appAppliedFan = fan;
+                Logger.Info($"App profiles: fans -> {fan}.");
+                _appFanApplying = true;
+                try
+                {
+                    await ApplyAppRuleFanAsync(fan);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("App profiles: the fan switch failed.", ex);
+                }
+                finally
+                {
+                    _appFanApplying = false;
+                }
+            }
         }
+
+        // Keep the active label current for fan-only changes and name edits.
+        var label = _appManualOverride
+            ? $"{rule.DisplayName} \u2192 {_appAppliedProfile} (manual)"
+            : ActiveRuleText(rule, target);
+        if (!string.Equals(SettingsManager.Get(AppProfileStore.ActiveKey, ""), label, StringComparison.Ordinal))
+            SettingsManager.Save(AppProfileStore.ActiveKey, label);
     }
 
     private async Task RestoreAppRuleAsync(string reason)
     {
         var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
+        var powerOwned = _appRuleOwned;
+        var fanOwned = _appFanOwned;
 
         // With AutoSwitch on the AC/DC slots were never touched, so they are the truthful base;
-        // with it off LastPowerMode holds the rule and the saved snapshot is the base.
-        var target = _appManualOverride
-            ? _appRestoreProfile
-            : SettingsManager.Get("AutoSwitch", 0) == 1
-                ? GetBasePowerProfile(isOnline)
-                : _appRestoreProfile;
-        target = AppProfileStore.ClampForThisMachine(target);
+        // with it off the saved snapshots are the base because Last*Mode holds the rule value.
+        var powerTarget = powerOwned
+            ? AppProfileStore.ClampForThisMachine(_appManualOverride
+                ? _appRestoreProfile
+                : SettingsManager.Get("AutoSwitch", 0) == 1
+                    ? GetBasePowerProfile(isOnline)
+                    : _appRestoreProfile)
+            : (PowerProfile?)null;
+        var fanTarget = fanOwned ? ChooseFanRestore(isOnline) : (FanProfile?)null;
 
-        var previous = _appAppliedProfile;
+        var previousPower = _appAppliedProfile;
+        var previousFan = _appAppliedFan;
         _appRuleOwned = false;
         _appRuleProfileValue = -1;
         _appRuleIndex = -1;
         _appManualOverride = false;
         _appActiveName = "";
         _appStartupSweepDone = true;
+        _appFanOwned = false;
+        _appFanModeValue = -1;
+        _appManualFanOverride = false;
         SettingsManager.Save(AppProfileStore.ActiveKey, "");
         SettingsManager.Delete(AppProfileStore.RestoreKey);
+        SettingsManager.Delete(AppProfileStore.FanRestoreKey);
 
-        Logger.Info($"App profiles: {reason}; restoring {target} (was {previous}).");
+        Logger.Info($"App profiles: {reason}; restoring {powerTarget?.ToString() ?? "mode untouched"}/" +
+                    $"{fanTarget?.ToString() ?? "fans untouched"} (was {previousPower}/{previousFan}).");
+
+        if (powerTarget is { } power)
+        {
+            try
+            {
+                await ApplyAppRuleProfileAsync(power, "app-rule-restore");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("App profiles: the mode restore failed.", ex);
+            }
+
+            _appAppliedProfile = power;
+        }
+
+        if (fanTarget is { } fan)
+        {
+            try
+            {
+                await ApplyAppRuleFanAsync(fan);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("App profiles: the fan restore failed.", ex);
+            }
+
+            _appAppliedFan = fan;
+        }
+    }
+
+    private async Task ApplyAppRuleFanAsync(FanProfile fan)
+    {
+        await _powerGate.WaitAsync();
         try
         {
-            await ApplyAppRuleProfileAsync(target, "app-rule-restore");
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("App profiles: the restore failed.", ex);
-        }
+            if (_shuttingDown) return;
 
-        _appAppliedProfile = target;
+            if (fan == FanProfile.Medium)
+            {
+                // Curve mode owns the fans once LastFanMode says Medium; otherwise the saved
+                // manual speeds are the custom mode.
+                if (SettingsManager.Get("IsCurveModeEnabled", 0) != 1)
+                {
+                    var cpu = FanSafety.Clamp(SettingsManager.Get("CustomFanSpeedCpu", 50));
+                    var gpu = FanSafety.Clamp(SettingsManager.Get("CustomFanSpeedGpu", 50));
+                    await AcerWmiManager.SetCustomFansAsync(cpu, gpu);
+                }
+            }
+            else
+            {
+                await AcerWmiManager.SetFansAsync(fan);
+            }
+
+            SettingsManager.Save("LastFanMode", fan.ToString());
+            ResetFanRamp();
+        }
+        finally
+        {
+            _powerGate.Release();
+        }
     }
+
+    private static FanProfile? FanFor(AppFanMode mode) => mode switch
+    {
+        AppFanMode.Auto => FanProfile.Auto,
+        AppFanMode.Max => FanProfile.Max,
+        AppFanMode.Custom => FanProfile.Medium,
+        _ => null
+    };
+
+    private FanProfile ChooseFanRestore(bool isOnline) =>
+        _appManualFanOverride
+            ? _appRestoreFan
+            : SettingsManager.Get("AutoSwitch", 0) == 1
+                ? GetBaseFan(isOnline)
+                : _appRestoreFan;
+
 
     /// <summary>Applies just the parts a profile owns; fans, charge and display are not per-app.</summary>
     private async Task ApplyAppRuleProfileAsync(PowerProfile profile, string source)
@@ -834,14 +1012,17 @@ public class TrayApplication : ApplicationContext
     }
 
     private static string ActiveRuleText(AppProfileRule rule, PowerProfile profile) =>
-        $"{rule.DisplayName} \u2192 {profile}";
+        rule.Fan == AppFanMode.Leave
+            ? $"{rule.DisplayName} \u2192 {profile}"
+            : $"{rule.DisplayName} \u2192 {profile} \u00b7 {rule.Fan} fans";
 
-    /// <summary>No app is running at tray start: a saved restore mode is stale.</summary>
+    /// <summary>No app is running at tray start: saved restore values are stale.</summary>
     private void ClearStaleRestore()
     {
         if (_appStartupSweepDone) return;
         _appStartupSweepDone = true;
         SettingsManager.Delete(AppProfileStore.RestoreKey);
+        SettingsManager.Delete(AppProfileStore.FanRestoreKey);
     }
 
     private void ReloadHotkeys()

@@ -56,6 +56,8 @@ public partial class NitrousDashboard : Window
     private bool _uiScaleLoading;
     private bool _dashboardOptionsLoading;
     private bool _appProfilesLoading;
+    private static readonly AppFanMode[] FanChoices =
+        [AppFanMode.Leave, AppFanMode.Auto, AppFanMode.Max, AppFanMode.Custom];
     private List<AppProfileRule> _appRules = new();
     private sealed record RunningApp(string Executable, string Title);
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
@@ -1275,6 +1277,11 @@ public partial class NitrousDashboard : Window
             ? profile
             : PowerProfile.Performance;
 
+    private AppFanMode SelectedNewFan() =>
+        NewAppFanBox.SelectedItem is ComboBoxItem { Tag: AppFanMode fan }
+            ? fan
+            : AppFanMode.Leave;
+
     private void BuildNewAppProfileChoices()
     {
         NewAppProfileBox.Items.Clear();
@@ -1282,6 +1289,12 @@ public partial class NitrousDashboard : Window
             NewAppProfileBox.Items.Add(new ComboBoxItem { Content = profile.ToString(), Tag = profile });
 
         NewAppProfileBox.SelectedIndex = Math.Min(2, NewAppProfileBox.Items.Count - 1);
+
+        NewAppFanBox.Items.Clear();
+        foreach (var mode in FanChoices)
+            NewAppFanBox.Items.Add(new ComboBoxItem { Content = mode.ToString(), Tag = mode });
+
+        NewAppFanBox.SelectedIndex = 0;
     }
 
     private void BuildAppProfileList()
@@ -1315,24 +1328,13 @@ public partial class NitrousDashboard : Window
 
     private Border CreateAppProfileRow(AppProfileRule rule, int index)
     {
-        var row = new Grid();
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        var labels = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0)
-        };
-
         var name = new TextBlock
         {
             Text = rule.DisplayName,
             FontSize = 10.5,
             FontWeight = FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center
         };
         name.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
 
@@ -1340,29 +1342,11 @@ public partial class NitrousDashboard : Window
         {
             Text = rule.Executable,
             FontSize = 8.5,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0)
         };
         executable.SetResourceReference(TextBlock.ForegroundProperty, "TextMutedBrush");
-
-        labels.Children.Add(name);
-        labels.Children.Add(executable);
-
-        var choices = AppProfileChoices();
-        var profile = new ComboBox
-        {
-            Width = 100,
-            Style = (Style)FindResource("CompactComboBoxStyle"),
-            Tag = index,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0),
-            ToolTip = "The power mode this app switches to."
-        };
-        foreach (var choice in choices)
-            profile.Items.Add(new ComboBoxItem { Content = choice.ToString(), Tag = choice });
-
-        profile.SelectedIndex = Math.Max(0,
-            Array.IndexOf(choices, AppProfileStore.ClampForThisMachine(rule.Profile)));
-        profile.SelectionChanged += AppRuleProfile_Changed;
 
         var toggle = new CheckBox
         {
@@ -1388,20 +1372,68 @@ public partial class NitrousDashboard : Window
         };
         remove.Click += AppRuleRemove_Click;
 
-        Grid.SetColumn(labels, 0);
+        var top = new Grid();
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        top.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(name, 0);
+        Grid.SetColumn(toggle, 1);
+        Grid.SetColumn(remove, 2);
+        top.Children.Add(name);
+        top.Children.Add(toggle);
+        top.Children.Add(remove);
+
+        var choices = AppProfileChoices();
+        var profile = new ComboBox
+        {
+            Width = 100,
+            Style = (Style)FindResource("CompactComboBoxStyle"),
+            Tag = index,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 6, 0),
+            ToolTip = "The power mode this app switches to."
+        };
+        foreach (var choice in choices)
+            profile.Items.Add(new ComboBoxItem { Content = choice.ToString(), Tag = choice });
+
+        profile.SelectedIndex = Math.Max(0,
+            Array.IndexOf(choices, AppProfileStore.ClampForThisMachine(rule.Profile)));
+        profile.SelectionChanged += AppRuleProfile_Changed;
+
+        var fan = new ComboBox
+        {
+            Width = 108,
+            Style = (Style)FindResource("CompactComboBoxStyle"),
+            Tag = index,
+            VerticalAlignment = VerticalAlignment.Center,
+            ToolTip = "What this app does to the fans."
+        };
+        foreach (var mode in FanChoices)
+            fan.Items.Add(new ComboBoxItem { Content = $"Fans: {mode}", Tag = mode });
+
+        fan.SelectedIndex = Math.Max(0, Array.IndexOf(FanChoices, rule.Fan));
+        fan.SelectionChanged += AppRuleFan_Changed;
+
+        var bottom = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+        bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(executable, 0);
         Grid.SetColumn(profile, 1);
-        Grid.SetColumn(toggle, 2);
-        Grid.SetColumn(remove, 3);
-        row.Children.Add(labels);
-        row.Children.Add(profile);
-        row.Children.Add(toggle);
-        row.Children.Add(remove);
+        Grid.SetColumn(fan, 2);
+        bottom.Children.Add(executable);
+        bottom.Children.Add(profile);
+        bottom.Children.Add(fan);
+
+        var content = new StackPanel();
+        content.Children.Add(top);
+        content.Children.Add(bottom);
 
         var border = new Border
         {
             Padding = new Thickness(8, 6, 6, 6),
             Margin = new Thickness(0, 4, 0, 0),
-            Child = row
+            Child = content
         };
         border.SetResourceReference(Border.BackgroundProperty, "SurfaceHoverBrush");
         border.SetResourceReference(Border.CornerRadiusProperty, "SurfaceCornerRadius");
@@ -1421,6 +1453,16 @@ public partial class NitrousDashboard : Window
         if (combo.SelectedItem is not ComboBoxItem { Tag: PowerProfile profile }) return;
 
         _appRules[index].Profile = profile;
+        AppProfileStore.Save(_appRules);
+    }
+
+    private void AppRuleFan_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_appProfilesLoading || sender is not ComboBox { Tag: int index } combo) return;
+        if (index < 0 || index >= _appRules.Count) return;
+        if (combo.SelectedItem is not ComboBoxItem { Tag: AppFanMode fan }) return;
+
+        _appRules[index].Fan = fan;
         AppProfileStore.Save(_appRules);
     }
 
@@ -1460,7 +1502,7 @@ public partial class NitrousDashboard : Window
         try { display = System.Diagnostics.FileVersionInfo.GetVersionInfo(dialog.FileName).ProductName; }
         catch { }
 
-        AddAppRule(executable, display, SelectedNewProfile());
+        AddAppRule(executable, display, SelectedNewProfile(), SelectedNewFan());
     }
 
     private void AppRunningBox_DropDownOpened(object? sender, EventArgs e)
@@ -1521,10 +1563,10 @@ public partial class NitrousDashboard : Window
             return;
         }
 
-        AddAppRule(app.Executable, app.Title, SelectedNewProfile());
+        AddAppRule(app.Executable, app.Title, SelectedNewProfile(), SelectedNewFan());
     }
 
-    private void AddAppRule(string executable, string? displayName, PowerProfile profile)
+    private void AddAppRule(string executable, string? displayName, PowerProfile profile, AppFanMode fan)
     {
         executable = System.IO.Path.GetFileName(executable);
         if (string.IsNullOrWhiteSpace(executable)) return;
@@ -1542,6 +1584,7 @@ public partial class NitrousDashboard : Window
                 ? System.IO.Path.GetFileNameWithoutExtension(executable)
                 : displayName.Trim(),
             Profile = AppProfileStore.ClampForThisMachine(profile),
+            Fan = fan,
             Enabled = true
         });
 

@@ -14,6 +14,10 @@ public sealed class AppProfileRule
     public string Executable { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public PowerProfile Profile { get; set; } = PowerProfile.Performance;
+
+    /// <summary>What the rule does to the fans; <see cref="AppFanMode.Leave"/> by default.</summary>
+    public AppFanMode Fan { get; set; } = AppFanMode.Leave;
+
     public bool Enabled { get; set; } = true;
 
     [JsonIgnore]
@@ -30,6 +34,7 @@ public static class AppProfileStore
     public const string EnabledKey = "AppProfilesEnabled";
     public const string ActiveKey = "AppProfileActive";
     public const string RestoreKey = "AppProfileRestoreMode";
+    public const string FanRestoreKey = "AppFanRestoreMode";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -78,6 +83,9 @@ public static class AppProfileStore
 
             if (!Enum.IsDefined(rule.Profile))
                 rule.Profile = PowerProfile.Performance;
+
+            if (!Enum.IsDefined(rule.Fan))
+                rule.Fan = AppFanMode.Leave;
 
             rule.Executable = executable;
             rule.DisplayName = string.IsNullOrWhiteSpace(rule.DisplayName)
