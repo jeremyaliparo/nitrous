@@ -198,14 +198,16 @@ public partial class NitrousDashboard : Window
 
         // The tray, a hotkey or another process may have asked for (or released) WhisperMode
         // without changing the mode, fan or refresh. That request is a registry flag, so follow
-        // it every tick rather than only when one of the other values moves.
-        var whisperActive = SettingsManager.Get("WhisperActive", 0) == 1;
+        // it every tick rather than only when one of the other values moves. The label only ever
+        // claims On in Quiet: a stale request must not follow a mode that is no longer Quiet.
+        var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
+        var whisperActive = activeMode == PowerProfile.Quiet &&
+                            SettingsManager.Get("WhisperActive", 0) == 1;
         if (DataContext is DashboardViewModel whisperVm && whisperVm.WhisperModeActive != whisperActive)
             whisperVm.WhisperModeActive = whisperActive;
 
         UpdateAppProfileActiveText();
 
-        var activeMode = (PowerProfile)SettingsManager.Get("LastPowerMode", (int)PowerProfile.Performance);
         var activeFan = Enum.TryParse(SettingsManager.Get("LastFanMode", "Auto"), out FanProfile fan)
             ? fan
             : FanProfile.Auto;

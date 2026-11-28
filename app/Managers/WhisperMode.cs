@@ -54,7 +54,10 @@ internal static class WhisperMode
     {
         lock (Gate)
         {
-            if (_lastRequested == enable) return;
+            // The persisted flag is the cross-process truth: the dashboard and the tray each have
+            // their own _lastRequested, and the other one may have changed WhisperMode since.
+            var stored = SettingsManager.Get("WhisperActive", -1);
+            if (_lastRequested == enable && stored == (enable ? 1 : 0)) return;
 
             if (_unavailable) return;
             if (!Resolve()) return;

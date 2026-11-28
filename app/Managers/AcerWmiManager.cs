@@ -140,10 +140,14 @@ public static class AcerWmiManager
 
             // The acknowledgement flash the OEM software plays on a mode change. Cosmetic only, so
             // it is skipped when the mode did not actually move (the view model re-applies a mode
-            // on profile clicks and the tray re-applies on AC/DC changes).
-            if (_lastBlinkedMode != profile && SettingsManager.Get("KbBlinkOnMode", true))
+            // on profile clicks and the tray re-applies on AC/DC changes). The last flashed mode is
+            // persisted because the dashboard and the tray are separate processes: the dashboard
+            // must not skip a flash just because the tray was the one that moved the mode.
+            var lastBlinked = SettingsManager.Get("LastBlinkedMode", "");
+            if (!string.Equals(lastBlinked, profile.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                SettingsManager.Get("KbBlinkOnMode", true))
             {
-                _lastBlinkedMode = profile;
+                SettingsManager.Save("LastBlinkedMode", profile.ToString());
 
                 // Detached: the flash holds its worker for the visible duration, and the caller
                 // still has CPU and GPU profile work to do. It is cosmetic, so it must not delay
@@ -153,8 +157,6 @@ public static class AcerWmiManager
             }
         });
     }
-
-    private static PowerProfile? _lastBlinkedMode;
 
     /// <summary>
     /// CoolBoost is offered only where APGeAction function 7's own marker says that function is
