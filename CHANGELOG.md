@@ -3,6 +3,21 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.4 - 2026-11-28
+
+### Power
+
+- **App profiles are event-driven now.** The three-second process snapshot is gone. A WMI watcher
+  subscribes to `Win32_ProcessStartTrace` and `Win32_ProcessStopTrace`, which are push events from the
+  kernel's process path, and tracks running counts. It takes one snapshot when it starts (for apps
+  already running) and again after resume or a WMI restart; otherwise it wakes only for a start/stop.
+  Rule edits and manual power/fan changes signal the tray through a named event. Only if the WMI
+  subscription is refused does a ten-second polling fallback start.
+- **Fan hotkey and manual overrides during a rule.** The tray's fan hotkey no longer re-reads the
+  rule's fan through `ApplyPowerSettingsAsync`; it applies the chosen fan directly and lets the
+  override take effect. AC/DC re-applies now respect an active manual power or fan override instead
+  of restoring the rule's choice.
+
 ## 0.19.0-test.3 - 2026-11-28
 
 ### Power
