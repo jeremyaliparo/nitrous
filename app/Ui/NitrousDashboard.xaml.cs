@@ -51,6 +51,8 @@ public partial class NitrousDashboard : Window
 
     private bool _gpuLimitsReading;
     private bool _gpuMuxReading;
+    private bool _cornerUpdating;
+    private bool _uiScaleLoading;
     private Nitrous.Enums.PowerProfile _cpuPowerProfile;
 
     /// <summary>The effect lists as offered on this machine: a five-effect controller hides the last two.</summary>
@@ -65,6 +67,7 @@ public partial class NitrousDashboard : Window
         Closed += (_, _) => ThemeManager.Changed -= OnThemeChanged;
         BuildAppearanceSwatches();
         BuildFontChoices();
+        InitializeAppearanceCustomizations();
 
         // Shown unless it has been turned off; read before the binding exists so the toggle cannot
         // write a default back over the saved choice.
@@ -922,6 +925,178 @@ public partial class NitrousDashboard : Window
         ThemeManager.SetFont(System.Windows.Application.Current, ThemeManager.FontFamilies[index].Family);
     }
 
+    /// <summary>
+    /// Loads the two appearance choices that are not part of the palette: the corner style and the
+    /// dashboard scale. Both are dashboard-only; the tray OSD keeps its own fixed size.
+    /// </summary>
+    private void InitializeAppearanceCustomizations()
+    {
+        var square = SettingsManager.Get("SquareCorners", 0) == 1;
+        _cornerUpdating = true;
+        try { TogSquareCorners.IsChecked = square; }
+        finally { _cornerUpdating = false; }
+        ApplyCornerStyle(square);
+
+        LoadUiScaleOptions(SettingsManager.Get("UiScale", 100));
+    }
+
+    private void SquareCorners_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_cornerUpdating) return;
+
+        var square = TogSquareCorners.IsChecked == true;
+        SettingsManager.Save("SquareCorners", square ? 1 : 0);
+        ApplyCornerStyle(square);
+    }
+
+    /// <summary>
+    /// Zeroes the shared corner radii. Every corner in the dashboard resolves through one of these
+    /// resources, so the whole surface becomes square at once; the nav buttons carry their own
+    /// per-edge radii in Tag, which the style binds.
+    /// </summary>
+    private void ApplyCornerStyle(bool square)
+    {
+        Resources["FrameCornerRadius"] = new CornerRadius(square ? 0 : 16);
+        Resources["HeroCornerRadius"] = new CornerRadius(square ? 0 : 12);
+        Resources["CardCornerRadius"] = new CornerRadius(square ? 0 : 10);
+        Resources["SurfaceCornerRadius"] = new CornerRadius(square ? 0 : 8);
+        Resources["ChipCornerRadius"] = new CornerRadius(square ? 0 : 6);
+        Resources["MicroCornerRadius"] = new CornerRadius(square ? 0 : 2);
+        Resources["NavBarCornerRadius"] = square
+            ? new CornerRadius(0)
+            : new CornerRadius(0, 0, 15, 15);
+
+        NavDashBtn.Tag = square ? "0,0,0,0" : "0,0,0,15";
+        NavGpuBtn.Tag = "0,0,0,0";
+        NavKeyboardBtn.Tag = "0,0,0,0";
+        NavSetBtn.Tag = square ? "0,0,0,0" : "0,0,15,0";
+    }
+
+    private void LoadUiScaleOptions(int saved)
+    {
+        _uiScaleLoading = true;
+        try
+        {
+            var work = SystemParameters.WorkArea;
+            UiScale110Item.IsEnabled = 660 * 1.10 <= work.Height - 24;
+            UiScale125Item.IsEnabled = 660 * 1.25 <= work.Height - 24;
+
+            var allowed = new List<int> { 90, 100 };
+            if (UiScale110Item.IsEnabled) allowed.Add(110);
+            if (UiScale125Item.IsEnabled) allowed.Add(125);
+
+            var chosen = allowed.Contains(saved) ? saved : allowed[^1];
+            UiScaleBox.SelectedIndex = chosen switch
+            {
+                90 => 0,
+                110 => 2,
+                125 => 3,
+                _ => 1
+            };
+
+            ApplyUiScale(chosen);
+            if (chosen != saved) SettingsManager.Save("UiScale", chosen);
+        }
+        finally
+        {
+            _uiScaleLoading = false;
+        }
+    }
+
+    private void UiScale_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_uiScaleLoading || UiScaleBox.SelectedIndex < 0) return;
+
+        var percent = UiScaleBox.SelectedIndex switch
+        {
+            0 => 90,
+            2 => 110,
+            3 => 125,
+            _ => 100
+        };
+
+        SettingsManager.Save("UiScale", percent);
+        ApplyUiScale(percent);
+    }
+
+    /// <summary>
+    /// Scales the whole dashboard, not just its text: the window grows by the same factor and the
+    /// root carries a LayoutTransform, so every card, plot and control stays proportional and crisp.
+    /// ComboBox popups are separate windows and get the same transform through UiScaleTransform.
+    /// </summary>
+    private void ApplyUiScale(int percent)
+    {
+        var work = CurrentWorkArea();
+        var maxScale = Math.Min((work.Height - 24) / 660.0, (work.Width - 24) / 375.0);
+        var scale = percent / 100.0;
+
+        if (scale > maxScale)
+        {
+            var fit = new[] { 125, 110, 100, 90 }.FirstOrDefault(p => p / 100.0 <= maxScale, 90);
+            Logger.Info($"UI scale: {percent}% does not fit this screen; using {fit}%.");
+            percent = fit;
+            scale = percent / 100.0;
+
+            _uiScaleLoading = true;
+            try
+            {
+                UiScaleBox.SelectedIndex = percent switch
+                {
+                    90 => 0,
+                    110 => 2,
+                    125 => 3,
+                    _ => 1
+                };
+            }
+            finally
+            {
+                _uiScaleLoading = false;
+            }
+
+            SettingsManager.Save("UiScale", percent);
+        }
+
+        Width = Math.Round(375 * scale);
+        Height = Math.Round(660 * scale);
+
+        if (Content is FrameworkElement root)
+            root.LayoutTransform = new ScaleTransform(scale, scale);
+
+        Resources["UiScaleTransform"] = new ScaleTransform(scale, scale);
+        ClampWindowToWorkArea();
+    }
+
+    /// <summary>The work area of the screen the window is on, in WPF device-independent units.</summary>
+    private Rect CurrentWorkArea()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var screen = handle != IntPtr.Zero
+            ? System.Windows.Forms.Screen.FromHandle(handle)
+            : System.Windows.Forms.Screen.PrimaryScreen;
+        if (screen == null) return SystemParameters.WorkArea;
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return new Rect(
+            screen.WorkingArea.Left / dpi.DpiScaleX,
+            screen.WorkingArea.Top / dpi.DpiScaleY,
+            screen.WorkingArea.Width / dpi.DpiScaleX,
+            screen.WorkingArea.Height / dpi.DpiScaleY);
+    }
+
+    private void ClampWindowToWorkArea()
+    {
+        if (double.IsNaN(Left) || double.IsNaN(Top)) return;
+
+        var work = CurrentWorkArea();
+        if (Width > work.Width) Width = work.Width;
+        if (Height > work.Height) Height = work.Height;
+
+        if (Left < work.Left) Left = work.Left;
+        if (Top < work.Top) Top = work.Top;
+        if (Left + Width > work.Right) Left = Math.Max(work.Left, work.Right - Width);
+        if (Top + Height > work.Bottom) Top = Math.Max(work.Top, work.Bottom - Height);
+    }
+
     private void OnThemeChanged()
     {
         ApplyNavColours();
@@ -1054,6 +1229,10 @@ public partial class NitrousDashboard : Window
         {
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
+
+        // The saved scale was applied before the window had a handle; re-apply it now that the real
+        // screen and DPI are known, so a 125% choice cannot hang off a shorter display.
+        ApplyUiScale(SettingsManager.Get("UiScale", 100));
 
         // The saved position can belong to a monitor that is no longer connected. Wait until
         // layout has produced a real window rect, then recover if necessary.

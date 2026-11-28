@@ -11,6 +11,17 @@
         RenderOptions.ClearTypeHint="Enabled"
         Deactivated="Window_Deactivated" Activated="Window_Activated">
 	<Window.Resources>
+		<!-- Shared corner radii; the Theme "Square corners" toggle zeroes all of them. -->
+		<CornerRadius x:Key="FrameCornerRadius">16</CornerRadius>
+		<CornerRadius x:Key="HeroCornerRadius">12</CornerRadius>
+		<CornerRadius x:Key="CardCornerRadius">10</CornerRadius>
+		<CornerRadius x:Key="SurfaceCornerRadius">8</CornerRadius>
+		<CornerRadius x:Key="ChipCornerRadius">6</CornerRadius>
+		<CornerRadius x:Key="MicroCornerRadius">2</CornerRadius>
+		<CornerRadius x:Key="NavBarCornerRadius">0,0,15,15</CornerRadius>
+		<!-- Scales ComboBox popups with the dashboard; a popup is a separate window and does not inherit the root transform. -->
+		<ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1"/>
+
 		<BitmapImage x:Key="CachedAppLogo" UriSource="pack://application:,,,/assets/logo.png" CacheOption="OnLoad" />
 		<Style x:Key="ActionButtonStyle" TargetType="RadioButton">
 			<!-- Default state: Transparent background to blend into the rail -->
@@ -35,7 +46,7 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="6"
+                                    CornerRadius="{DynamicResource ChipCornerRadius}"
                                     Margin="0"
                                     SnapsToDevicePixels="True">
 								<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -94,7 +105,7 @@
 			<Setter Property="Template">
 				<Setter.Value>
 					<ControlTemplate TargetType="CheckBox">
-						<Border x:Name="BgBorder" Width="44" Height="24" CornerRadius="12" Background="{DynamicResource ToggleTrackBrush}">
+						<Border x:Name="BgBorder" Width="44" Height="24" CornerRadius="{DynamicResource HeroCornerRadius}" Background="{DynamicResource ToggleTrackBrush}">
 							<Ellipse x:Name="Thumb" Width="18" Height="18" Fill="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Left" Margin="3,0,0,0"/>
 						</Border>
 						<ControlTemplate.Triggers>
@@ -125,13 +136,13 @@
 				<Setter.Value>
 					<ControlTemplate TargetType="Slider">
 						<Grid Height="20">
-							<Border Height="4" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="2" VerticalAlignment="Center"/>
+							<Border Height="4" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="{DynamicResource MicroCornerRadius}" VerticalAlignment="Center"/>
 							<Track x:Name="PART_Track">
 								<Track.DecreaseRepeatButton>
 									<RepeatButton Command="Slider.DecreaseLarge">
 										<RepeatButton.Template>
 											<ControlTemplate TargetType="RepeatButton">
-												<Border Height="4" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" CornerRadius="2"/>
+												<Border Height="4" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Slider}}" CornerRadius="{DynamicResource MicroCornerRadius}"/>
 											</ControlTemplate>
 										</RepeatButton.Template>
 									</RepeatButton>
@@ -174,7 +185,7 @@
 				<Setter.Value>
 					<ControlTemplate TargetType="CheckBox">
 						<StackPanel Orientation="Horizontal">
-							<Border Width="12" Height="12" Background="{DynamicResource TextPrimaryBrush}" CornerRadius="2" VerticalAlignment="Center" Margin="0,0,6,0">
+							<Border Width="12" Height="12" Background="{DynamicResource TextPrimaryBrush}" CornerRadius="{DynamicResource MicroCornerRadius}" VerticalAlignment="Center" Margin="0,0,6,0">
 								<Path x:Name="CheckIcon" Data="M3,8L6,11L11,3" Stroke="{DynamicResource WindowBgBrush}" StrokeThickness="2" Stretch="Uniform" Margin="2" Visibility="Collapsed"/>
 							</Border>
 							<TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -222,7 +233,7 @@
 					<ControlTemplate TargetType="Button">
 						<Border x:Name="Chip" Background="{TemplateBinding Background}"
 						        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-						        CornerRadius="6" Padding="8,3">
+						        CornerRadius="{DynamicResource ChipCornerRadius}" Padding="8,3">
 							<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
 						</Border>
 						<ControlTemplate.Triggers>
@@ -249,7 +260,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                        <Border x:Name="BtnBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource SurfaceCornerRadius}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -337,8 +348,8 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
                         <Grid x:Name="PART_Track">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="2"/>
-                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="2" HorizontalAlignment="Left"/>
+                            <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource MicroCornerRadius}"/>
+                            <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="{DynamicResource MicroCornerRadius}" HorizontalAlignment="Left"/>
                         </Grid>
                     </ControlTemplate>
                 </Setter.Value>
@@ -356,7 +367,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="Chip" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}"
-                                BorderThickness="1" CornerRadius="7" Padding="12,5">
+                                BorderThickness="1" CornerRadius="{DynamicResource ChipCornerRadius}" Padding="12,5">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -382,7 +393,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="ItemBorder" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource ChipCornerRadius}" Padding="{TemplateBinding Padding}">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -412,7 +423,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
                         <Grid>
-                            <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"/>
+                            <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{DynamicResource ChipCornerRadius}"/>
                             <Grid Margin="8,0,7,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -450,9 +461,10 @@
                                 <Border Background="{DynamicResource CardBgBrush}"
                                         BorderBrush="{DynamicResource BorderSubtleBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="6"
+                                        CornerRadius="{DynamicResource ChipCornerRadius}"
                                         Margin="0,2,0,0"
-                                        Width="{TemplateBinding ActualWidth}">
+                                        Width="{TemplateBinding ActualWidth}"
+                                        LayoutTransform="{DynamicResource UiScaleTransform}">
                                     <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                         <ItemsPresenter Margin="2"/>
                                     </ScrollViewer>
@@ -481,9 +493,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="8">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="{DynamicResource SurfaceCornerRadius}">
                             <Grid>
-                                <Border x:Name="HoverOverlay" Background="{DynamicResource TextPrimaryBrush}" Opacity="0" CornerRadius="8"/>
+                                <Border x:Name="HoverOverlay" Background="{DynamicResource TextPrimaryBrush}" Opacity="0" CornerRadius="{DynamicResource SurfaceCornerRadius}"/>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
                             </Grid>
                         </Border>
@@ -514,7 +526,7 @@
                         <Border Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8" Padding="0">
+                                CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="0">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -560,7 +572,7 @@
                                     <Thumb MinHeight="24" Cursor="Hand">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="{x:Type Thumb}">
-                                                <Border x:Name="ThumbBorder" Background="{DynamicResource DividerBrush}" CornerRadius="2" Margin="2,0"/>
+                                                <Border x:Name="ThumbBorder" Background="{DynamicResource DividerBrush}" CornerRadius="{DynamicResource MicroCornerRadius}" Margin="2,0"/>
                                                 <ControlTemplate.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
                                                         <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
@@ -607,8 +619,8 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Swatch" Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
-                            <Border Background="{DynamicResource ScrimBrush}" CornerRadius="4" Padding="7,2" Margin="6" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+                        <Border x:Name="Swatch" Background="{TemplateBinding Background}" CornerRadius="{DynamicResource SurfaceCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+                            <Border Background="{DynamicResource ScrimBrush}" CornerRadius="{DynamicResource ChipCornerRadius}" Padding="7,2" Margin="6" VerticalAlignment="Bottom" HorizontalAlignment="Center">
                                 <TextBlock Text="{TemplateBinding Content}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
                             </Border>
                         </Border>
@@ -642,7 +654,7 @@
 		</Style>
 	</Window.Resources>
 	<!-- Outer Frame with Rounded Corners -->
-	<Border Background="{DynamicResource WindowBgBrush}" CornerRadius="16" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+	<Border Background="{DynamicResource WindowBgBrush}" CornerRadius="{DynamicResource FrameCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
 		<Grid>
 			<Grid.RowDefinitions>
 				<RowDefinition Height="50"/>
@@ -655,11 +667,11 @@
 				<!-- Right Side: Power Pill, Pin to Top & Close -->
 				<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
 					<!-- 1. Dynamic Power State Pill -->
-                    <Border x:Name="DashPowerPillBorder" BorderBrush="{DynamicResource DangerBrush}" BorderThickness="1" CornerRadius="6" Margin="0,0,12,0"
+                    <Border x:Name="DashPowerPillBorder" BorderBrush="{DynamicResource DangerBrush}" BorderThickness="1" CornerRadius="{DynamicResource ChipCornerRadius}" Margin="0,0,12,0"
                             ToolTip="Measured battery charge/discharge rate. Windows does not expose the adapter's rated wattage.">
                         <Grid>
                             <!-- Auto-tinting subtle background -->
-                            <Border Background="{Binding BorderBrush, ElementName=DashPowerPillBorder}" Opacity="0.15" CornerRadius="5"/>
+                            <Border Background="{Binding BorderBrush, ElementName=DashPowerPillBorder}" Opacity="0.15" CornerRadius="{DynamicResource ChipCornerRadius}"/>
 
                             <StackPanel Orientation="Horizontal" Margin="8,4">
                                 <!-- Updated to an AC Power Plug icon -->
@@ -750,9 +762,9 @@
 						<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource HeroCornerRadius}" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="{DynamicResource CardCornerRadius}" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
@@ -769,7 +781,7 @@
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 						<!-- CPU Telemetry -->
-						<Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
+						<Border Grid.Column="0" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource SurfaceCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -793,7 +805,7 @@
 							</Grid>
 						</Border>
 						<!-- GPU Telemetry -->
-						<Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
+						<Border Grid.Column="2" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource SurfaceCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="10,8">
 							<Grid>
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
@@ -903,7 +915,7 @@
 							<TextBlock Text="On" Foreground="{DynamicResource AccentBrush}" FontSize="10" FontWeight="Bold" Margin="4,0,0,0" VerticalAlignment="Center"/>
 						</StackPanel>
 					</Grid>
-					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,16">
 						<UniformGrid Rows="1" Height="34">
 							<RadioButton x:Name="BtnPowerQuiet" TabIndex="0" GroupName="Power" Uid="Quiet" Tag="M1,13 L9.4,11.5 A3,3 0 1,1 9.4,14.5 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Quiet" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Quiet"/>
 							<RadioButton x:Name="BtnPowerBal" TabIndex="1" GroupName="Power" Uid="Balanced" Tag="M12,2 L13.5,10.4 A3,3 0 1,1 10.5,10.4 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Bal" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetPowerCommand}" CommandParameter="Balanced"/>
@@ -920,7 +932,7 @@
 						<TextBlock Text="DISPLAY" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 						<TextBlock x:Name="DisplayCurrentText" Grid.Column="1" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" TextAlignment="Right" TextTrimming="CharacterEllipsis" Margin="8,0,0,0"/>
 					</Grid>
-					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="12,10" Margin="0,0,0,16">
 						<StackPanel>
 							<!-- Refresh rate -->
 							<Grid>
@@ -937,7 +949,7 @@
 					</Border>
 					<!-- Fans -->
 					<TextBlock Text="FANS" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
-					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,16">
 						<UniformGrid Rows="1" Height="34">
 							<RadioButton x:Name="BtnFanAuto" TabIndex="0" GroupName="Fans" Uid="Auto" Tag="M12,4V1L7,5L12,9V6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6.34,14H4.27A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z" Content="Auto" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Auto"/>
 							<RadioButton x:Name="BtnFanMax" TabIndex="1" GroupName="Fans" Uid="Max" Tag="M19.78,20.78 L12.78,15.9 A3,3 0 1,1 14.9,13.78 Z M4.93,20.06 A10,10 0 1,1 19.07,20.06 C18.68,20.45 18.05,20.45 17.66,20.06 C17.27,19.67 17.27,19.04 17.66,18.65 A8,8 0 1,0 6.34,18.65 C6.74,19.04 6.74,19.67 6.35,20.06 C5.96,20.45 5.32,20.45 4.93,20.06 Z" Content="Max" Style="{StaticResource ActionButtonStyle}" Command="{Binding SetFanCommand}" CommandParameter="Max"/>
@@ -945,7 +957,7 @@
 						</UniformGrid>
 					</Border>
 					<!-- CoolBoost, where APGeAction function 7 is it (AN517-51 and the AN515-45/57). -->
-					<Border x:Name="CoolBoostCard" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" Visibility="Collapsed">
+					<Border x:Name="CoolBoostCard" Background="{DynamicResource CardBgBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="12,8" Margin="0,0,0,12" Visibility="Collapsed">
 						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*"/>
@@ -959,7 +971,7 @@
 						</Grid>
 					</Border>
 					<StackPanel x:Name="CustomFanSection" Opacity="{Binding CustomFanOpacity}">
-						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="8" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="12,12,12,16">
+						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource SurfaceCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="12,12,12,16">
 							<StackPanel>
 								<Grid Margin="0,0,0,12">
 									<Grid.ColumnDefinitions>
@@ -1037,9 +1049,9 @@
 						<RowDefinition Height="Auto"/>
 						<RowDefinition Height="*"/>
 					</Grid.RowDefinitions>
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,10" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource HeroCornerRadius}" Margin="0,0,0,10" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="{DynamicResource CardCornerRadius}" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
@@ -1049,7 +1061,7 @@
 						</StackPanel>
 					</Border>
 					<!-- One category at a time; the same tab strip the LIGHT page uses. -->
-					<Border Grid.Row="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+					<Border Grid.Row="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,10">
 						<UniformGrid Rows="1" Height="32">
 							<RadioButton x:Name="SetupPowerTab" Tag="M7,2V13H10V22L17,10H13L15,2H7Z" TabIndex="0" GroupName="Setup" Content="Power" ToolTip="CPU power limits and battery" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
 							<RadioButton x:Name="SetupSystemTab" Tag="M3,17V19H9V17H3M3,5V7H13V5H3M13,21V19H21V17H13V15H11V21H13M7,9V11H3V13H7V15H9V9H7M14,9V11H21V9H14M11,3V9H13V7H21V5H13V3H11Z" TabIndex="1" GroupName="Setup" Content="System" ToolTip="Telemetry, startup, boot logo, Acer services, diagnostics" Style="{StaticResource ActionButtonStyle}" Checked="SetupTab_Checked"/>
@@ -1279,7 +1291,7 @@
 											<TextBlock Text="Boot Logo" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"/>
 										</StackPanel>
 										<TextBlock Text="Replaces Acer's splash at power-on. The picture is read from the EFI system partition; the BIOS is never modified, and REMOVE brings Acer's logo back." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" TextWrapping="Wrap"/>
-										<Border Height="96" Margin="0,10,0,0" CornerRadius="6" Background="#0B0B0F" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+										<Border Height="96" Margin="0,10,0,0" CornerRadius="{DynamicResource ChipCornerRadius}" Background="#0B0B0F" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
 											<Image x:Name="BootLogoPreview" Stretch="Uniform" Margin="4"/>
 										</Border>
 										<TextBlock x:Name="BootLogoStatus" Style="{StaticResource CardStatusStyle}" Foreground="{DynamicResource TextMutedBrush}" FontSize="9.5" Margin="0,6,0,0" TextWrapping="Wrap"/>
@@ -1328,7 +1340,7 @@
 								</Border>
 
 								<!-- Diagnostics -->
-								<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
+								<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,4,0,0" Padding="15,12">
 									<StackPanel>
 										<StackPanel Orientation="Horizontal" Margin="0,0,0,4">
 											<Path Data="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M13,9V3.5L18.5,9H13M8,13H16V15H8V13M8,17H16V19H8V17Z" Fill="{DynamicResource TextPrimaryBrush}" Stretch="Uniform" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -1592,10 +1604,33 @@
 												<ColumnDefinition Width="*"/>
 												<ColumnDefinition Width="Auto"/>
 											</Grid.ColumnDefinitions>
+											<TextBlock Text="UI scale" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Scales the whole dashboard. 125% needs a screen at least 850 px tall."/>
+											<ComboBox Grid.Column="1" x:Name="UiScaleBox" Width="130" Style="{StaticResource CompactComboBoxStyle}" SelectionChanged="UiScale_Changed" ToolTip="Scales the whole dashboard.">
+												<ComboBoxItem x:Name="UiScale90Item" Content="90%"/>
+												<ComboBoxItem x:Name="UiScale100Item" Content="100%"/>
+												<ComboBoxItem x:Name="UiScale110Item" Content="110%"/>
+												<ComboBoxItem x:Name="UiScale125Item" Content="125%"/>
+											</ComboBox>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
 											<TextBlock Text="Scrollbars" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center"/>
 											<CheckBox Grid.Column="1" x:Name="TogScrollbars" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
-											          IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
-											          ToolTip="Show the scrollbar on the four pages. Off hides it; the wheel still scrolls."/>
+												IsChecked="{Binding ShowScrollbars}" Checked="Scrollbars_Toggled" Unchecked="Scrollbars_Toggled"
+												ToolTip="Show the scrollbar on the four pages. Off hides it; the wheel still scrolls."/>
+										</Grid>
+										<Grid Margin="0,8,0,0">
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="Auto"/>
+											</Grid.ColumnDefinitions>
+											<TextBlock Text="Square corners" Foreground="{DynamicResource TextBodyBrush}" FontSize="10.5" VerticalAlignment="Center" ToolTip="Remove the rounded corners from the dashboard, cards and controls."/>
+											<CheckBox Grid.Column="1" x:Name="TogSquareCorners" Style="{StaticResource ModernToggleStyle}" VerticalAlignment="Center"
+												Checked="SquareCorners_Toggled" Unchecked="SquareCorners_Toggled"
+												ToolTip="Remove the rounded corners from the dashboard, cards and controls."/>
 										</Grid>
 									</StackPanel>
 								</Border>
@@ -1614,9 +1649,9 @@
 					</ScrollViewer.Resources>
 					<StackPanel Margin="0,0,4,16">
 					<!-- Compact Hero Banner -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource HeroCornerRadius}" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="{DynamicResource CardCornerRadius}" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
@@ -1626,7 +1661,7 @@
 						</StackPanel>
 					</Border>
 					<!-- GPU TELEMETRY: clocks, live power and meters -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12">
 						<StackPanel>
 							<Grid Margin="0,0,0,2">
 								<Grid.ColumnDefinitions>
@@ -1637,7 +1672,7 @@
 								<Path Grid.Column="0" Fill="{DynamicResource AccentBrush}" Stretch="Uniform" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center" Data="M22,9V7H20V5A2,2 0 0,0 18,3H4A2,2 0 0,0 2,5V19A2,2 0 0,0 4,21H18A2,2 0 0,0 20,19V17H22V15H20V13H22V11H20V9H22M18,19H4V5H18V19M6,13H11V17H6V13M12,7H16V10H12V7M6,7H11V12H6V7M12,11H16V17H12V11Z"/>
 								<TextBlock Grid.Column="1" Text="{Binding GpuNameText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"
 								           TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,0,8,0" ToolTip="{Binding GpuNameText}"/>
-								<Border Grid.Column="2" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+								<Border Grid.Column="2" Background="{DynamicResource BorderSubtleBrush}" CornerRadius="{DynamicResource ChipCornerRadius}" Padding="6,2" VerticalAlignment="Center">
 									<TextBlock Text="{Binding GpuArchText}" Foreground="{DynamicResource AccentBrush}" FontSize="9" FontWeight="Bold"/>
 								</Border>
 							</Grid>
@@ -1735,7 +1770,7 @@
 						</StackPanel>
 					</Border>
 					<!-- GPU MODE (MUX): a BIOS setting, only offered where NVIDIA DDS is not the control -->
-					<Border x:Name="GpuMuxCard" Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12"
+					<Border x:Name="GpuMuxCard" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12"
 					        Visibility="{Binding GpuMuxAvailable, Converter={StaticResource BoolToVis}}">
 						<StackPanel>
 							<Grid Margin="0,0,0,2">
@@ -1772,7 +1807,7 @@
 						</StackPanel>
 					</Border>
 					<!-- Advanced Optimus: the NVIDIA app owns the display mode, so no BIOS write here -->
-					<Border x:Name="GpuDdsCard" Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12"
+					<Border x:Name="GpuDdsCard" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,12"
 					        Visibility="{Binding GpuDdsNoticeVisible, Converter={StaticResource BoolToVis}}">
 						<StackPanel>
 							<StackPanel Orientation="Horizontal">
@@ -1786,7 +1821,7 @@
 					</Border>
 
 					<!-- CLOCK OFFSETS SLIDERS -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,16">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="16,12,16,14" Margin="0,0,0,16">
 						<StackPanel>
 							<Grid Margin="0,0,0,8">
 								<TextBlock Text="GPU TUNING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -1860,7 +1895,7 @@
 						</StackPanel>
 					</Border>
 					<!-- Vendor GPU software: driver settings Nitrous deliberately does not touch -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="14,12" Margin="0,0,0,16"
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="14,12" Margin="0,0,0,16"
 						        Visibility="{Binding IsNvidiaToolAvailable, Converter={StaticResource BoolToVis}}">
 						<Grid>
 							<Grid.ColumnDefinitions>
@@ -1886,9 +1921,9 @@
                 		<Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource SlimScrollBarStyle}"/>
                 	</ScrollViewer.Resources>
                 	<StackPanel Margin="0,0,4,16">
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="12" Margin="0,0,0,12" Padding="12">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource HeroCornerRadius}" Margin="0,0,0,12" Padding="12">
 						<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-							<Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
+							<Border Width="44" Height="44" CornerRadius="{DynamicResource CardCornerRadius}" Background="{DynamicResource SurfaceRaisedBrush}" Margin="0,0,12,0">
 								<Image Source="{StaticResource CachedAppLogo}" RenderOptions.BitmapScalingMode="HighQuality" Margin="8" Stretch="Uniform"/>
 							</Border>
 							<StackPanel VerticalAlignment="Center">
@@ -1903,7 +1938,7 @@
 						<TextBlock Text="LIGHTING" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 						<TextBlock x:Name="KeyboardLightingStatus" Foreground="{DynamicResource TextDimBrush}" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center"/>
 					</Grid>
-					<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,10">
+					<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,10">
 						<UniformGrid Rows="1" Height="34">
 							<RadioButton x:Name="LightingGlobalTab" Tag="M16.36,14C16.44,13.34 16.5,12.68 16.5,12C16.5,11.32 16.44,10.66 16.36,10H19.74C19.9,10.64 20,11.31 20,12C20,12.69 19.9,13.36 19.74,14M14.59,19.56C15.19,18.45 15.65,17.25 15.97,16H18.92C17.96,17.65 16.43,18.93 14.59,19.56M14.34,14H9.66C9.56,13.34 9.5,12.68 9.5,12C9.5,11.32 9.56,10.65 9.66,10H14.34C14.43,10.65 14.5,11.32 14.5,12C14.5,12.68 14.43,13.34 14.34,14M12,19.96C11.17,18.76 10.5,17.43 10.09,16H13.91C13.5,17.43 12.83,18.76 12,19.96M8,8H5.08C6.03,6.34 7.57,5.06 9.4,4.44C8.8,5.55 8.35,6.75 8,8M5.08,16H8C8.35,17.25 8.8,18.45 9.4,19.56C7.57,18.94 6.03,17.66 5.08,16M4.26,14C4.1,13.36 4,12.69 4,12C4,11.31 4.1,10.64 4.26,10H7.64C7.56,10.66 7.5,11.32 7.5,12C7.5,12.68 7.56,13.34 7.64,14M12,4.03C12.83,5.23 13.5,6.57 13.91,8H10.09C10.5,6.57 11.17,5.23 12,4.03M18.92,8H15.97C15.65,6.75 15.19,5.55 14.59,4.44C16.43,5.07 17.96,6.34 18.92,8M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" TabIndex="0" GroupName="Lighting" Content="Global" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="LightingTab_Checked"/>
 							<RadioButton x:Name="LightingAreaTab" Tag="M3,3H11V11H3V3M13,3H21V11H13V3M3,13H11V21H3V13M13,13H21V21H13V13Z" TabIndex="1" GroupName="Lighting" Content="Area" Style="{StaticResource ActionButtonStyle}" Checked="LightingTab_Checked"/>
@@ -1911,7 +1946,7 @@
 					</Border>
 
 					<!-- Global: one effect, written to the keyboard and then to the cover logo -->
-					<Border x:Name="GlobalPanel" Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+					<Border x:Name="GlobalPanel" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
 						<StackPanel>
 							<TextBlock Text="One effect for the keyboard and the cover logo." Foreground="{DynamicResource TextMutedBrush}" FontSize="10.5" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
@@ -1946,12 +1981,12 @@
 
 					<!-- Area: one card, with the device chosen at the top -->
 					<StackPanel x:Name="AreaPanel" Visibility="Collapsed">
-						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+						<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
 							<StackPanel>
 								<Grid Margin="0,0,0,8">
 									<TextBlock Text="DEVICE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
 								</Grid>
-								<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3">
+								<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3">
 									<UniformGrid Rows="1" Height="34">
 										<RadioButton x:Name="AreaKeyboardTab" Tag="M19,10H17V8H19M19,13H17V11H19M16,10H14V8H16M16,13H14V11H16M13,10H11V8H13M13,13H11V11H13M8,10H6V8H8M8,13H6V11H8M5,10H3V8H5M5,13H3V11H5M4,17H20V15H4M22,5H2A2,2 0 0,0 0,7V17A2,2 0 0,0 2,19H22A2,2 0 0,0 24,17V7A2,2 0 0,0 22,5Z" TabIndex="0" GroupName="LightingArea" Content="Keyboard" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="AreaTab_Checked"/>
 										<RadioButton x:Name="AreaLogoTab" Tag="M3,5H21V17H3V5M5,7V15H19V7H5M1,19H23V21H1V19Z" TabIndex="1" GroupName="LightingArea" Content="Cover logo" Style="{StaticResource ActionButtonStyle}" Checked="AreaTab_Checked"/>
@@ -1961,7 +1996,7 @@
 								<Border Height="1" Background="{DynamicResource BorderSubtleBrush}" Margin="0,12,0,12"/>
 
 								<StackPanel x:Name="AreaKeyboardPanel">
-									<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="3" Margin="0,0,0,12">
+									<Border Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource SurfaceCornerRadius}" Padding="3" Margin="0,0,0,12">
 										<UniformGrid Rows="1" Height="34">
 											<RadioButton x:Name="KbStaticTab" Tag="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2Z" TabIndex="0" GroupName="LightingMode" Content="Static" IsChecked="True" Style="{StaticResource ActionButtonStyle}" Checked="KbMode_Checked"/>
 											<RadioButton x:Name="KbDynamicTab" Tag="M4,10H7V20H4V10M9,4H12V20H9V4M14,13H17V20H14V13M19,7H22V20H19V7Z" TabIndex="1" GroupName="LightingMode" Content="Dynamic" Style="{StaticResource ActionButtonStyle}" Checked="KbMode_Checked"/>
@@ -2057,7 +2092,7 @@
 					</StackPanel>
 
 					<!-- Sync: a software overlay that works on both presets; the target decides the lid -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
 						<StackPanel>
 							<Grid Margin="0,0,0,2">
 								<TextBlock Text="SYNC" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -2119,7 +2154,7 @@
 						</StackPanel>
 					</Border>
 					<!-- Power mode change flash: the OEM acknowledgement blink, reproduced standalone -->
-					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="10" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
+					<Border Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource CardCornerRadius}" Margin="0,0,0,10" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Padding="15">
 						<Grid>
 							<StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
 								<TextBlock Text="Power mode change flash" Foreground="{DynamicResource TextPrimaryBrush}" FontWeight="Bold" FontSize="12"/>
@@ -2132,7 +2167,7 @@
                 </ScrollViewer>
 			</Grid>
 			<!-- Bottom Navigation -->
-			<Border Grid.Row="2" Background="{DynamicResource CardBgBrush}" CornerRadius="0,0,15,15">
+			<Border Grid.Row="2" Background="{DynamicResource CardBgBrush}" CornerRadius="{DynamicResource NavBarCornerRadius}">
 				<Grid>
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*"/>
