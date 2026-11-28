@@ -1330,6 +1330,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
             {
                 Logger.Warn("Power: failed to switch profile.", ex);
             }
+            finally
+            {
+                AppProfileChangeSignal.Notify();
+            }
         });
 
         SetFanCommand = new RelayCommand(async param =>
@@ -1355,6 +1359,10 @@ public class DashboardViewModel : ObservableObject, IDisposable
             catch (Exception ex)
             {
                 Logger.Warn("Fan: failed to switch mode.", ex);
+            }
+            finally
+            {
+                AppProfileChangeSignal.Notify();
             }
         });
 

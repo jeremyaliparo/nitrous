@@ -82,6 +82,11 @@ public class TrayApplication : ApplicationContext
     private FanProfile _appRestoreFan = FanProfile.Auto;
     private FanProfile _appAppliedFan = FanProfile.Auto;
 
+    private readonly EventWaitHandle _appProfileChanged = AppProfileChangeSignal.CreateReceiver();
+    private readonly SemaphoreSlim _appProfileGate = new(1, 1);
+    private ProcessEventWatcher? _processWatcher;
+    private HashSet<string> _appWatchNames = new(StringComparer.OrdinalIgnoreCase);
+
     private volatile bool _shuttingDown;
     private int _cleanupStarted;
     private string _registeredCycleHotkey = "";
@@ -488,6 +493,11 @@ public class TrayApplication : ApplicationContext
 
             var isOnline = SystemInformation.PowerStatus.PowerLineStatus == PowerLineStatus.Online;
             await _gpuManager.ApplyOnBootAsync(GetActivePowerProfile(isOnline));
+
+            // The dGPU/EC readback is back; reconcile the process set in case WMI events were
+            // missed while Windows was asleep.
+            if (_processWatcher is { IsRunning: true }) _processWatcher.Resync();
+            else _ = EvaluateAppProfilesAsync("resume");
         }
     }
 
@@ -520,7 +530,10 @@ public class TrayApplication : ApplicationContext
     private PowerProfile GetActivePowerProfile(bool isOnline)
     {
         var rule = _appRuleProfileValue;
-        return rule >= 0 ? (PowerProfile)rule : GetBasePowerProfile(isOnline);
+        if (rule >= 0)
+            return _appManualOverride ? _appAppliedProfile : (PowerProfile)rule;
+
+        return GetBasePowerProfile(isOnline);
     }
 
     private static FanProfile GetBaseFan(bool isOnline)
@@ -538,7 +551,10 @@ public class TrayApplication : ApplicationContext
     private FanProfile GetActiveFan(bool isOnline)
     {
         var fan = _appFanModeValue;
-        return fan >= 0 ? (FanProfile)fan : GetBaseFan(isOnline);
+        if (fan >= 0)
+            return _appManualFanOverride ? _appAppliedFan : (FanProfile)fan;
+
+        return GetBaseFan(isOnline);
     }
 
     private async Task ApplyPowerSettingsAsync(bool isStartup, bool force)
@@ -637,8 +653,23 @@ public class TrayApplication : ApplicationContext
     /// overwriting the AC/DC slots, so reverting cannot restore the game profile by accident.
     /// Power and fans are owned independently: a rule may change one or both.
     /// </summary>
-    private async Task EvaluateAppProfilesAsync()
+    private async Task EvaluateAppProfilesAsync(string reason)
     {
+        await _appProfileGate.WaitAsync();
+        try
+        {
+            await EvaluateAppProfilesCoreAsync(reason);
+        }
+        finally
+        {
+            _appProfileGate.Release();
+        }
+    }
+
+    private async Task EvaluateAppProfilesCoreAsync(string reason)
+    {
+        if (_shuttingDown) return;
+
         if (!AppProfileStore.Enabled)
         {
             if (_appRuleOwned || _appFanOwned) await RestoreAppRuleAsync("app profiles disabled");
@@ -687,7 +718,7 @@ public class TrayApplication : ApplicationContext
         HashSet<string> running;
         try
         {
-            running = RunningProcessNames();
+            running = CurrentRunningNames();
         }
         catch (Exception ex)
         {
@@ -1004,6 +1035,96 @@ public class TrayApplication : ApplicationContext
         return names;
     }
 
+    private HashSet<string> CurrentRunningNames()
+    {
+        var watcher = _processWatcher;
+        return watcher is { IsRunning: true } ? watcher.RunningNames() : RunningProcessNames();
+    }
+
+    private void StartAppProfileEngine()
+    {
+        ReloadAppWatchNames();
+
+        _processWatcher = new ProcessEventWatcher();
+        _processWatcher.ProcessChanged += OnProcessChanged;
+        _processWatcher.Resynced += OnProcessResynced;
+
+        if (!_processWatcher.Start())
+        {
+            Logger.Warn("App profiles: process events unavailable; using the polling fallback.");
+            _processWatcher.Dispose();
+            _processWatcher = null;
+            StartAppProfilePollingFallback();
+        }
+
+        _ = EvaluateAppProfilesAsync("startup");
+
+        Task.Run(() =>
+        {
+            var handles = new WaitHandle[] { _appProfileChanged, _engineCts.Token.WaitHandle };
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    if (WaitHandle.WaitAny(handles) != 0) break;
+                    ReloadAppWatchNames();
+                    _ = EvaluateAppProfilesAsync("settings changed");
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (OperationCanceledException) { }
+        });
+    }
+
+    private void StartAppProfilePollingFallback()
+    {
+        Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            try
+            {
+                while (!_engineCts.Token.IsCancellationRequested)
+                {
+                    await timer.WaitForNextTickAsync(_engineCts.Token);
+
+                    try
+                    {
+                        await EvaluateAppProfilesAsync("fallback poll");
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn("App profiles: fallback evaluation failed.", ex);
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+    }
+
+    private void ReloadAppWatchNames()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rule in AppProfileStore.Load())
+        {
+            if (rule.Enabled)
+                names.Add(rule.MatchName);
+        }
+
+        _appWatchNames = names;
+    }
+
+    private void OnProcessChanged(string name, bool started)
+    {
+        if (!_appWatchNames.Contains(name)) return;
+        _ = EvaluateAppProfilesAsync(started ? "process started" : "process stopped");
+    }
+
+    private void OnProcessResynced() => _ = EvaluateAppProfilesAsync("process resync");
+
     private void ShowRuleOsd(string app, PowerProfile profile)
     {
         var title = string.IsNullOrWhiteSpace(app) ? profile.ToString().ToUpperInvariant() : app.ToUpperInvariant();
@@ -1193,6 +1314,8 @@ public class TrayApplication : ApplicationContext
         {
             _powerGate.Release();
         }
+
+        _ = EvaluateAppProfilesAsync("manual power");
     }
 
     private void ShowProfileOsd(PowerProfile profile)
@@ -1243,12 +1366,23 @@ public class TrayApplication : ApplicationContext
 
         try
         {
-            await ApplyPowerSettingsAsync(isStartup: false, force: true).ConfigureAwait(false);
+            if (_appFanOwned)
+            {
+                // ApplyPowerSettingsAsync would read the rule's fan back and undo the manual
+                // choice; apply this one directly so the override is what the hardware holds.
+                await ApplyAppRuleFanAsync(next).ConfigureAwait(false);
+            }
+            else
+            {
+                await ApplyPowerSettingsAsync(isStartup: false, force: true).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
             Logger.Error("Fans: the hotkey cycle failed.", ex);
         }
+
+        _ = EvaluateAppProfilesAsync("manual fan");
     }
 
     /// <summary>
@@ -1657,33 +1791,9 @@ public class TrayApplication : ApplicationContext
             catch (OperationCanceledException) { }
         });
 
-        // App profiles. One process snapshot every three seconds, and only when a rule exists;
-        // an empty rule list costs a registry read and no process scan.
-        Task.Run(async () =>
-        {
-            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
-            try
-            {
-                while (!_engineCts.Token.IsCancellationRequested)
-                {
-                    await timer.WaitForNextTickAsync(_engineCts.Token);
-
-                    try
-                    {
-                        await EvaluateAppProfilesAsync();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Warn("App profiles: evaluation failed.", ex);
-                    }
-                }
-            }
-            catch (OperationCanceledException) { }
-        });
+        // App profiles: WMI process start/stop events, with a polling fallback only when WMI
+        // refuses the subscription. No periodic process scan in the normal path.
+        StartAppProfileEngine();
     }
 
     private void CleanupResources(bool killUiProcesses)
@@ -1736,6 +1846,8 @@ public class TrayApplication : ApplicationContext
         SafeDispose(_hotkeys, "hotkey registration");
         SafeDispose(_hotkeyChanged, "hotkey change event");
         SafeDispose(_appearanceChanged, "appearance change event");
+        SafeDispose(_appProfileChanged, "app profile change event");
+        SafeDispose(_processWatcher, "process event watcher");
         SafeDispose(_osd, "on-screen display");
         SafeDispose(_uiInvoker, "UI invoker");
         SafeDispose(_gpuManager, "GPU manager");

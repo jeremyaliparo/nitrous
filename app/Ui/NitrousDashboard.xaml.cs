@@ -1512,6 +1512,7 @@ public partial class NitrousDashboard : Window
     {
         if (_appProfilesLoading) return;
         AppProfileStore.SetEnabled(TogAppProfiles.IsChecked == true);
+        AppProfileChangeSignal.Notify();
     }
 
     private void AppRuleProfile_Changed(object sender, SelectionChangedEventArgs e)
@@ -1521,7 +1522,7 @@ public partial class NitrousDashboard : Window
         if (combo.SelectedItem is not ComboBoxItem { Tag: PowerProfile profile }) return;
 
         _appRules[index].Profile = profile;
-        AppProfileStore.Save(_appRules);
+        SaveAppRules();
     }
 
     private void AppRuleFan_Changed(object sender, SelectionChangedEventArgs e)
@@ -1531,7 +1532,7 @@ public partial class NitrousDashboard : Window
         if (combo.SelectedItem is not ComboBoxItem { Tag: AppFanMode fan }) return;
 
         _appRules[index].Fan = fan;
-        AppProfileStore.Save(_appRules);
+        SaveAppRules();
     }
 
     private void AppRuleEnabled_Toggled(object sender, RoutedEventArgs e)
@@ -1540,7 +1541,7 @@ public partial class NitrousDashboard : Window
         if (index < 0 || index >= _appRules.Count) return;
 
         _appRules[index].Enabled = toggle.IsChecked == true;
-        AppProfileStore.Save(_appRules);
+        SaveAppRules();
     }
 
     private void AppRuleRemove_Click(object sender, RoutedEventArgs e)
@@ -1549,7 +1550,7 @@ public partial class NitrousDashboard : Window
         if (index < 0 || index >= _appRules.Count) return;
 
         _appRules.RemoveAt(index);
-        AppProfileStore.Save(_appRules);
+        SaveAppRules();
         BuildAppProfileList();
         UpdateAppProfileStatus("Rule removed.");
     }
@@ -1656,9 +1657,15 @@ public partial class NitrousDashboard : Window
             Enabled = true
         });
 
-        AppProfileStore.Save(_appRules);
+        SaveAppRules();
         BuildAppProfileList();
         UpdateAppProfileStatus($"{executable} added. It takes effect within a few seconds.");
+    }
+
+    private void SaveAppRules()
+    {
+        AppProfileStore.Save(_appRules);
+        AppProfileChangeSignal.Notify();
     }
 
     private void UpdateAppProfileStatus(string message, bool warn = false)
