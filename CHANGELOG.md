@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.6 - 2026-11-28
+
+### Power
+
+- **Process-event restore reconciliation.** WMI can report a packaged app's start as two processes
+  and its stop for only one, leaving the rule's count stale so it never handed the mode back. A stop
+  event now takes one live snapshot before evaluating; start events still use the event count, because
+  a fresh snapshot can arrive before the process is visible. A tray that starts with no matching app
+  also clears a stale active-rule label left by a killed tray.
+
 ## 0.19.0-test.5 - 2026-11-28
 
 ### Appearance
