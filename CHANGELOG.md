@@ -3,6 +3,16 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.19.0-test.2 - 2026-11-28
+
+### Appearance
+
+- **The Nitro toast now renders.** The OSD's card cache keyed on profile, size and accent but not the
+  design; Card and Nitro share the 360 x 96 size, so Nitro reused the cached Card surface. The design
+  is now part of the key, including the status-toast cache. The OSD is drawn by the tray, so the tray
+  must be running this build; a dashboard from a newer build over an older tray will still show the
+  old designs.
+
 ## 0.19.0-test.1 - 2026-11-28
 
 ### Appearance
