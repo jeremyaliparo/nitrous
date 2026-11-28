@@ -18,6 +18,7 @@
 		<CornerRadius x:Key="SurfaceCornerRadius">8</CornerRadius>
 		<CornerRadius x:Key="ChipCornerRadius">6</CornerRadius>
 		<CornerRadius x:Key="MicroCornerRadius">2</CornerRadius>
+		<CornerRadius x:Key="SwatchRingCornerRadius">9</CornerRadius>
 		<CornerRadius x:Key="NavBarCornerRadius">0,0,15,15</CornerRadius>
 		<!-- Scales ComboBox popups with the dashboard; a popup is a separate window and does not inherit the root transform. -->
 		<ScaleTransform x:Key="UiScaleTransform" ScaleX="1" ScaleY="1"/>

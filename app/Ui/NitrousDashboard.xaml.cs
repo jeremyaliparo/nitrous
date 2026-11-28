@@ -711,19 +711,12 @@ public partial class NitrousDashboard : Window
     /// "Pick any colour". A fixed spectrum rather than the current choice, because the row is only
     /// rebuilt on theme change; the selection ring and the rest of the window show what is in use.
     /// </summary>
-    private CornerRadius SwatchCorner =>
-        Resources["ChipCornerRadius"] is CornerRadius radius ? radius : new CornerRadius(6);
-
-    private CornerRadius SwatchRingCorner =>
-        Resources["SurfaceCornerRadius"] is CornerRadius radius ? radius : new CornerRadius(8);
-
     private Button CreateCustomSwatch()
     {
         var inner = new Border
         {
             Width = 22,
             Height = 22,
-            CornerRadius = SwatchCorner,
             Background = new LinearGradientBrush
             {
                 StartPoint = new System.Windows.Point(0, 0),
@@ -743,11 +736,15 @@ public partial class NitrousDashboard : Window
         {
             Width = 28,
             Height = 28,
-            CornerRadius = SwatchRingCorner,
             BorderThickness = new Thickness(2),
             BorderBrush = Brushes.Transparent,
             Child = inner
         };
+
+        // Resource references, not captured values: the swatches must follow the Square corners
+        // toggle while the window is open, not only when they are created.
+        inner.SetResourceReference(Border.CornerRadiusProperty, "ChipCornerRadius");
+        ring.SetResourceReference(Border.CornerRadiusProperty, "SwatchRingCornerRadius");
 
         var button = new Button
         {
@@ -787,7 +784,6 @@ public partial class NitrousDashboard : Window
         {
             Width = 22,
             Height = 22,
-            CornerRadius = SwatchCorner,
             Background = colour is { } c ? new SolidColorBrush(c) : null
         };
 
@@ -811,11 +807,13 @@ public partial class NitrousDashboard : Window
         {
             Width = 28,
             Height = 28,
-            CornerRadius = SwatchRingCorner,
             BorderThickness = new Thickness(2),
             BorderBrush = Brushes.Transparent,
             Child = inner
         };
+
+        inner.SetResourceReference(Border.CornerRadiusProperty, "ChipCornerRadius");
+        ring.SetResourceReference(Border.CornerRadiusProperty, "SwatchRingCornerRadius");
 
         var button = new Button
         {
@@ -968,6 +966,7 @@ public partial class NitrousDashboard : Window
         Resources["SurfaceCornerRadius"] = new CornerRadius(square ? 0 : 8);
         Resources["ChipCornerRadius"] = new CornerRadius(square ? 0 : 6);
         Resources["MicroCornerRadius"] = new CornerRadius(square ? 0 : 2);
+        Resources["SwatchRingCornerRadius"] = new CornerRadius(square ? 0 : 9);
         Resources["NavBarCornerRadius"] = square
             ? new CornerRadius(0)
             : new CornerRadius(0, 0, 15, 15);
