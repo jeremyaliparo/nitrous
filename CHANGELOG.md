@@ -3,6 +3,15 @@
 All notable changes to Nitrous are documented here. The GitHub release for a version is
 published from the matching section of this file.
 
+## 0.17.0-test.7 - 2026-11-28
+
+### Appearance
+
+- **Three toast designs.** `Card` keeps the logo tile and its 360 x 96 card; `Compact` drops the
+  logo for a 300 x 76 card; `Minimal` keeps the caption and mode name in a 240 x 60 pill with the
+  accent dot on the left. The toast size choice (80-120 %) scales whichever design is picked, and
+  status toasts use the same design.
+
 ## 0.17.0-test.6 - 2026-11-28
 
 ### Appearance
